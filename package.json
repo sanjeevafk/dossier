@@ -14,7 +14,8 @@
     "cli": "tsx src/cli.ts",
     "server": "tsx src/server.ts",
     "benchmark": "tsx src/benchmark.ts",
-    "test": "node --test"
+    "test:stress": "tsx src/stress-test.ts",
+    "test": "node --test test/*.test.mjs"
   },
   "keywords": [
     "ai-agent",
