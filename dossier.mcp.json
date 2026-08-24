@@ -1,6 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "mcpServers": {
+    "dossier": {
+      "command": "node",
+      "args": ["dist/mcp-server.js"],
+      "description": "Dossier Adversarial Multi-Agent Idea Intelligence & Stanford CS329A Epistemic Verification Engine"
+    },
     "agent-reach": {
       "command": "agent-reach",
       "args": ["doctor"],
