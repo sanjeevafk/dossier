@@ -5,6 +5,7 @@
 *.local
 !example.env
 scripts/temp_video/
+dossier_demo.mp4
 
 # Python
 __pycache__/
