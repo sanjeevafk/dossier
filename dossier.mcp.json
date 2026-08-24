@@ -1,6 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "mcpServers": {
+    "agent-reach": {
+      "command": "agent-reach",
+      "args": ["doctor"],
+      "description": "Agent Reach social & community intelligence (Reddit, Twitter/X, HackerNews, YouTube, GitHub, V2EX, Jina Web)"
+    },
     "filesystem": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
