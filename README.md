@@ -4,21 +4,21 @@ Adversarial multi-agent idea intelligence platform built on the [TrueForge](http
 
 > **Live Web Application:** [https://dossier-ai.onrender.com](https://dossier-ai.onrender.com)  
 > **Repository:** [https://github.com/sanjeevafk/dossier](https://github.com/sanjeevafk/dossier)  
-> **Demo Video (1080p Full HD):** [Watch Demo Video](https://dossier-ai.onrender.com) *(Also stored locally at `dossier_demo.mp4`)*  
+> **Demo Video (1080p Full HD):** [Watch Demo Video on Google Drive](https://drive.google.com/file/d/1y_5fLjF2D_S4T37TJLz4dXLyKNiB7Zxb/view?usp=sharing)  
 > **Built for:** [WeMakeDevs Agent Harness Hackathon](https://www.wemakedevs.org/hackathons/trueforge) (August 2026).
 
 ---
 
 ## Demo Video
 
-A 75-second high-definition walkthrough demonstrating:
+🎬 **[Watch the 2-Minute High-Definition Demo Video on Google Drive](https://drive.google.com/file/d/1y_5fLjF2D_S4T37TJLz4dXLyKNiB7Zxb/view?usp=sharing)**
+
+A comprehensive walkthrough demonstrating:
 1. **Adversarial Swarm Execution** with domain classification (`VanRakshak` Hardware Robotics).
 2. **Stanford CS329A Epistemic Verification** separating facts from modelled assumptions.
 3. **TrueForge Isolated Python3 Sandbox** executing Exit 0 unit economics simulation.
 4. **Dual-Key Human Approval Checkpoints** enforcing operator authorization.
 5. **Terminal Benchmarks & Stress Tests** (`pnpm run benchmark` & `pnpm run test:stress`).
-
-Local video file: [`dossier_demo.mp4`](./dossier_demo.mp4)
 
 ---
 
