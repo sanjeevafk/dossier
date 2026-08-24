@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Adversarial Multi-Agent Idea Intelligence Platform built on TrueForge",
   "main": "dist/index.js",
+  "bin": {
+    "dossier": "./dist/cli.js",
+    "dossier-mcp": "./dist/mcp-server.js"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -12,6 +16,8 @@
     "start": "tsx src/server.ts",
     "start:prod": "node dist/server.js",
     "cli": "tsx src/cli.ts",
+    "mcp": "tsx src/mcp-server.ts",
+    "mcp:prod": "node dist/mcp-server.js",
     "server": "tsx src/server.ts",
     "benchmark": "tsx src/benchmark.ts",
     "test:stress": "tsx src/stress-test.ts",

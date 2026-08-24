@@ -15,7 +15,7 @@ interface StressTestCase {
   assertion: (result: any) => { passed: boolean; details: string };
 }
 
-async function runStressTestSuite() {
+export async function runStressTestSuite() {
   console.log(pc.bold(pc.cyan("\n=======================================================")));
   console.log(pc.bold(pc.cyan("  🛡️  DOSSIER ADVERSARIAL STRESS & HARNESS EXPLOIT SUITE")));
   console.log(pc.bold(pc.cyan("  Testing Jailbreak Defense, Sandbox Isolation & Fuzzing")));
@@ -222,9 +222,20 @@ ${testResults.map(r => `| **${r.id}** | \`${r.category}\` | **${r.passed ? "PASS
   const reportPath = path.join(process.cwd(), "docs", "STRESS_TEST_RESULTS.md");
   fs.writeFileSync(reportPath, mdReport, "utf-8");
   console.log(pc.green(`✔ Stress test report exported to: ${reportPath}\n`));
+
+  return {
+    totalTests: testResults.length,
+    passedTests: testResults.filter(r => r.passed).length,
+    failedTests: testResults.filter(r => !r.passed).length,
+    overallPassRate: allPassed ? "100%" : "FAILED",
+    durationSec: totalRuntimeSec,
+    results: testResults
+  };
 }
 
-runStressTestSuite().catch(err => {
-  console.error("Stress Test Suite Failed:", err);
-  process.exit(1);
-});
+if (process.argv[1] && process.argv[1].includes("stress-test")) {
+  runStressTestSuite().catch(err => {
+    console.error("Stress Test Suite Failed:", err);
+    process.exit(1);
+  });
+}

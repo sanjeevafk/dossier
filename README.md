@@ -117,9 +117,49 @@ pnpm cli evaluate \
   --cac 200
 ```
 
-### Run Tests
+### Run Tests & Adversarial Stress Suite
 ```bash
-pnpm test
+pnpm test          # Node.js standard test suite
+pnpm run test:stress # 5-invariant adversarial harness exploit suite
+pnpm run benchmark   # 10-concept domain resilience benchmark
+```
+
+---
+
+## Model Context Protocol (MCP) & Agent Skill
+
+Dossier is packaged as both a **standalone MCP server** and an **Agent Skill** (`skills/dossier/SKILL.md`) that any agent framework (Claude Code, Cursor, Goose, TrueForge, OpenAI Swarm) can plug into.
+
+### 1. Connecting via MCP (`dossier.mcp.json`)
+
+Add Dossier to your Claude Desktop config (`claude_desktop_config.json`) or harness MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "dossier": {
+      "command": "node",
+      "args": ["/path/to/dossier/dist/mcp-server.js"],
+      "env": {
+        "ORCAROUTER_API_KEY": "your_api_key_here",
+        "MODEL_NAME": "openai/gpt-4o-mini"
+      }
+    }
+  }
+}
+```
+
+#### Exposed MCP Tools:
+- **`evaluate_idea`**: Deploys the 6-agent domain swarm, runs Stanford CS329A epistemic verification, isolated Python unit economics simulation, and compiles full intelligence dossiers.
+- **`stress_test_concept`**: Evaluates prompt injection defense, impossible physics detection, and sandbox isolation.
+- **`run_sandbox_economics`**: Executes isolated Python 3 subprocesses to deterministically compute LTV, CAC, and payback bounds.
+- **`verify_claims_epistemics`**: Classifies claims into the 7 Stanford epistemic states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
+
+### 2. Installing the Agent Skill
+
+To install Dossier as a native skill in your agent environment:
+```bash
+cp -r skills/dossier ~/.agents/skills/
 ```
 
 ---
@@ -127,3 +167,4 @@ pnpm test
 ## License
 
 MIT (c) [sanjeevafk](https://github.com/sanjeevafk)
+
