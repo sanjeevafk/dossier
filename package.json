@@ -1,7 +1,7 @@
 {
-  "name": "idea-swarm",
+  "name": "dossier-ai",
   "version": "0.1.0",
-  "description": "Adversarial Multi-Agent Idea Validation Platform built on TrueForge",
+  "description": "Adversarial Multi-Agent Idea Intelligence Platform built on TrueForge",
   "main": "dist/index.js",
   "type": "module",
   "engines": {

@@ -15,7 +15,7 @@ const orchestrator = new IdeaSwarmOrchestrator();
 
 // Health check
 app.get("/health", (req: Request, res: Response) => {
-  res.json({ status: "ok", service: "idea-swarm-trueforge", timestamp: new Date().toISOString() });
+  res.json({ status: "ok", service: "dossier-trueforge", timestamp: new Date().toISOString() });
 });
 
 // Evaluate endpoint
@@ -66,7 +66,7 @@ app.post("/api/approval/:actionId", (req: Request, res: Response) => {
 
 if (process.env.NODE_ENV !== "test") {
   app.listen(port, () => {
-    console.log(`⚡ Idea Swarm Server listening on http://localhost:${port}`);
+    console.log(`⚡ Dossier Intelligence Server listening on http://localhost:${port}`);
   });
 }
 
