@@ -14,6 +14,7 @@ import {
 import { SWARM_ROLES } from "../config/prompts.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
+import { queryPolymarketMarkets } from "../tools/polymarket.js";
 import { generateAgentTurn } from "../services/llm.js";
 
 export interface SwarmExecutionOptions {
@@ -102,12 +103,15 @@ Market Context: ${marketContext}`;
     notify("01 INGEST", `Ingesting target concept "${idea.title}" into TrueForge execution runtime...`);
     notify("02 DECOMPOSE", "Decomposing assumptions, technical dependencies, and market variables...");
 
-    const marketResearch = await performMarketResearch(idea.title, [
-      idea.targetAudience,
-      idea.monetization
+    const [marketResearch, polymarketSignals] = await Promise.all([
+      performMarketResearch(idea.title, [
+        idea.targetAudience,
+        idea.monetization
+      ]),
+      queryPolymarketMarkets(idea.title)
     ]);
 
-    const marketContext = `Competitors: ${marketResearch.identifiedCompetitors.map(c => c.name).join(", ")}. Signals: ${marketResearch.marketSignals.join("; ")}`;
+    const marketContext = `Competitors: ${marketResearch.identifiedCompetitors.map(c => c.name).join(", ")}. Signals: ${marketResearch.marketSignals.join("; ")}. Polymarket Macro: ${polymarketSignals.keyTakeaway}`;
 
     notify("03 INVESTIGATE", "Deploying 6 specialized subagents across parallel recon threads...");
 
@@ -432,6 +436,7 @@ Market Context: ${marketContext}`;
       keyAssumptions,
       contradictions,
       evidenceFeed,
+      predictionMarkets: polymarketSignals,
       debateTrail,
       simulation: {
         cacEstimateUsd: sandboxSim.metrics.cacEstimateUsd,
