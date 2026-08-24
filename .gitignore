@@ -4,6 +4,7 @@
 *.env
 *.local
 !example.env
+scripts/temp_video/
 
 # Python
 __pycache__/
