@@ -84,18 +84,23 @@ export interface Contradiction {
   guidance: string;
 }
 
-export type EpistemicTier = 
-  | "VERIFIED_FACT"        // Empirical real-world ground truth (Polymarket odds, official regulations, live competitor data)
-  | "VERIFIED_COMPUTATION" // Deterministic sandbox math (Python3 isolated subprocess exit 0)
-  | "MODELLED_ASSUMPTION"  // Explicit hypotheses not yet validated with empirical trials
-  | "UNKNOWN_CRITICAL";    // Unquantified black-box risk
+export type EpistemicState = 
+  | "VERIFIED_FACT"        // Independently verified empirical ground truth (official regulations, confirmed competitor data)
+  | "VERIFIED_COMPUTATION" // Deterministic computation executed in isolated environment (Python3 subprocess exit 0) — input assumptions remain separately labelled
+  | "EXTERNAL_EVIDENCE"    // Sourced external data that has not been independently verified (Polymarket Gamma odds, community recon)
+  | "MODELLED_ASSUMPTION"  // Explicit hypotheses & projections not yet tested with empirical field trials
+  | "INFERENCE"            // Deductions drawn by an agent based on models or domain analogies
+  | "UNKNOWN"              // Unquantified black-box risk or missing parameter
+  | "CONTRADICTED";        // Disproved or conflicting claims with direct counter-evidence
+
+export type EpistemicTier = EpistemicState; // Backward-compatible alias
 
 export interface EvidenceItem {
   id: string;
   claim: string;
-  tier: EpistemicTier;
-  claimType: EpistemicTier; // Backwards compatible alias
-  provenance: string; // e.g. "Polymarket Gamma API", "Agent Reach", "Python3 Sandbox"
+  tier: EpistemicState;
+  claimType: EpistemicState; // Backwards compatible alias
+  provenance: string; // e.g. "Polymarket Gamma API", "Agent Reach", "Python3 Sandbox", "Official DGCA Standard"
   indicator: "SUPPORTING" | "CONTRADICTING" | "NEUTRAL";
   confidencePercent: number; // 0 to 100
   falsificationCriteria?: string;
@@ -104,7 +109,8 @@ export interface EvidenceItem {
 export interface ScoreFactor {
   impact: number; // e.g. +30 or -15
   description: string;
-  groundingTier: EpistemicTier;
+  groundingTier: EpistemicState;
+  riskMitigationVerdict?: "MITIGATES_RISK" | "PARTIAL_MITIGATION" | "DOES_NOT_MITIGATE";
 }
 
 export interface DimensionScoreTrace {
@@ -116,9 +122,13 @@ export interface DimensionScoreTrace {
 export interface EpistemicTaxonomySummary {
   verifiedFactsCount: number;
   verifiedComputationsCount: number;
+  externalEvidenceCount: number;
   modelledAssumptionsCount: number;
+  inferencesCount: number;
   unknownsCount: number;
+  contradictionsCount: number;
   hasUnvalidatedFatalAssumptions: boolean;
+  hasUnresolvedUnknownsOrContradictions: boolean;
 }
 
 export type ValidationVerdict = "BUILD" | "BUILD_IF_VALIDATED" | "REFINE" | "KILL";
