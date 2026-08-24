@@ -7,6 +7,33 @@ export type SwarmRole =
   | "expert"
   | "synthesizer";
 
+export type IdeaDomainArchetype =
+  | "b2b_saas"
+  | "b2g_govtech"
+  | "healthcare_clinical"
+  | "hardware_robotics"
+  | "consumer_social"
+  | "deeptech_research"
+  | "web3_defi"
+  | "general_startup";
+
+export interface DomainClassification {
+  archetype: IdeaDomainArchetype;
+  archetypeLabel: string;
+  primaryCustomer: string;
+  procurementCycle: string;
+  regulatoryEnvironment: string;
+  unitEconomicsModel: string;
+  specialistRoleLabels: {
+    analyst: { number: string; title: string; mandate: string };
+    customer: { number: string; title: string; mandate: string };
+    architect: { number: string; title: string; mandate: string };
+    investor: { number: string; title: string; mandate: string };
+    redteam: { number: string; title: string; mandate: string };
+    expert: { number: string; title: string; mandate: string };
+  };
+}
+
 export interface IdeaInput {
   title: string;
   summary: string;
@@ -44,6 +71,7 @@ export interface KeyAssumption {
   statement: string;
   evidenceStatus: "VERIFIED" | "UNVERIFIED" | "HIGH_RISK" | "REJECTED";
   riskLevel: RiskLevel;
+  disproofCondition: string;
 }
 
 export interface Contradiction {
@@ -59,14 +87,16 @@ export interface Contradiction {
 export interface EvidenceItem {
   id: string;
   claim: string;
-  source: string;
+  claimType: "VERIFIED_COMPUTATION" | "EMPIRICAL_EVIDENCE" | "UNVERIFIED_ASSUMPTION";
+  provenance: string; // e.g. "Polymarket Gamma API", "Agent Reach", "Python3 Sandbox"
   indicator: "SUPPORTING" | "CONTRADICTING" | "NEUTRAL";
-  confidence: string; // e.g. "84%"
+  confidencePercent: number; // 0 to 100
 }
 
 export interface DebateChallenge {
   challenger: SwarmRole;
   target: SwarmRole;
+  round: number; // 1 or 2
   challengePoint: string;
   rebuttal?: string;
   status: "OPEN" | "REBUTTED" | "CONCEDED";
@@ -88,11 +118,36 @@ export interface SimulationResult {
 
 export interface ApprovalAction {
   id: string;
-  actionType: "COLD_OUTREACH_EMAIL" | "SMOKE_TEST_LANDING_PAGE" | "COMMUNITY_POST" | "SURVEY_DISTRIBUTION";
+  actionType: "COLD_OUTREACH_EMAIL" | "SMOKE_TEST_LANDING_PAGE" | "COMMUNITY_POST" | "SURVEY_DISTRIBUTION" | "PILOT_LOI_DRAFT";
   summary: string;
   payload: Record<string, any>;
   requiresApproval: true;
   status: "PENDING_HUMAN_APPROVAL" | "APPROVED" | "REJECTED";
+}
+
+export interface ResilienceScoreBreakdown {
+  technicalFeasibility: number; // 20%
+  demandAndAdoption: number; // 25%
+  economicsAndCapitalEfficiency: number; // 20%
+  defensibilityAndMoat: number; // 15%
+  adversarialResilience: number; // 20%
+  compositeScore: number; // 0 to 100
+  dimensionRationales: {
+    technicalFeasibility: string;
+    demandAndAdoption: string;
+    economicsAndCapitalEfficiency: string;
+    defensibilityAndMoat: string;
+    adversarialResilience: string;
+  };
+}
+
+export interface CheapestValidationExperiment {
+  title: string;
+  description: string;
+  estimatedCostUsd: number;
+  timeToExecuteDays: number;
+  successMetric: string;
+  failureKillSignal: string;
 }
 
 export interface IdeaDossier {
@@ -100,7 +155,8 @@ export interface IdeaDossier {
   dossierCode: string; // e.g. "TF-007"
   timestamp: string;
   idea: IdeaInput;
-  killScore: number; // 0 to 100
+  domainClassification: DomainClassification;
+  killScore: number; // 0 to 100 (composite resilience score)
   confidenceScore: number; // e.g. 78%
   overallVerdict: "BUILD" | "REFINE" | "KILL";
   riskLevel: RiskLevel;
@@ -109,6 +165,16 @@ export interface IdeaDossier {
   keyAssumptions: KeyAssumption[];
   contradictions: Contradiction[];
   evidenceFeed: EvidenceItem[];
+  strongestEvidence: EvidenceItem;
+  weakestAssumption: {
+    id: string;
+    statement: string;
+    fatalRisk: string;
+    disproofThreshold: string;
+  };
+  killConditions: string[];
+  cheapestValidationExperiment: CheapestValidationExperiment;
+  resilienceBreakdown: ResilienceScoreBreakdown;
   predictionMarkets?: {
     source: string;
     macroSentiment: string;

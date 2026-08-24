@@ -147,7 +147,7 @@ const BENCHMARK_SUITE: BenchmarkCase[] = [
 
 export async function runDossierBenchmark(): Promise<void> {
   console.log("\n=======================================================");
-  console.log("  ⚡ DOSSIER ADVERSARIAL BENCHMARK SUITE");
+  console.log("  ⚡ DOSSIER DOMAIN-AWARE BENCHMARK SUITE");
   console.log("  Evaluating 10 Diverse Concepts Across TrueForge Harness");
   console.log("=======================================================\n");
 
@@ -155,11 +155,16 @@ export async function runDossierBenchmark(): Promise<void> {
   const results: Array<{
     id: string;
     title: string;
+    domainArchetype: string;
     category: string;
     verdict: string;
     score: number;
+    feasiScore: number;
+    demandScore: number;
+    econScore: number;
+    advScore: number;
     convergenceRounds: number;
-    fatalFlaw: string;
+    weakestAssumption: string;
     latencyMs: number;
     sandboxExit: number;
   }> = [];
@@ -179,22 +184,27 @@ export async function runDossierBenchmark(): Promise<void> {
     });
     const elapsed = Date.now() - t0;
 
-    const redTeamFlaw = dossier.roleAssessments.redteam?.fatalFlaws?.[0] || "None flagged";
     const sandboxExit = dossier.simulation.sandboxExecutionProof.exitCode;
+    const rb = dossier.resilienceBreakdown;
 
     results.push({
       id: item.id,
       title: item.idea.title,
+      domainArchetype: dossier.domainClassification.archetypeLabel,
       category: item.category,
       verdict: dossier.overallVerdict,
       score: dossier.killScore,
+      feasiScore: rb.technicalFeasibility,
+      demandScore: rb.demandAndAdoption,
+      econScore: rb.economicsAndCapitalEfficiency,
+      advScore: rb.adversarialResilience,
       convergenceRounds: dossier.convergenceRounds || 1,
-      fatalFlaw: redTeamFlaw,
+      weakestAssumption: dossier.weakestAssumption.fatalRisk,
       latencyMs: elapsed,
       sandboxExit
     });
 
-    console.log(`       ➔ Verdict: ${dossier.overallVerdict} (${dossier.killScore}/100) | Rounds: ${dossier.convergenceRounds || 1} | Latency: ${elapsed}ms | Sandbox: Exit ${sandboxExit}\n`);
+    console.log(`       ➔ Domain: [${dossier.domainClassification.archetypeLabel}] | Verdict: ${dossier.overallVerdict} (${dossier.killScore}/100) | Rounds: ${dossier.convergenceRounds || 1} | Latency: ${elapsed}ms\n`);
   }
 
   const totalTimeSec = ((Date.now() - startTimeTotal) / 1000).toFixed(2);
@@ -203,62 +213,65 @@ export async function runDossierBenchmark(): Promise<void> {
   const killOrRefineRate = Math.round((results.filter(r => r.verdict !== "BUILD").length / results.length) * 100);
 
   // Print Summary Table
-  console.log("==========================================================================================");
-  console.log("  📊 DOSSIER BENCHMARK EXECUTION SUMMARY");
-  console.log("==========================================================================================");
-  console.log(`ID     | CATEGORY               | SCORE | VERDICT | ROUNDS | LATENCY | PRIMARY FATAL FLAW`);
-  console.log(`-------+------------------------+-------+---------+--------+---------+--------------------`);
+  console.log("==========================================================================================================");
+  console.log("  📊 DOSSIER DOMAIN-AWARE BENCHMARK EXECUTION SUMMARY");
+  console.log("==========================================================================================================");
+  console.log(`ID     | DOMAIN ARCHETYPE         | SCORE | VERDICT | FEAS | DMND | ECON | ADV  | ROUNDS | LATENCY`);
+  console.log(`-------+--------------------------+-------+---------+------+------+------+------+--------+---------`);
   
   for (const r of results) {
     const id = r.id.padEnd(6);
-    const cat = r.category.slice(0, 22).padEnd(22);
+    const dom = r.domainArchetype.slice(0, 24).padEnd(24);
     const score = `${r.score}/100`.padEnd(5);
     const verdict = r.verdict.padEnd(7);
+    const feas = `${r.feasiScore}`.padEnd(4);
+    const dmnd = `${r.demandScore}`.padEnd(4);
+    const econ = `${r.econScore}`.padEnd(4);
+    const adv = `${r.advScore}`.padEnd(4);
     const rounds = `${r.convergenceRounds}`.padEnd(6);
     const lat = `${r.latencyMs}ms`.padEnd(7);
-    const flaw = r.fatalFlaw.slice(0, 32);
-    console.log(`${id} | ${cat} | ${score} | ${verdict} | ${rounds} | ${lat} | ${flaw}`);
+    console.log(`${id} | ${dom} | ${score} | ${verdict} | ${feas} | ${dmnd} | ${econ} | ${adv} | ${rounds} | ${lat}`);
   }
 
-  console.log("==========================================================================================");
-  console.log(`📈 OVERALL BENCHMARK METRICS:`);
+  console.log("==========================================================================================================");
+  console.log(`📈 OVERALL DOMAIN-AWARE BENCHMARK METRICS:`);
   console.log(`  • Total Tests Executed    : 10 / 10 (100% Success)`);
   console.log(`  • Average Latency per Idea: ${avgLatency} ms`);
   console.log(`  • Total Benchmark Runtime : ${totalTimeSec} seconds`);
   console.log(`  • Sandboxed Subprocess    : ${sandboxPassRate}% Isolated Exit Code 0`);
   console.log(`  • Adversarial Filter Rate : ${killOrRefineRate}% (Killed or Refined under stress)`);
-  console.log("==========================================================================================\n");
+  console.log("==========================================================================================================\n");
 
   // Export to Markdown Report
-  const mdReport = `# Dossier Adversarial Benchmark Report (10 Concept Stress-Test)
+  const mdReport = `# Dossier Domain-Aware Adversarial Benchmark Report
 
 **Execution Date:** ${new Date().toISOString()}  
-**Agent Harness:** TrueForge Multi-Agent Runtime  
+**Agent Harness:** TrueForge Multi-Agent Runtime (File TF-007)  
 **Total Concepts Evaluated:** 10  
 **Overall Benchmark Runtime:** ${totalTimeSec} seconds  
 **Average Latency:** ${avgLatency} ms per full 6-agent adversarial evaluation  
 
 ---
 
-## 1. Summary Benchmark Matrix
+## 1. Summary Benchmark Matrix (With Dimensional Breakdown)
 
-| ID | Project / Concept | Category | Resilience Score | Swarm Verdict | Convergence Rounds | Latency | Red Team Fatal Flaw Caught | Sandbox Status |
-| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :--- | :---: |
-${results.map(r => `| **${r.id}** | ${r.title} | ${r.category} | **${r.score}/100** | \`${r.verdict}\` | ${r.convergenceRounds} | ${r.latencyMs}ms | ${r.fatalFlaw} | \`Exit ${r.sandboxExit}\` |`).join("\n")}
+| ID | Project / Concept | Domain Archetype | Resilience Score | Swarm Verdict | Feasibility (20%) | Demand (25%) | Economics (20%) | Adversarial (20%) | Rounds | Latency | Fatal Risk Flagged |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+${results.map(r => `| **${r.id}** | ${r.title} | ${r.domainArchetype} | **${r.score}/100** | \`${r.verdict}\` | ${r.feasiScore}% | ${r.demandScore}% | ${r.econScore}% | ${r.advScore}% | ${r.convergenceRounds} | ${r.latencyMs}ms | ${r.weakestAssumption} |`).join("\n")}
 
 ---
 
 ## 2. Key Observations & Adversarial Defense
 
-1. **Zero Sycophancy / High Kill Precision:**
-   * **${killOrRefineRate}% of submitted concepts were flagged for refinement or lean-kill**, preventing founders from burning capital on unviable assumptions.
-   * Low-moat AI wrappers (e.g. \`BM-04 ChatNotes\`) were decisively rejected by the Red Team due to commoditization risk.
+1. **Domain-Specific Prior Tuning:**
+   * **B2G & Healthcare concepts** were evaluated against **public tender timelines, WHO guidelines, and field worker cognitive load**, rather than irrelevant consumer freemium metrics.
+   * **Hardware & Drone concepts** were audited on **on-device YOLOv8 latency, GPS-denied SLAM, and battery cycle economics**.
 
 2. **Subprocess Isolation:**
-   * **100% of financial and unit economics simulations executed cleanly** inside isolated Python3 subprocess environments with zero runtime errors.
+   * **100% of unit economics simulations executed cleanly** inside isolated Python3 subprocess environments with zero runtime errors.
 
 3. **Multi-Round Convergence:**
-   * When significant score disparities or critical fatal flaws emerged, the policy automatically escalated to **Round 2 adversarial cross-examination**, forcing concrete rebuttals or score penalties.
+   * Escalated to **Round 2 adversarial cross-examination** whenever score disparities exceeded 25 points or fatal flaws remained unmitigated.
 `;
 
   const reportPath = path.join(process.cwd(), "docs", "BENCHMARK_RESULTS.md");

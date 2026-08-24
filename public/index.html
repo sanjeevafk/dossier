@@ -504,35 +504,91 @@
           <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-bordercol pb-6">
             <div>
               <div class="flex items-center gap-3 mb-2 font-mono text-xs">
-                <span class="classified-stamp-small text-crimsonacc border-crimsonacc">CLASSIFIED BRIEF</span>
+                <span class="classified-stamp-small text-crimsonacc border-crimsonacc">EVIDENCE-FIRST DOSSIER</span>
                 <span class="text-zinc-500" id="resDossierCode">DOSSIER // TF-007</span>
                 <span class="text-emeraldacc" id="resDossierStatus">STATUS: COMPILED</span>
               </div>
               <h2 id="resSubjectTitle" class="font-display text-3xl font-extrabold text-bone tracking-tight mt-1">AI STUDY COMPANION</h2>
-              <p id="resExecutiveSummary" class="text-xs md:text-sm text-zinc-300 mt-2.5 max-w-2xl font-sans leading-relaxed"></p>
+              
+              <!-- Domain Classification Badge Row -->
+              <div id="resDomainBanner" class="mt-3 inline-flex flex-wrap items-center gap-2 font-mono text-[11px] p-2 bg-panel rounded border border-bordercol">
+                <span class="text-amberacc font-bold" id="resDomainArchetype">DOMAIN: HEALTHCARE</span>
+                <span class="text-zinc-600">•</span>
+                <span class="text-zinc-400" id="resDomainCustomer">CUSTOMER: FRONT-LINE CHW</span>
+                <span class="text-zinc-600">•</span>
+                <span class="text-zinc-400" id="resDomainCycle">CYCLE: 6-12 MO B2G</span>
+              </div>
+
+              <p id="resExecutiveSummary" class="text-xs md:text-sm text-zinc-300 mt-3 max-w-3xl font-sans leading-relaxed"></p>
             </div>
 
             <div class="flex sm:flex-row md:flex-col gap-3 shrink-0">
-              <div class="bg-panel border border-bordercol p-4 rounded text-center md:text-right min-w-[150px]">
-                <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block">VERDICT</span>
+              <div class="bg-panel border border-bordercol p-4 rounded text-center md:text-right min-w-[160px]">
+                <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block">OVERALL VERDICT</span>
                 <span id="resVerdictBadge" class="font-mono text-2xl font-black text-amberacc mt-0.5 block">REFINE</span>
               </div>
-              <div class="bg-panel border border-bordercol p-3 rounded text-center md:text-right min-w-[150px] font-mono text-xs">
-                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">CONFIDENCE:</span><span id="resConfidence" class="text-bone font-bold">78%</span></div>
+              <div class="bg-panel border border-bordercol p-3 rounded text-center md:text-right min-w-[160px] font-mono text-xs">
+                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RESILIENCE:</span><span id="resScoreVal" class="text-amberacc font-bold">68/100</span></div>
+                <div class="flex justify-between md:justify-end gap-3 mt-1"><span class="text-zinc-500">CONFIDENCE:</span><span id="resConfidence" class="text-bone font-bold">78%</span></div>
                 <div class="flex justify-between md:justify-end gap-3 mt-1"><span class="text-zinc-500">RISK:</span><span id="resRiskLevel" class="text-amberacc font-bold">MEDIUM</span></div>
               </div>
             </div>
           </div>
 
-          <!-- Consensus Grid -->
+          <!-- 5-Dimensional Resilience Breakdown -->
           <div>
-            <h3 class="font-mono text-xs font-bold text-bone uppercase tracking-wider mb-3">AGENT CONSENSUS BREAKDOWN</h3>
+            <h3 class="font-mono text-xs font-bold text-bone uppercase tracking-wider mb-3">TRANSPARENT 5-DIMENSIONAL RESILIENCE SCORE</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono text-xs" id="resilienceGrid"></div>
+          </div>
+
+          <!-- Domain Specialist Agent Consensus Grid -->
+          <div>
+            <h3 class="font-mono text-xs font-bold text-bone uppercase tracking-wider mb-3">DOMAIN SPECIALIST AGENT RECON</h3>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs" id="consensusGrid"></div>
           </div>
 
-          <!-- Contradictions Clash -->
+          <!-- Evidence & Weakest Assumption Row -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
+            <div class="p-4 bg-panel border border-emeraldacc/40 rounded space-y-2">
+              <div class="flex items-center justify-between text-emeraldacc font-bold">
+                <span>🔬 STRONGEST VERIFIED EVIDENCE</span>
+                <span id="strongestEvidenceType" class="text-[9px] px-1.5 py-0.5 rounded bg-emeraldacc/10">VERIFIED</span>
+              </div>
+              <p id="strongestEvidenceText" class="text-zinc-200 text-[11px] leading-relaxed"></p>
+              <div id="strongestEvidenceProv" class="text-[10px] text-zinc-500 italic"></div>
+            </div>
+
+            <div class="p-4 bg-panel border border-crimsonacc/40 rounded space-y-2">
+              <div class="flex items-center justify-between text-crimsonacc font-bold">
+                <span>⚠️ WEAKEST FATAL ASSUMPTION</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-crimsonacc/10">CRITICAL RISK</span>
+              </div>
+              <p id="weakestAssumptionText" class="text-zinc-200 text-[11px] leading-relaxed"></p>
+              <div id="weakestAssumptionDisproof" class="text-[10px] text-amberacc/90"></div>
+            </div>
+          </div>
+
+          <!-- Kill Conditions & Cheapest Validation Experiment Row -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
+            <div class="p-4 bg-panel border border-bordercol rounded space-y-2.5">
+              <div class="text-crimsonacc font-bold">💀 STRICT KILL CONDITIONS (FALSIFIABLE)</div>
+              <ul id="killConditionsList" class="space-y-1 text-zinc-300 text-[11px] list-disc list-inside"></ul>
+            </div>
+
+            <div class="p-4 bg-panel border border-amberacc/40 rounded space-y-2.5">
+              <div class="text-amberacc font-bold">🧪 CHEAPEST VALIDATION EXPERIMENT</div>
+              <div id="cheapestExpTitle" class="font-bold text-bone text-xs"></div>
+              <p id="cheapestExpDesc" class="text-zinc-300 text-[11px]"></p>
+              <div class="flex justify-between items-center text-[10px] pt-1 border-t border-bordercol/60 text-zinc-400">
+                <span id="cheapestExpCostTime">Cost: $0 | Time: 4 Days</span>
+                <span id="cheapestExpMetric" class="text-emeraldacc font-bold"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Unresolved Contradictions Clash -->
           <div>
-            <h3 class="font-mono text-xs font-bold text-amberacc uppercase tracking-wider mb-3">UNRESOLVED CONTRADICTIONS</h3>
+            <h3 class="font-mono text-xs font-bold text-amberacc uppercase tracking-wider mb-3">UNRESOLVED CONTRADICTIONS &amp; REBUTTALS</h3>
             <div id="contradictionsList" class="space-y-3 font-mono text-xs"></div>
           </div>
 
@@ -735,11 +791,54 @@
       document.getElementById('resExecutiveSummary').textContent = dossier.executiveSummary;
       document.getElementById('resConfidence').textContent = `${dossier.confidenceScore}%`;
       document.getElementById('resRiskLevel').textContent = dossier.riskLevel;
+      if (document.getElementById('resScoreVal')) {
+        document.getElementById('resScoreVal').textContent = `${dossier.killScore}/100`;
+      }
+
+      // Domain Banner
+      if (dossier.domainClassification) {
+        document.getElementById('resDomainArchetype').textContent = `DOMAIN: ${dossier.domainClassification.archetypeLabel.toUpperCase()}`;
+        document.getElementById('resDomainCustomer').textContent = `CUSTOMER: ${dossier.domainClassification.primaryCustomer}`;
+        document.getElementById('resDomainCycle').textContent = `CYCLE: ${dossier.domainClassification.procurementCycle}`;
+      }
 
       const verdictBadge = document.getElementById('resVerdictBadge');
       verdictBadge.textContent = dossier.overallVerdict;
       verdictBadge.className = dossier.overallVerdict === 'BUILD' ? 'font-mono text-2xl font-black text-emeraldacc mt-0.5 block' :
         (dossier.overallVerdict === 'REFINE' ? 'font-mono text-2xl font-black text-amberacc mt-0.5 block' : 'font-mono text-2xl font-black text-crimsonacc mt-0.5 block');
+
+      // Render 5-Dimensional Resilience Breakdown
+      const resilienceGrid = document.getElementById('resilienceGrid');
+      if (resilienceGrid && dossier.resilienceBreakdown) {
+        const rb = dossier.resilienceBreakdown;
+        resilienceGrid.innerHTML = `
+          <div class="p-3 bg-panel rounded border border-bordercol">
+            <div class="text-[10px] text-zinc-400 uppercase">Feasibility (20%)</div>
+            <div class="text-base font-extrabold text-emeraldacc mt-0.5">${rb.technicalFeasibility}%</div>
+            <div class="text-[9px] text-zinc-500 mt-1">Process isolation &amp; latency</div>
+          </div>
+          <div class="p-3 bg-panel rounded border border-bordercol">
+            <div class="text-[10px] text-zinc-400 uppercase">Demand &amp; Adoption (25%)</div>
+            <div class="text-base font-extrabold text-amberacc mt-0.5">${rb.demandAndAdoption}%</div>
+            <div class="text-[9px] text-zinc-500 mt-1">User urgency vs inertia</div>
+          </div>
+          <div class="p-3 bg-panel rounded border border-bordercol">
+            <div class="text-[10px] text-zinc-400 uppercase">Economics &amp; CAC (20%)</div>
+            <div class="text-base font-extrabold text-emeraldacc mt-0.5">${rb.economicsAndCapitalEfficiency}%</div>
+            <div class="text-[9px] text-zinc-500 mt-1">LTV/CAC &amp; margin payback</div>
+          </div>
+          <div class="p-3 bg-panel rounded border border-bordercol">
+            <div class="text-[10px] text-zinc-400 uppercase">Defensibility (15%)</div>
+            <div class="text-base font-extrabold text-cyan-400 mt-0.5">${rb.defensibilityAndMoat}%</div>
+            <div class="text-[9px] text-zinc-500 mt-1">Regulatory &amp; workflow moat</div>
+          </div>
+          <div class="p-3 bg-panel rounded border border-bordercol">
+            <div class="text-[10px] text-zinc-400 uppercase">Adversarial (20%)</div>
+            <div class="text-base font-extrabold text-crimsonacc mt-0.5">${rb.adversarialResilience}%</div>
+            <div class="text-[9px] text-zinc-500 mt-1">Red team attack resilience</div>
+          </div>
+        `;
+      }
 
       // Render Consensus Grid
       const consensusGrid = document.getElementById('consensusGrid');
@@ -755,6 +854,38 @@
           <div class="text-[9px] text-zinc-400 uppercase mt-0.5">${info.verdict}</div>
         `;
         consensusGrid.appendChild(box);
+      }
+
+      // Render Strongest Evidence & Weakest Assumption
+      if (dossier.strongestEvidence) {
+        document.getElementById('strongestEvidenceType').textContent = dossier.strongestEvidence.claimType;
+        document.getElementById('strongestEvidenceText').textContent = `"${dossier.strongestEvidence.claim}"`;
+        document.getElementById('strongestEvidenceProv').textContent = `Provenance: ${dossier.strongestEvidence.provenance} (Confidence: ${dossier.strongestEvidence.confidencePercent}%)`;
+      }
+
+      if (dossier.weakestAssumption) {
+        document.getElementById('weakestAssumptionText').textContent = `"${dossier.weakestAssumption.statement}" — Fatal Risk: ${dossier.weakestAssumption.fatalRisk}`;
+        document.getElementById('weakestAssumptionDisproof').textContent = `Disproof Trigger: ${dossier.weakestAssumption.disproofThreshold}`;
+      }
+
+      // Render Kill Conditions
+      const killList = document.getElementById('killConditionsList');
+      if (killList && dossier.killConditions) {
+        killList.innerHTML = '';
+        dossier.killConditions.forEach(cond => {
+          const li = document.createElement('li');
+          li.textContent = cond;
+          killList.appendChild(li);
+        });
+      }
+
+      // Render Cheapest Validation Experiment
+      if (dossier.cheapestValidationExperiment) {
+        const exp = dossier.cheapestValidationExperiment;
+        document.getElementById('cheapestExpTitle').textContent = exp.title;
+        document.getElementById('cheapestExpDesc').textContent = exp.description;
+        document.getElementById('cheapestExpCostTime').textContent = `Cost: $${exp.estimatedCostUsd} | Time: ${exp.timeToExecuteDays} Days`;
+        document.getElementById('cheapestExpMetric').textContent = `Success: ${exp.successMetric}`;
       }
 
       // Render Contradictions
@@ -778,19 +909,19 @@
       const approvalList = document.getElementById('approvalList');
       approvalList.innerHTML = '';
       dossier.approvalGates.forEach(gate => {
-        const gDiv = document.createElement('div');
-        gDiv.className = 'p-3 bg-bgdark rounded border border-bordercol flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs';
-        gDiv.innerHTML = `
+        const item = document.createElement('div');
+        item.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-panel rounded border border-bordercol';
+        item.innerHTML = `
           <div>
-            <div class="text-[10px] text-amberacc font-bold uppercase mb-0.5">${gate.actionType}</div>
-            <p class="text-xs text-bone font-sans">${gate.summary}</p>
+            <div class="text-bone font-mono text-xs font-bold">${gate.summary}</div>
+            <div class="text-zinc-500 font-mono text-[10px] uppercase mt-0.5">Action: ${gate.actionType} • Dual-Key Safety: Active</div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <button onclick="handleApproval('${gate.id}', 'APPROVE')" class="px-3 py-1 bg-emeraldacc text-black font-bold uppercase text-[10px] rounded">AUTHORIZE</button>
-            <button onclick="handleApproval('${gate.id}', 'REJECT')" class="px-3 py-1 bg-zinc-800 hover:bg-crimsonacc text-zinc-300 hover:text-white font-bold uppercase text-[10px] rounded">VETO</button>
+            <button onclick="handleApprovalAction('${gate.id}', 'APPROVED')" class="px-3 py-1.5 bg-emeraldacc/20 hover:bg-emeraldacc/30 text-emeraldacc border border-emeraldacc/40 font-mono text-xs font-bold rounded transition">AUTHORIZE</button>
+            <button onclick="handleApprovalAction('${gate.id}', 'REJECTED')" class="px-3 py-1.5 bg-crimsonacc/20 hover:bg-crimsonacc/30 text-crimsonacc border border-crimsonacc/40 font-mono text-xs font-bold rounded transition">VETO</button>
           </div>
         `;
-        approvalList.appendChild(gDiv);
+        approvalList.appendChild(item);
       });
     }
 

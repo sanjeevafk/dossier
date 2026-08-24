@@ -8,12 +8,12 @@ const program = new Command();
 
 program
   .name("dossier")
-  .description("Adversarial multi-agent idea intelligence platform on TrueForge harness")
-  .version("0.1.0");
+  .description("Domain-Aware Adversarial Multi-Agent Idea Intelligence Platform on TrueForge harness")
+  .version("0.2.0");
 
 program
   .command("evaluate")
-  .description("Compile an intelligence dossier on an idea through the adversarial agent swarm")
+  .description("Compile an evidence-first intelligence dossier on an idea through domain specialist agents")
   .option("-t, --title <title>", "Idea title", "Autonomous Micro-SaaS Agent")
   .option("-s, --summary <summary>", "Idea summary description", "AI swarm that validates startup ideas before building.")
   .option("-a, --audience <audience>", "Target audience", "Founders, indie hackers, venture builders")
@@ -22,8 +22,8 @@ program
   .option("-c, --cac <number>", "Estimated customer acquisition cost in USD", "150")
   .action(async (options) => {
     console.log(pc.cyan("\n======================================================="));
-    console.log(pc.bold(pc.yellow("  ⚡ DOSSIER — ADVERSARIAL IDEA INTELLIGENCE")));
-    console.log(pc.dim("  Powered by TrueForge Harness (File TF-007)"));
+    console.log(pc.bold(pc.yellow("  ⚡ DOSSIER — EVIDENCE-FIRST ADVERSARIAL SWARM")));
+    console.log(pc.dim("  TrueForge Harness (File TF-007) • Zero Sycophancy"));
     console.log(pc.cyan("=======================================================\n"));
 
     const ideaInput: IdeaInput = {
@@ -33,9 +33,9 @@ program
       monetization: options.monetization
     };
 
-    console.log(pc.bold("Target Concept:"), pc.green(ideaInput.title));
-    console.log(pc.bold("Audience:      "), ideaInput.targetAudience);
-    console.log(pc.bold("Monetization:  "), ideaInput.monetization);
+    console.log(pc.bold("Target Concept: "), pc.green(ideaInput.title));
+    console.log(pc.bold("Target Audience:"), ideaInput.targetAudience);
+    console.log(pc.bold("Monetization:   "), ideaInput.monetization);
     console.log(pc.dim("\n-------------------------------------------------------"));
 
     const orchestrator = new IdeaSwarmOrchestrator();
@@ -49,48 +49,91 @@ program
     });
 
     console.log(pc.dim("-------------------------------------------------------\n"));
-    console.log(pc.bold(pc.cyan("📊 SWARM VERDICT & KILL SCORE:")));
-    const verdictColor = dossier.killScore >= 60 ? pc.green : pc.red;
-    console.log(`  Resilience Score : ${verdictColor(pc.bold(`${dossier.killScore}/100`))}`);
-    console.log(`  Consensus Verdict: ${verdictColor(pc.bold(dossier.overallVerdict))}\n`);
+    
+    // Domain Classification
+    const domain = dossier.domainClassification;
+    console.log(pc.bold(pc.yellow(`🎯 DOMAIN CLASSIFICATION: [${domain.archetypeLabel}]`)));
+    console.log(`  • Primary Customer : ${pc.cyan(domain.primaryCustomer)}`);
+    console.log(`  • Sales/Procurement: ${domain.procurementCycle}`);
+    console.log(`  • Regulatory Frame : ${domain.regulatoryEnvironment}`);
+    console.log(`  • Economics Model  : ${domain.unitEconomicsModel}\n`);
 
-    console.log(pc.bold("👥 AGENT ASSESSMENTS:"));
+    // Verdict & Dimensional Resilience Breakdown
+    console.log(pc.bold(pc.cyan("📊 SWARM VERDICT & RESILIENCE BREAKDOWN:")));
+    const verdictColor = dossier.killScore >= 75 ? pc.green : dossier.killScore >= 50 ? pc.yellow : pc.red;
+    console.log(`  Overall Verdict    : ${verdictColor(pc.bold(dossier.overallVerdict))}`);
+    console.log(`  Composite Resilience: ${verdictColor(pc.bold(`${dossier.killScore}/100`))} (Confidence: ${dossier.confidenceScore}%, Risk: ${dossier.riskLevel})\n`);
+
+    const rb = dossier.resilienceBreakdown;
+    console.log(pc.bold("  Dimensional Score Breakdown:"));
+    console.log(`  1. Technical Feasibility (20%)     : ${pc.green(`${rb.technicalFeasibility}/100`)} — ${pc.dim(rb.dimensionRationales.technicalFeasibility)}`);
+    console.log(`  2. Demand & Adoption (25%)         : ${pc.yellow(`${rb.demandAndAdoption}/100`)} — ${pc.dim(rb.dimensionRationales.demandAndAdoption)}`);
+    console.log(`  3. Unit Economics & Capital (20%)  : ${pc.green(`${rb.economicsAndCapitalEfficiency}/100`)} — ${pc.dim(rb.dimensionRationales.economicsAndCapitalEfficiency)}`);
+    console.log(`  4. Defensibility & Moat (15%)      : ${pc.cyan(`${rb.defensibilityAndMoat}/100`)} — ${pc.dim(rb.dimensionRationales.defensibilityAndMoat)}`);
+    console.log(`  5. Adversarial Resilience (20%)    : ${pc.red(`${rb.adversarialResilience}/100`)} — ${pc.dim(rb.dimensionRationales.adversarialResilience)}\n`);
+
+    // Domain Specialist Agents
+    console.log(pc.bold("👥 DOMAIN SPECIALIST ASSESSMENTS:"));
     for (const [role, report] of Object.entries(dossier.roleAssessments)) {
       if (role === "synthesizer") continue;
-      console.log(`\n  ${pc.bold(pc.yellow(`• ${report.roleTitle}`))}: ${pc.cyan(`${report.score}/100`)} (${report.verdict})`);
+      console.log(`\n  ${pc.bold(pc.yellow(`• [${report.roleNumber}] ${report.roleTitle}`))}: ${pc.cyan(`${report.score}/100`)} (${report.verdict})`);
       console.log(`    ${pc.dim("Rationale:")} ${report.rationale}`);
       if (report.fatalFlaws.length > 0) {
         console.log(`    ${pc.red("Fatal Flaw:")} ${report.fatalFlaws[0]}`);
       }
     }
 
-    console.log(pc.bold("\n⚔️  ADVERSARIAL DEBATE HIGHLIGHTS:"));
+    // Adversarial Debate Trail
+    console.log(pc.bold("\n⚔️  ADVERSARIAL CROSS-EXAMINATION TRAIL:"));
     for (const challenge of dossier.debateTrail) {
-      console.log(`  [${pc.red(challenge.challenger.toUpperCase())} vs ${pc.green(challenge.target.toUpperCase())}]`);
-      console.log(`  - Challenge: ${challenge.challengePoint}`);
+      console.log(`  [Round ${challenge.round} // ${pc.red(challenge.challenger.toUpperCase())} ➔ ${pc.green(challenge.target.toUpperCase())}] (${pc.yellow(challenge.status)})`);
+      console.log(`  • Challenge: ${challenge.challengePoint}`);
       if (challenge.rebuttal) {
-        console.log(`  - Rebuttal:  ${pc.dim(challenge.rebuttal)}`);
+        console.log(`  • Rebuttal : ${pc.dim(challenge.rebuttal)}`);
       }
     }
 
+    // Evidence & Assumptions
+    console.log(pc.bold("\n🔬 EVIDENCE & WEAKEST ASSUMPTION:"));
+    console.log(`  ${pc.bold(pc.green("• STRONGEST EVIDENCE"))} [${dossier.strongestEvidence.claimType}]:`);
+    console.log(`    "${dossier.strongestEvidence.claim}"`);
+    console.log(`    Provenance: ${pc.dim(dossier.strongestEvidence.provenance)} (Confidence: ${dossier.strongestEvidence.confidencePercent}%)`);
+
+    console.log(`\n  ${pc.bold(pc.red("• WEAKEST ASSUMPTION"))} [${dossier.weakestAssumption.id}]:`);
+    console.log(`    "${dossier.weakestAssumption.statement}"`);
+    console.log(`    Fatal Risk: ${pc.red(dossier.weakestAssumption.fatalRisk)}`);
+    console.log(`    Disproof Threshold: ${pc.dim(dossier.weakestAssumption.disproofThreshold)}`);
+
+    // Kill Conditions
+    console.log(pc.bold("\n💀 STRICT KILL CONDITIONS (FALSIFIABLE):"));
+    for (let i = 0; i < dossier.killConditions.length; i++) {
+      console.log(`  ${i + 1}. ${dossier.killConditions[i]}`);
+    }
+
+    // Cheapest Validation Experiment
+    const exp = dossier.cheapestValidationExperiment;
+    console.log(pc.bold("\n🧪 CHEAPEST VALIDATION EXPERIMENT:"));
+    console.log(`  Title      : ${pc.bold(pc.yellow(exp.title))}`);
+    console.log(`  Cost & Time: ${pc.green(`$${exp.estimatedCostUsd}`)} | ${pc.cyan(`${exp.timeToExecuteDays} Days`)}`);
+    console.log(`  Action     : ${exp.description}`);
+    console.log(`  Success    : ${pc.green(exp.successMetric)}`);
+    console.log(`  Kill Signal: ${pc.red(exp.failureKillSignal)}`);
+
+    // Sandboxed Unit Economics
     console.log(pc.bold("\n📈 SANDBOXED UNIT ECONOMICS:"));
     console.log(`  • Est. LTV / CAC : ${pc.bold(`${dossier.simulation.ltvCacRatio}x`)} (LTV: $${dossier.simulation.ltvEstimateUsd} / CAC: $${dossier.simulation.cacEstimateUsd})`);
     console.log(`  • Payback Period : ${dossier.simulation.estimatedPaybackMonths} months`);
     console.log(`  • Monthly Infra  : $${dossier.simulation.monthlyInfraCostUsd}`);
     console.log(`  • Sandbox Proof  : ${pc.dim(dossier.simulation.sandboxExecutionProof.runtime)} (exit ${dossier.simulation.sandboxExecutionProof.exitCode})`);
 
-    console.log(pc.bold("\n🛑 HUMAN-IN-THE-LOOP APPROVAL GATES (TrueForge Safety):"));
+    // Human Approval Gates
+    console.log(pc.bold("\n🛑 HUMAN-IN-THE-LOOP APPROVAL GATES (TrueForge Dual-Key Safety):"));
     for (const gate of dossier.approvalGates) {
       console.log(`  • [${pc.yellow(gate.status)}] ${gate.summary}`);
       console.log(`    Action Type: ${gate.actionType}`);
     }
 
-    console.log(pc.bold("\n🚀 7-DAY VALIDATION ROADMAP:"));
-    console.log(`  Day 1–2: ${dossier.validationRoadmap.day1to2.join(" | ")}`);
-    console.log(`  Day 3–5: ${dossier.validationRoadmap.day3to5.join(" | ")}`);
-    console.log(`  Day 6–7: ${dossier.validationRoadmap.day6to7.join(" | ")}`);
-
-    console.log(pc.green("\n✔ Full validation dossier compiled successfully.\n"));
+    console.log(pc.green("\n✔ Full evidence-first dossier compiled successfully.\n"));
   });
 
 program.parse(process.argv);
