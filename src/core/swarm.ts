@@ -10,15 +10,75 @@ import {
 import { SWARM_ROLES } from "../config/prompts.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
+import { generateAgentTurn } from "../services/llm.js";
 
 export interface SwarmExecutionOptions {
   onProgress?: (stage: string, detail: string) => void;
   pricingMonthlyUsd?: number;
   expectedChurnMonthly?: number;
   estimatedCacUsd?: number;
+  useLiveLLM?: boolean;
 }
 
 export class IdeaSwarmOrchestrator {
+  /**
+   * Evaluate an individual agent perspective using live OrcaRouter LLM if available.
+   */
+  private async evaluateRoleWithLLM(
+    role: SwarmRole,
+    idea: IdeaInput,
+    marketContext: string
+  ): Promise<AgentOpinion | null> {
+    if (!process.env.ORCAROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
+      return null;
+    }
+
+    const config = SWARM_ROLES[role];
+    const systemPrompt = `${config.systemPrompt}
+You must return a strictly valid JSON object matching this schema:
+{
+  "verdict": "STRONG_KILL" | "LEAN_KILL" | "PIVOT_REQUIRED" | "VIABLE_WITH_RISK" | "STRONG_PURSUE",
+  "score": number (0 to 100),
+  "fatalFlaws": string[],
+  "keyAssumptions": string[],
+  "competitiveRisks": string[],
+  "mustTestBeforeBuilding": string[],
+  "rationale": string
+}`;
+
+    const userPrompt = `Evaluate this concept:
+Title: ${idea.title}
+Summary: ${idea.summary}
+Target Audience: ${idea.targetAudience}
+Monetization: ${idea.monetization}
+Market Comps: ${marketContext}`;
+
+    try {
+      const raw = await generateAgentTurn(systemPrompt, userPrompt, {
+        temperature: 0.6,
+        maxTokens: 1200
+      });
+      // Extract JSON if wrapped in markdown blocks
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      return {
+        role,
+        roleTitle: config.roleTitle,
+        verdict: parsed.verdict || "VIABLE_WITH_RISK",
+        score: typeof parsed.score === "number" ? parsed.score : 60,
+        fatalFlaws: Array.isArray(parsed.fatalFlaws) ? parsed.fatalFlaws : [],
+        keyAssumptions: Array.isArray(parsed.keyAssumptions) ? parsed.keyAssumptions : [],
+        competitiveRisks: Array.isArray(parsed.competitiveRisks) ? parsed.competitiveRisks : [],
+        mustTestBeforeBuilding: Array.isArray(parsed.mustTestBeforeBuilding) ? parsed.mustTestBeforeBuilding : [],
+        rationale: parsed.rationale || "Evaluated via OrcaRouter multi-agent harness."
+      };
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Run the full adversarial evaluation swarm on a submitted idea.
    */
@@ -34,11 +94,25 @@ export class IdeaSwarmOrchestrator {
       idea.monetization
     ]);
 
+    const marketContext = `Competitors: ${marketResearch.identifiedCompetitors.map(c => c.name).join(", ")}. Signals: ${marketResearch.marketSignals.join("; ")}`;
+
     notify("AGENTS_PARALLEL", "Spawning 5 adversarial subagents in TrueForge execution harness...");
+
+    // Execute subagents concurrently (via OrcaRouter if enabled, or fast deterministic analysis)
+    const shouldCallLive = options.useLiveLLM !== false;
+    const [liveSkeptic, liveInvestor, liveArchitect, liveAnalyst, liveCustomer] = shouldCallLive
+      ? await Promise.all([
+          this.evaluateRoleWithLLM("skeptic", idea, marketContext),
+          this.evaluateRoleWithLLM("investor", idea, marketContext),
+          this.evaluateRoleWithLLM("architect", idea, marketContext),
+          this.evaluateRoleWithLLM("analyst", idea, marketContext),
+          this.evaluateRoleWithLLM("customer", idea, marketContext)
+        ])
+      : [null, null, null, null, null];
 
     // 1. Skeptic Agent
     notify("ROLE_EVAL", "The Skeptic is probing for fatal flaws, churn traps, and distribution bottlenecks...");
-    const skepticOpinion: AgentOpinion = {
+    const skepticOpinion: AgentOpinion = liveSkeptic || {
       role: "skeptic",
       roleTitle: SWARM_ROLES.skeptic.roleTitle,
       verdict: "LEAN_KILL",
@@ -64,7 +138,7 @@ export class IdeaSwarmOrchestrator {
 
     // 2. Investor Agent
     notify("ROLE_EVAL", "The Investor is sizing TAM/SAM, pricing power, and defensible moats...");
-    const investorOpinion: AgentOpinion = {
+    const investorOpinion: AgentOpinion = liveInvestor || {
       role: "investor",
       roleTitle: SWARM_ROLES.investor.roleTitle,
       verdict: "VIABLE_WITH_RISK",
@@ -86,7 +160,7 @@ export class IdeaSwarmOrchestrator {
 
     // 3. Technical Architect Agent
     notify("ROLE_EVAL", "The Technical Architect is evaluating compute costs, API limits, and sandbox isolation...");
-    const architectOpinion: AgentOpinion = {
+    const architectOpinion: AgentOpinion = liveArchitect || {
       role: "architect",
       roleTitle: SWARM_ROLES.architect.roleTitle,
       verdict: "STRONG_PURSUE",
@@ -110,7 +184,7 @@ export class IdeaSwarmOrchestrator {
 
     // 4. Market Analyst Agent
     notify("ROLE_EVAL", "The Market Analyst is mapping market trends and positioning whitespace...");
-    const analystOpinion: AgentOpinion = {
+    const analystOpinion: AgentOpinion = liveAnalyst || {
       role: "analyst",
       roleTitle: SWARM_ROLES.analyst.roleTitle,
       verdict: "PIVOT_REQUIRED",
@@ -133,7 +207,7 @@ export class IdeaSwarmOrchestrator {
 
     // 5. Customer Persona Agent
     notify("ROLE_EVAL", "The Customer Persona is testing workflow disruption and price tolerance...");
-    const customerOpinion: AgentOpinion = {
+    const customerOpinion: AgentOpinion = liveCustomer || {
       role: "customer",
       roleTitle: SWARM_ROLES.customer.roleTitle,
       verdict: "VIABLE_WITH_RISK",
@@ -230,7 +304,7 @@ export class IdeaSwarmOrchestrator {
       {
         id: `gate-outreach-${Date.now()}`,
         actionType: "COLD_OUTREACH_EMAIL",
-        summary: "Send 20 personalized cold validation emails to prospective design partners found via research.",
+        summary: `Send 20 personalized cold validation emails to prospective design partners found via research for "${idea.title}".`,
         payload: {
           subject: `Question regarding ${idea.title} validation`,
           recipientCount: 20,
@@ -242,9 +316,9 @@ export class IdeaSwarmOrchestrator {
       {
         id: `gate-smoke-test-${Date.now()}`,
         actionType: "SMOKE_TEST_LANDING_PAGE",
-        summary: "Publish a targeted one-page smoke test with waitlist form to test customer intent and conversion.",
+        summary: `Publish a targeted one-page smoke test with waitlist form for "${idea.title}" to test conversion.`,
         payload: {
-          targetDomain: "ideavalidator-test.live",
+          targetDomain: "dossier-validation-test.live",
           budgetLimitUsd: 25.0
         },
         requiresApproval: true,
@@ -258,7 +332,7 @@ export class IdeaSwarmOrchestrator {
       idea,
       killScore: avgScore,
       overallVerdict: consensusVerdict,
-      executiveSummary: `The Idea Swarm evaluated "${idea.title}" across 5 specialized perspectives. Consensus score is ${avgScore}/100. While technical feasibility is high (82/100), market and distribution risks require targeted validation before full engineering build.`,
+      executiveSummary: `The Dossier Swarm evaluated "${idea.title}" across 5 specialized perspectives. Consensus score is ${avgScore}/100. While technical feasibility is scored at ${architectOpinion.score}/100, market and distribution risks require targeted validation before full engineering build.`,
       roleAssessments: {
         skeptic: skepticOpinion,
         investor: investorOpinion,
