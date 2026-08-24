@@ -13,6 +13,7 @@
     "start:prod": "node dist/server.js",
     "cli": "tsx src/cli.ts",
     "server": "tsx src/server.ts",
+    "benchmark": "tsx src/benchmark.ts",
     "test": "node --test"
   },
   "keywords": [
