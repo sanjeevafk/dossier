@@ -818,9 +818,12 @@
         }
         esEl.innerHTML = `
           <span class="px-2 py-0.5 rounded bg-emeraldacc/10 text-emeraldacc border border-emeraldacc/30">${es.verifiedFactsCount} Verified Facts</span>
-          <span class="px-2 py-0.5 rounded bg-emeraldacc/10 text-emeraldacc border border-emeraldacc/30">${es.verifiedComputationsCount} Sandbox Computations</span>
+          <span class="px-2 py-0.5 rounded bg-emeraldacc/10 text-emeraldacc border border-emeraldacc/30">${es.verifiedComputationsCount} Computations (Exit 0)</span>
+          <span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">${es.externalEvidenceCount} External Evidence</span>
           <span class="px-2 py-0.5 rounded bg-amberacc/10 text-amberacc border border-amberacc/30">${es.modelledAssumptionsCount} Modelled Hypotheses</span>
+          <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">${es.inferencesCount} Inferences</span>
           <span class="px-2 py-0.5 rounded bg-crimsonacc/10 text-crimsonacc border border-crimsonacc/30">${es.unknownsCount} Unknowns</span>
+          <span class="px-2 py-0.5 rounded bg-crimsonacc/10 text-crimsonacc border border-crimsonacc/30">${es.contradictionsCount} Contradictions</span>
         `;
       }
 
