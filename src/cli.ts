@@ -60,17 +60,42 @@ program
 
     // Verdict & Dimensional Resilience Breakdown
     console.log(pc.bold(pc.cyan("📊 SWARM VERDICT & RESILIENCE BREAKDOWN:")));
-    const verdictColor = dossier.killScore >= 75 ? pc.green : dossier.killScore >= 50 ? pc.yellow : pc.red;
+    const verdictColor = dossier.overallVerdict === "BUILD" ? pc.green : (dossier.overallVerdict === "BUILD_IF_VALIDATED" ? pc.green : (dossier.overallVerdict === "REFINE" ? pc.yellow : pc.red));
     console.log(`  Overall Verdict    : ${verdictColor(pc.bold(dossier.overallVerdict))}`);
-    console.log(`  Composite Resilience: ${verdictColor(pc.bold(`${dossier.killScore}/100`))} (Confidence: ${dossier.confidenceScore}%, Risk: ${dossier.riskLevel})\n`);
+    console.log(`  Composite Resilience: ${verdictColor(pc.bold(`${dossier.killScore}/100`))} (Confidence: ${dossier.confidenceScore}%, Risk: ${dossier.riskLevel === "LOW" ? pc.green(dossier.riskLevel) : pc.yellow(dossier.riskLevel)})`);
+    
+    if (dossier.epistemicSummary) {
+      const es = dossier.epistemicSummary;
+      console.log(`  Epistemic Balance  : ${pc.cyan(`${es.verifiedFactsCount} Verified Facts`)} | ${pc.green(`${es.verifiedComputationsCount} Verified Computations`)} | ${pc.yellow(`${es.modelledAssumptionsCount} Modelled Assumptions`)} | ${pc.red(`${es.unknownsCount} Unknowns`)}`);
+      if (es.hasUnvalidatedFatalAssumptions && dossier.overallVerdict === "BUILD_IF_VALIDATED") {
+        console.log(pc.yellow(`  ⚠️  Verdict Constrained: Unresolved fatal assumptions prevent unconditional BUILD until validated.`));
+      }
+    }
+    console.log();
 
     const rb = dossier.resilienceBreakdown;
-    console.log(pc.bold("  Dimensional Score Breakdown:"));
+    console.log(pc.bold("  Dimensional Score Breakdown (Traceable Attribution):"));
     console.log(`  1. Technical Feasibility (20%)     : ${pc.green(`${rb.technicalFeasibility}/100`)} — ${pc.dim(rb.dimensionRationales.technicalFeasibility)}`);
+    if (rb.dimensionTraces) {
+      console.log(`     ${pc.dim("Trace:")} ${rb.dimensionTraces.technicalFeasibility.factors.map(f => `${f.impact > 0 ? pc.green(`+${f.impact}`) : pc.red(`${f.impact}`)} [${f.groundingTier}] ${f.description}`).join(pc.dim(" • "))}`);
+    }
     console.log(`  2. Demand & Adoption (25%)         : ${pc.yellow(`${rb.demandAndAdoption}/100`)} — ${pc.dim(rb.dimensionRationales.demandAndAdoption)}`);
+    if (rb.dimensionTraces) {
+      console.log(`     ${pc.dim("Trace:")} ${rb.dimensionTraces.demandAndAdoption.factors.map(f => `${f.impact > 0 ? pc.green(`+${f.impact}`) : pc.red(`${f.impact}`)} [${f.groundingTier}] ${f.description}`).join(pc.dim(" • "))}`);
+    }
     console.log(`  3. Unit Economics & Capital (20%)  : ${pc.green(`${rb.economicsAndCapitalEfficiency}/100`)} — ${pc.dim(rb.dimensionRationales.economicsAndCapitalEfficiency)}`);
+    if (rb.dimensionTraces) {
+      console.log(`     ${pc.dim("Trace:")} ${rb.dimensionTraces.economicsAndCapitalEfficiency.factors.map(f => `${f.impact > 0 ? pc.green(`+${f.impact}`) : pc.red(`${f.impact}`)} [${f.groundingTier}] ${f.description}`).join(pc.dim(" • "))}`);
+    }
     console.log(`  4. Defensibility & Moat (15%)      : ${pc.cyan(`${rb.defensibilityAndMoat}/100`)} — ${pc.dim(rb.dimensionRationales.defensibilityAndMoat)}`);
-    console.log(`  5. Adversarial Resilience (20%)    : ${pc.red(`${rb.adversarialResilience}/100`)} — ${pc.dim(rb.dimensionRationales.adversarialResilience)}\n`);
+    if (rb.dimensionTraces) {
+      console.log(`     ${pc.dim("Trace:")} ${rb.dimensionTraces.defensibilityAndMoat.factors.map(f => `${f.impact > 0 ? pc.green(`+${f.impact}`) : pc.red(`${f.impact}`)} [${f.groundingTier}] ${f.description}`).join(pc.dim(" • "))}`);
+    }
+    console.log(`  5. Adversarial Resilience (20%)    : ${pc.red(`${rb.adversarialResilience}/100`)} — ${pc.dim(rb.dimensionRationales.adversarialResilience)}`);
+    if (rb.dimensionTraces) {
+      console.log(`     ${pc.dim("Trace:")} ${rb.dimensionTraces.adversarialResilience.factors.map(f => `${f.impact > 0 ? pc.green(`+${f.impact}`) : pc.red(`${f.impact}`)} [${f.groundingTier}] ${f.description}`).join(pc.dim(" • "))}`);
+    }
+    console.log();
 
     // Domain Specialist Agents
     console.log(pc.bold("👥 DOMAIN SPECIALIST ASSESSMENTS:"));
@@ -95,7 +120,7 @@ program
 
     // Evidence & Assumptions
     console.log(pc.bold("\n🔬 EVIDENCE & WEAKEST ASSUMPTION:"));
-    console.log(`  ${pc.bold(pc.green("• STRONGEST EVIDENCE"))} [${dossier.strongestEvidence.claimType}]:`);
+    console.log(`  ${pc.bold(pc.green("• STRONGEST EVIDENCE"))} [${dossier.strongestEvidence.tier}]:`);
     console.log(`    "${dossier.strongestEvidence.claim}"`);
     console.log(`    Provenance: ${pc.dim(dossier.strongestEvidence.provenance)} (Confidence: ${dossier.strongestEvidence.confidencePercent}%)`);
 
