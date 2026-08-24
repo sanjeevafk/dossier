@@ -79,8 +79,8 @@ Dossier stress-tests startup concepts, product features, and technical proposals
 
 ### Installation
 ```bash
-git clone https://github.com/sanjeevafk/trueforge-agent.git
-cd trueforge-agent
+git clone https://github.com/sanjeevafk/dossier.git
+cd dossier
 pnpm install
 ```
 
