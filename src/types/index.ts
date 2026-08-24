@@ -109,6 +109,17 @@ export interface IdeaDossier {
   keyAssumptions: KeyAssumption[];
   contradictions: Contradiction[];
   evidenceFeed: EvidenceItem[];
+  predictionMarkets?: {
+    source: string;
+    macroSentiment: string;
+    keyTakeaway: string;
+    marketsFound: Array<{
+      title: string;
+      probabilityYesPercent: number;
+      volumeUsd: number;
+      marketUrl: string;
+    }>;
+  };
   debateTrail: DebateChallenge[];
   simulation: SimulationResult;
   validationRoadmap: {
