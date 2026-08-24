@@ -103,10 +103,11 @@ if __name__ == "__main__":
     const ltv = (pricingMonthlyUsd * grossMargin) / Math.max(expectedMonthlyChurnRate, 0.01);
     const ltvCacRatio = Number((ltv / Math.max(estimatedCacUsd, 1.0)).toFixed(2));
     const payback = Number((estimatedCacUsd / Math.max(pricingMonthlyUsd * grossMargin, 1.0)).toFixed(1));
+    const numericExitCode = typeof error.code === "number" ? error.code : 1;
 
     return {
       runtime: "fallback-embedded-sandbox",
-      exitCode: error.code || 1,
+      exitCode: numericExitCode,
       stdout: error.stdout || "",
       stderr: error.message || "",
       metrics: {
