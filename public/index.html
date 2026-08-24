@@ -803,9 +803,26 @@
       }
 
       const verdictBadge = document.getElementById('resVerdictBadge');
-      verdictBadge.textContent = dossier.overallVerdict;
-      verdictBadge.className = dossier.overallVerdict === 'BUILD' ? 'font-mono text-2xl font-black text-emeraldacc mt-0.5 block' :
+      verdictBadge.textContent = dossier.overallVerdict === 'BUILD_IF_VALIDATED' ? 'BUILD IF VALIDATED' : dossier.overallVerdict;
+      verdictBadge.className = (dossier.overallVerdict === 'BUILD' || dossier.overallVerdict === 'BUILD_IF_VALIDATED') ? 'font-mono text-xl md:text-2xl font-black text-emeraldacc mt-0.5 block' :
         (dossier.overallVerdict === 'REFINE' ? 'font-mono text-2xl font-black text-amberacc mt-0.5 block' : 'font-mono text-2xl font-black text-crimsonacc mt-0.5 block');
+
+      if (dossier.epistemicSummary) {
+        const es = dossier.epistemicSummary;
+        let esEl = document.getElementById('resEpistemicBanner');
+        if (!esEl) {
+          esEl = document.createElement('div');
+          esEl.id = 'resEpistemicBanner';
+          esEl.className = 'mt-2 text-[10px] font-mono text-zinc-400 flex flex-wrap gap-2';
+          document.getElementById('resDomainBanner').parentNode.insertBefore(esEl, document.getElementById('resExecutiveSummary'));
+        }
+        esEl.innerHTML = `
+          <span class="px-2 py-0.5 rounded bg-emeraldacc/10 text-emeraldacc border border-emeraldacc/30">${es.verifiedFactsCount} Verified Facts</span>
+          <span class="px-2 py-0.5 rounded bg-emeraldacc/10 text-emeraldacc border border-emeraldacc/30">${es.verifiedComputationsCount} Sandbox Computations</span>
+          <span class="px-2 py-0.5 rounded bg-amberacc/10 text-amberacc border border-amberacc/30">${es.modelledAssumptionsCount} Modelled Hypotheses</span>
+          <span class="px-2 py-0.5 rounded bg-crimsonacc/10 text-crimsonacc border border-crimsonacc/30">${es.unknownsCount} Unknowns</span>
+        `;
+      }
 
       // Render 5-Dimensional Resilience Breakdown
       const resilienceGrid = document.getElementById('resilienceGrid');

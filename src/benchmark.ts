@@ -216,14 +216,14 @@ export async function runDossierBenchmark(): Promise<void> {
   console.log("==========================================================================================================");
   console.log("  📊 DOSSIER DOMAIN-AWARE BENCHMARK EXECUTION SUMMARY");
   console.log("==========================================================================================================");
-  console.log(`ID     | DOMAIN ARCHETYPE         | SCORE | VERDICT | FEAS | DMND | ECON | ADV  | ROUNDS | LATENCY`);
-  console.log(`-------+--------------------------+-------+---------+------+------+------+------+--------+---------`);
+  console.log(`ID     | DOMAIN ARCHETYPE         | SCORE | VERDICT            | FEAS | DMND | ECON | ADV  | ROUNDS | LATENCY`);
+  console.log(`-------+--------------------------+-------+--------------------+------+------+------+------+--------+---------`);
   
   for (const r of results) {
     const id = r.id.padEnd(6);
     const dom = r.domainArchetype.slice(0, 24).padEnd(24);
     const score = `${r.score}/100`.padEnd(5);
-    const verdict = r.verdict.padEnd(7);
+    const verdict = r.verdict.padEnd(18);
     const feas = `${r.feasiScore}`.padEnd(4);
     const dmnd = `${r.demandScore}`.padEnd(4);
     const econ = `${r.econScore}`.padEnd(4);
