@@ -44,7 +44,7 @@ export interface IdeaInput {
   unclearAssumptions?: string[];
 }
 
-export type Verdict = "BUILD" | "REFINE" | "KILL" | "STRONG_KILL" | "LEAN_KILL" | "PIVOT_REQUIRED" | "VIABLE_WITH_RISK" | "STRONG_PURSUE";
+export type Verdict = "BUILD" | "BUILD_IF_VALIDATED" | "REFINE" | "KILL" | "STRONG_KILL" | "LEAN_KILL" | "PIVOT_REQUIRED" | "VIABLE_WITH_RISK" | "STRONG_PURSUE";
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 export interface AgentOpinion {
@@ -84,14 +84,44 @@ export interface Contradiction {
   guidance: string;
 }
 
+export type EpistemicTier = 
+  | "VERIFIED_FACT"        // Empirical real-world ground truth (Polymarket odds, official regulations, live competitor data)
+  | "VERIFIED_COMPUTATION" // Deterministic sandbox math (Python3 isolated subprocess exit 0)
+  | "MODELLED_ASSUMPTION"  // Explicit hypotheses not yet validated with empirical trials
+  | "UNKNOWN_CRITICAL";    // Unquantified black-box risk
+
 export interface EvidenceItem {
   id: string;
   claim: string;
-  claimType: "VERIFIED_COMPUTATION" | "EMPIRICAL_EVIDENCE" | "UNVERIFIED_ASSUMPTION";
+  tier: EpistemicTier;
+  claimType: EpistemicTier; // Backwards compatible alias
   provenance: string; // e.g. "Polymarket Gamma API", "Agent Reach", "Python3 Sandbox"
   indicator: "SUPPORTING" | "CONTRADICTING" | "NEUTRAL";
   confidencePercent: number; // 0 to 100
+  falsificationCriteria?: string;
 }
+
+export interface ScoreFactor {
+  impact: number; // e.g. +30 or -15
+  description: string;
+  groundingTier: EpistemicTier;
+}
+
+export interface DimensionScoreTrace {
+  score: number;
+  factors: ScoreFactor[];
+  rationale: string;
+}
+
+export interface EpistemicTaxonomySummary {
+  verifiedFactsCount: number;
+  verifiedComputationsCount: number;
+  modelledAssumptionsCount: number;
+  unknownsCount: number;
+  hasUnvalidatedFatalAssumptions: boolean;
+}
+
+export type ValidationVerdict = "BUILD" | "BUILD_IF_VALIDATED" | "REFINE" | "KILL";
 
 export interface DebateChallenge {
   challenger: SwarmRole;
@@ -139,6 +169,13 @@ export interface ResilienceScoreBreakdown {
     defensibilityAndMoat: string;
     adversarialResilience: string;
   };
+  dimensionTraces?: {
+    technicalFeasibility: DimensionScoreTrace;
+    demandAndAdoption: DimensionScoreTrace;
+    economicsAndCapitalEfficiency: DimensionScoreTrace;
+    defensibilityAndMoat: DimensionScoreTrace;
+    adversarialResilience: DimensionScoreTrace;
+  };
 }
 
 export interface CheapestValidationExperiment {
@@ -173,10 +210,11 @@ export interface IdeaDossier {
   timestamp: string;
   idea: IdeaInput;
   domainClassification: DomainClassification;
+  epistemicSummary?: EpistemicTaxonomySummary;
   verificationAudit?: VerificationAudit;
   killScore: number; // 0 to 100 (composite resilience score)
   confidenceScore: number; // e.g. 78%
-  overallVerdict: "BUILD" | "REFINE" | "KILL";
+  overallVerdict: ValidationVerdict;
   riskLevel: RiskLevel;
   executiveSummary: string;
   roleAssessments: Record<SwarmRole, AgentOpinion>;
