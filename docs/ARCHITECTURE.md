@@ -42,13 +42,24 @@ Dossier avoids single-prompt hallucinations by decomposing the problem into six 
 A core innovation in Dossier is the **Contradiction Surface**. In typical AI architectures, models output averaged responses. Dossier explicitly forces subagents to cross-examine and challenge each other's assumptions:
 
 ```text
-[RED TEAM]           "Freemium conversion in this category is historically <2%, making CAC payback unsustainable."
+[RED TEAM]           "Procurement cycles in B2G will exhaust early cash runway before first revenue."
         vs
-[CUSTOMER ADVOCATE]  "High-intent users express immediate willingness to pay $49/mo to save 5+ hours weekly."
+[INVESTOR]           "High LTV/CAC ratio (12.0x) provides strong long-term venture returns."
         ➔
 [CONTRADICTION]      UNRESOLVED CONFLICT // REQUIRES VALIDATION
-[GUIDANCE]           Deploy an unbranded smoke-test landing page to measure credit card intent before building.
+[GUIDANCE]           Pre-secure upfront milestone mobilization advances or grant co-funding.
 ```
+
+---
+
+## 4. Stanford CS329A Robust Verifier & Test-Time Self-Correction (`src/core/verifier.ts`)
+
+Inspired by **Stanford University's CS329A (Self-Improving AI Agents)** and **Azalia Mirhoseini's *LLM-as-a-Verifier*** research, Dossier implements an autonomous **Robust Verification Gate** before synthesizing any dossier:
+
+1. **Mathematical Invariance Check:** Verifies that agent financial scores match Python3 isolated sandbox simulation metrics (LTV/CAC, payback, token burn).
+2. **Anti-Sycophancy Gate:** Cites empirical field evidence before permitting scores $\ge 90/100$, preventing uncalibrated AI optimism.
+3. **Domain Prior Calibration:** Intercepts and corrects generic SaaS assumptions (e.g. freemium) when evaluating B2G, Healthcare, or Hardware projects.
+4. **Test-Time Self-Correction:** When an agent's claim fails verification, the engine triggers an automated reflection pass to penalize hallucinated certainty.
 
 ---
 

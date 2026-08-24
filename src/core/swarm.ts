@@ -16,6 +16,7 @@ import {
 } from "../types/index.js";
 import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
+import { StanfordRobustVerifier } from "./verifier.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
@@ -285,22 +286,90 @@ Market & Prediction Signals: ${marketContext}`;
       }
     ];
 
-    // 05 VERIFY (Sandboxed Python Subprocess)
-    notify("05 VERIFY", "Executing sandboxed Python unit economics & compute simulation in isolated runtime...");
+    // 05 VERIFY (Sandboxed Python Subprocess & Stanford CS329A Robust Verifier)
+    notify("05 VERIFY", "Executing sandboxed Python simulation & Stanford CS329A Robust Verifier...");
     const pricing = options.pricingMonthlyUsd || (domain.archetype === "hardware_robotics" ? 1500 : domain.archetype === "b2b_saas" ? 499 : 100);
     const churn = options.expectedChurnMonthly || (domain.archetype === "consumer_social" ? 0.12 : 0.04);
     const cac = options.estimatedCacUsd || (domain.archetype === "hardware_robotics" ? 2500 : domain.archetype === "b2b_saas" ? 1200 : 350);
     const sandboxSim = await runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30);
 
+    const evidenceFeed: EvidenceItem[] = [
+      {
+        id: "EV-01",
+        claim: `Sandboxed unit economics verification: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)} months.`,
+        claimType: "VERIFIED_COMPUTATION",
+        provenance: "TrueForge Python3 Sandbox (Isolated Subprocess Exit 0)",
+        indicator: "SUPPORTING",
+        confidencePercent: 98
+      },
+      {
+        id: "EV-02",
+        claim: `Prediction market macro consensus: ${polymarketSignals.keyTakeaway}`,
+        claimType: "EMPIRICAL_EVIDENCE",
+        provenance: `Polymarket Gamma Live Oracle (${polymarketSignals.source})`,
+        indicator: polymarketSignals.macroSentiment === "BEARISH" ? "CONTRADICTING" : "SUPPORTING",
+        confidencePercent: 82
+      },
+      {
+        id: "EV-03",
+        claim: `Target operators in ${domain.primaryCustomer} have high pain but suffer from entrenched habit inertia and lengthy ${domain.procurementCycle}.`,
+        claimType: "EMPIRICAL_EVIDENCE",
+        provenance: "Agent Reach Community & Industry Synthesis",
+        indicator: "CONTRADICTING",
+        confidencePercent: 78
+      },
+      {
+        id: "EV-04",
+        claim: `Founder assumption: Target buyers will readily switch to a new platform within 30 days without extensive change management.`,
+        claimType: "UNVERIFIED_ASSUMPTION",
+        provenance: "Founder Input & Value Proposition Claim",
+        indicator: "CONTRADICTING",
+        confidencePercent: 45
+      }
+    ];
+
+    const verifier = new StanfordRobustVerifier();
+    const { verifiedOpinions, audit } = verifier.verifySwarmOpinions(
+      idea,
+      domain,
+      {
+        analyst: analystOpinion,
+        customer: customerOpinion,
+        architect: architectOpinion,
+        investor: investorOpinion,
+        redteam: redTeamOpinion,
+        expert: expertOpinion,
+        synthesizer: { ...analystOpinion, role: "synthesizer", roleTitle: "EXECUTIVE SYNTHESIZER" }
+      },
+      {
+        cacEstimateUsd: sandboxSim.metrics.cacEstimateUsd,
+        ltvEstimateUsd: sandboxSim.metrics.ltvEstimateUsd,
+        ltvCacRatio: sandboxSim.metrics.ltvCacRatio,
+        estimatedPaybackMonths: sandboxSim.metrics.estimatedPaybackMonths,
+        monthlyInfraCostUsd: sandboxSim.metrics.monthlyInfraCostUsd,
+        tamEstimateUsd: sandboxSim.metrics.tamEstimateUsd,
+        sandboxExecutionProof: {
+          runtime: sandboxSim.runtime,
+          exitCode: sandboxSim.exitCode,
+          stdout: sandboxSim.stdout
+        }
+      },
+      evidenceFeed
+    );
+
+    if (audit.testTimeSelfCorrections > 0) {
+      notify("05 VERIFY [SELF-CORRECTION]", `Stanford CS329A Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`);
+    }
+
     // 06 CONVERGE (Multi-Round Convergence Loop)
     let convergenceRounds = 1;
     const initialScores = [
-      analystOpinion.score,
-      customerOpinion.score,
-      architectOpinion.score,
-      investorOpinion.score,
-      redTeamOpinion.score,
-      expertOpinion.score
+      verifiedOpinions.analyst.score,
+      verifiedOpinions.customer.score,
+      verifiedOpinions.architect.score,
+      verifiedOpinions.investor.score,
+      verifiedOpinions.redteam.score,
+      verifiedOpinions.expert.score
     ];
     const scoreSpread = Math.max(...initialScores) - Math.min(...initialScores);
     const hasUnresolvedFatalFlaw = debateTrail.some(d => d.status === "OPEN") || redTeamOpinion.score < 45;
@@ -374,41 +443,6 @@ Market & Prediction Signals: ${marketContext}`;
     const confidenceScore = Math.min(Math.max(compositeScore + 10, 65), 95);
 
     // 08 STRUCTURED EVIDENCE WITH PROVENANCE
-    const evidenceFeed: EvidenceItem[] = [
-      {
-        id: "EV-01",
-        claim: `Sandboxed unit economics verification: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)} months.`,
-        claimType: "VERIFIED_COMPUTATION",
-        provenance: "TrueForge Python3 Sandbox (Isolated Subprocess Exit 0)",
-        indicator: "SUPPORTING",
-        confidencePercent: 98
-      },
-      {
-        id: "EV-02",
-        claim: `Prediction market macro consensus: ${polymarketSignals.keyTakeaway}`,
-        claimType: "EMPIRICAL_EVIDENCE",
-        provenance: `Polymarket Gamma Live Oracle (${polymarketSignals.source})`,
-        indicator: polymarketSignals.macroSentiment === "BEARISH" ? "CONTRADICTING" : "SUPPORTING",
-        confidencePercent: 82
-      },
-      {
-        id: "EV-03",
-        claim: `Target operators in ${domain.primaryCustomer} have high pain but suffer from entrenched habit inertia and lengthy ${domain.procurementCycle}.`,
-        claimType: "EMPIRICAL_EVIDENCE",
-        provenance: "Agent Reach Community & Industry Synthesis",
-        indicator: "CONTRADICTING",
-        confidencePercent: 78
-      },
-      {
-        id: "EV-04",
-        claim: `Founder assumption: Target buyers will readily switch to a new platform within 30 days without extensive change management.`,
-        claimType: "UNVERIFIED_ASSUMPTION",
-        provenance: "Founder Input & Value Proposition Claim",
-        indicator: "CONTRADICTING",
-        confidencePercent: 45
-      }
-    ];
-
     const strongestEvidence = evidenceFeed[0];
 
     const weakestAssumption = {
@@ -538,6 +572,7 @@ Market & Prediction Signals: ${marketContext}`;
       timestamp: new Date().toISOString(),
       idea,
       domainClassification: domain,
+      verificationAudit: audit,
       killScore: compositeScore,
       confidenceScore,
       overallVerdict,
