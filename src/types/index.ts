@@ -121,6 +121,8 @@ export interface IdeaDossier {
     }>;
   };
   debateTrail: DebateChallenge[];
+  convergenceRounds: number;
+  debateRoundsExecuted: number;
   simulation: SimulationResult;
   validationRoadmap: {
     day1to2: string[];

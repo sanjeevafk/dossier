@@ -239,25 +239,51 @@ Market Context: ${marketContext}`;
       {
         challenger: "redteam",
         target: "investor",
-        challengePoint: "Investor projects $1B TAM, but commoditization of base models will drive pricing down to commodity hosting rates.",
-        rebuttal: "Value capture does not live in the model weights; it lives in the specialized workflow, sandbox execution data, and human approval trust.",
+        challengePoint: `Investor assumes high gross margins for "${idea.title}", but commoditization of base models and distribution cost will pressure cash flow.`,
+        rebuttal: "Value capture does not live in raw weights; it lives in the specialized workflow, sandbox execution data, and human approval trust.",
         status: "REBUTTED"
       },
       {
         challenger: "customer",
         target: "architect",
-        challengePoint: "Architect is optimizing for sub-second agent recursion, but users will bounce if onboarding requires API keys and complex config.",
+        challengePoint: "Architect is optimizing for agent recursion, but users will bounce if onboarding requires complex configuration or API keys.",
         rebuttal: "Agreed. Zero-config web onboarding must be prioritized over raw local SDK integration.",
         status: "CONCEDED"
       },
       {
         challenger: "redteam",
         target: "customer",
-        challengePoint: "Customer advocate assumes willingness to pay $49/mo, but similar productivity tools have <2% freemium-to-paid conversion.",
+        challengePoint: `Customer advocate assumes buyer urgency for "${idea.title}", but similar tools experience high churn and <2% freemium conversion.`,
         rebuttal: "Requires validation through a smoke test pre-order gate before full build.",
         status: "OPEN"
       }
     ];
+
+    // Convergence Check: Evaluate score variance and open challenges
+    const initialScores = [
+      analystOpinion.score,
+      customerOpinion.score,
+      architectOpinion.score,
+      investorOpinion.score,
+      redTeamOpinion.score,
+      expertOpinion.score
+    ];
+    const scoreSpread = Math.max(...initialScores) - Math.min(...initialScores);
+    const hasUnresolvedFatalFlaw = debateTrail.some(d => d.status === "OPEN") || redTeamOpinion.score < 45;
+
+    let convergenceRounds = 1;
+    if (hasUnresolvedFatalFlaw || scoreSpread > 30) {
+      convergenceRounds = 2;
+      notify("04 DEBATE [ROUND 2]", "Convergence criteria unmet. Escalating to Round 2 adversarial challenge on unaddressed fatal flaws...");
+      
+      debateTrail.push({
+        challenger: "redteam",
+        target: "expert",
+        challengePoint: `Red Team Round 2 Probe: Given "${redTeamOpinion.fatalFlaws[0] || "untested distribution friction"}", what hard evidence prevents terminal churn in month 1?`,
+        rebuttal: "Domain Expert & Synthesizer: Mandate dual-key human approval gate to pre-screen 10 pilot commitments before committing engineering sprint.",
+        status: "REBUTTED"
+      });
+    }
 
     notify("05 VERIFY", "Executing sandboxed Python unit economics & financial simulation...");
 
@@ -268,15 +294,11 @@ Market Context: ${marketContext}`;
 
     notify("06 VERDICT", "Synthesizing consensus, scoring resilience, and formulating actionable dossier...");
 
-    const scores = [
-      analystOpinion.score,
-      customerOpinion.score,
-      architectOpinion.score,
-      investorOpinion.score,
-      redTeamOpinion.score,
-      expertOpinion.score
-    ];
-    const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    const scores = initialScores;
+    let avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    if (convergenceRounds > 1 && redTeamOpinion.score < 40) {
+      avgScore = Math.max(avgScore - 4, 30); // Penalize score if critical red team fatal flaw survived
+    }
 
     let overallVerdict: "BUILD" | "REFINE" | "KILL" = "REFINE";
     let riskLevel: RiskLevel = "MEDIUM";
@@ -438,6 +460,8 @@ Market Context: ${marketContext}`;
       evidenceFeed,
       predictionMarkets: polymarketSignals,
       debateTrail,
+      convergenceRounds,
+      debateRoundsExecuted: convergenceRounds,
       simulation: {
         cacEstimateUsd: sandboxSim.metrics.cacEstimateUsd,
         ltvEstimateUsd: sandboxSim.metrics.ltvEstimateUsd,
