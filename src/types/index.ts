@@ -1,9 +1,10 @@
 export type SwarmRole =
-  | "skeptic"
-  | "investor"
-  | "architect"
   | "analyst"
   | "customer"
+  | "architect"
+  | "investor"
+  | "redteam"
+  | "expert"
   | "synthesizer";
 
 export interface IdeaInput {
@@ -11,22 +12,56 @@ export interface IdeaInput {
   summary: string;
   targetAudience: string;
   monetization: string;
+  projectType?: "Startup" | "Hackathon" | "Product" | "Research" | "Other";
   techStack?: string;
   unclearAssumptions?: string[];
 }
 
-export type Verdict = "STRONG_KILL" | "LEAN_KILL" | "PIVOT_REQUIRED" | "VIABLE_WITH_RISK" | "STRONG_PURSUE";
+export type Verdict = "BUILD" | "REFINE" | "KILL" | "STRONG_KILL" | "LEAN_KILL" | "PIVOT_REQUIRED" | "VIABLE_WITH_RISK" | "STRONG_PURSUE";
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 export interface AgentOpinion {
   role: SwarmRole;
+  roleNumber: string;
   roleTitle: string;
   verdict: Verdict;
-  score: number; // 0 (Fatal) - 100 (Unstoppable)
+  score: number; // 0 to 100
+  status: "IDLE" | "INITIALIZING" | "RESEARCHING" | "DEBATING" | "VERIFYING" | "COMPLETE" | "BLOCKED";
   fatalFlaws: string[];
   keyAssumptions: string[];
   competitiveRisks: string[];
   mustTestBeforeBuilding: string[];
   rationale: string;
+  telemetryMetadata?: {
+    latencyMs?: number;
+    claimsVerified?: number;
+    threatSeverity?: string;
+  };
+}
+
+export interface KeyAssumption {
+  id: string; // e.g. "A01"
+  statement: string;
+  evidenceStatus: "VERIFIED" | "UNVERIFIED" | "HIGH_RISK" | "REJECTED";
+  riskLevel: RiskLevel;
+}
+
+export interface Contradiction {
+  id: string;
+  agentA: string;
+  claimA: string;
+  agentB: string;
+  claimB: string;
+  resolutionStatus: "UNRESOLVED CONFLICT // REQUIRES VALIDATION" | "RESOLVED // ASSUMPTION MITIGATED";
+  guidance: string;
+}
+
+export interface EvidenceItem {
+  id: string;
+  claim: string;
+  source: string;
+  indicator: "SUPPORTING" | "CONTRADICTING" | "NEUTRAL";
+  confidence: string; // e.g. "84%"
 }
 
 export interface DebateChallenge {
@@ -62,12 +97,18 @@ export interface ApprovalAction {
 
 export interface IdeaDossier {
   id: string;
+  dossierCode: string; // e.g. "TF-007"
   timestamp: string;
   idea: IdeaInput;
-  killScore: number; // 0 (Dead on arrival) to 100 (Exceptional resilience)
-  overallVerdict: Verdict;
+  killScore: number; // 0 to 100
+  confidenceScore: number; // e.g. 78%
+  overallVerdict: "BUILD" | "REFINE" | "KILL";
+  riskLevel: RiskLevel;
   executiveSummary: string;
   roleAssessments: Record<SwarmRole, AgentOpinion>;
+  keyAssumptions: KeyAssumption[];
+  contradictions: Contradiction[];
+  evidenceFeed: EvidenceItem[];
   debateTrail: DebateChallenge[];
   simulation: SimulationResult;
   validationRoadmap: {
