@@ -16,42 +16,9 @@ Dossier grounds every evaluation in real-world evidence by combining:
 4. **Sandboxed Unit Economics Simulation** executing Python unit economics scripts inside isolated subprocess boundaries.
 5. **TrueForge Dual-Key Human Approval Checkpoints** that halt irreversible real-world transmissions until explicit operator authorization.
 
-```mermaid
-flowchart TD
-    User([User / Developer / Founder]) -->|Idea Input / Repo Scan| Intake[Dossier Intake Engine]
-    
-    subgraph ReconPhase [Recon & External Tooling Layer]
-        Intake --> WebRecon[Market Intelligence Tool]
-        Intake --> Polymarket[Polymarket Live Oracle]
-        Intake --> AgentReach[Agent Reach Community Intel]
-        Intake --> MCPClient[Native MCP Client Manager]
-    end
+![Dossier System Architecture](architecture-diagram.svg)
 
-    subgraph SwarmEngine [TrueForge Adversarial Multi-Agent Swarm]
-        ReconPhase --> Agent1["01 // Market Analyst"]
-        ReconPhase --> Agent2["02 // Customer Advocate"]
-        ReconPhase --> Agent3["03 // Technical Architect"]
-        ReconPhase --> Agent4["04 // Investor"]
-        ReconPhase --> Agent5["05 // Red Team (Chief Adversary)"]
-        ReconPhase --> Agent6["06 // Domain Expert"]
-    end
-
-    subgraph DebateLayer [Adversarial Cross-Examination]
-        Agent1 & Agent2 & Agent3 & Agent4 & Agent5 & Agent6 --> CrossDebate[Debate & Contradiction Resolution Engine]
-    end
-
-    subgraph SandboxLayer [TrueForge Isolated Sandbox]
-        CrossDebate --> PythonSandbox[Python3 Unit Economics Subprocess]
-    end
-
-    subgraph SynthesisLayer [Executive Dossier & Safety Gates]
-        PythonSandbox --> Synthesizer[Executive Synthesizer]
-        Synthesizer --> DossierReport[Compiled Intelligence Dossier]
-        Synthesizer --> ApprovalGates[Dual-Key Human Approval Checkpoints]
-    end
-
-    ApprovalGates -->|Operator Authorize / Veto| Outbound[External Action Execution]
-```
+*Fig 1: TrueForge Adversarial Multi-Agent Architecture — Reconnaissance, Concurrent Inference, Sandbox Stress-Testing, and Gated Execution.*
 
 ---
 
