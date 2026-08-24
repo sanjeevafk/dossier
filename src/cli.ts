@@ -7,13 +7,13 @@ import { IdeaInput } from "./types/index.js";
 const program = new Command();
 
 program
-  .name("idea-swarm")
-  .description("Adversarial multi-agent idea validation platform on TrueForge harness")
+  .name("dossier")
+  .description("Adversarial multi-agent idea intelligence platform on TrueForge harness")
   .version("0.1.0");
 
 program
   .command("evaluate")
-  .description("Evaluate an idea through the adversarial agent swarm")
+  .description("Compile an intelligence dossier on an idea through the adversarial agent swarm")
   .option("-t, --title <title>", "Idea title", "Autonomous Micro-SaaS Agent")
   .option("-s, --summary <summary>", "Idea summary description", "AI swarm that validates startup ideas before building.")
   .option("-a, --audience <audience>", "Target audience", "Founders, indie hackers, venture builders")
@@ -22,8 +22,8 @@ program
   .option("-c, --cac <number>", "Estimated customer acquisition cost in USD", "150")
   .action(async (options) => {
     console.log(pc.cyan("\n======================================================="));
-    console.log(pc.bold(pc.yellow("  ⚡ IDEA SWARM — ADVERSARIAL VALIDATION PLATFORM")));
-    console.log(pc.dim("  Powered by TrueForge Harness & Multi-Agent Consensus"));
+    console.log(pc.bold(pc.yellow("  ⚡ DOSSIER — ADVERSARIAL IDEA INTELLIGENCE")));
+    console.log(pc.dim("  Powered by TrueForge Harness (File TF-007)"));
     console.log(pc.cyan("=======================================================\n"));
 
     const ideaInput: IdeaInput = {
