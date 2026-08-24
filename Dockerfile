@@ -3,21 +3,17 @@ FROM node:22-slim
 # Install Python3 for the isolated economics sandbox
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    python3-pip \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pnpm globally
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
 WORKDIR /app
 
 # Copy dependency manifests
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 
-# Install all dependencies (including devDependencies for build)
-RUN pnpm install --frozen-lockfile
+# Install dependencies using npm
+RUN npm install
 
 # Copy source code and configuration
 COPY tsconfig.json ./
@@ -26,7 +22,7 @@ COPY public/ ./public/
 COPY dossier.mcp.json ./
 
 # Build TypeScript to dist
-RUN pnpm run build
+RUN npx tsc
 
 # Expose port
 ENV PORT=3000
