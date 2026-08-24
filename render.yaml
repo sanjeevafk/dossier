@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: dossier-ai
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+      - key: ORCAROUTER_API_KEY
+        sync: false
