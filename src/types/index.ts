@@ -150,12 +150,30 @@ export interface CheapestValidationExperiment {
   failureKillSignal: string;
 }
 
+export interface VerificationAuditItem {
+  id: string;
+  claimOrOpinion: string;
+  verdict: "VERIFIED_PASS" | "CORRECTED" | "REJECTED_UNGROUNDED";
+  rationale: string;
+  confidencePercent: number;
+}
+
+export interface VerificationAudit {
+  verifierProtocol: "STANFORD_CS329A_ROBUST_VERIFIER";
+  totalClaimsAudited: number;
+  hallucinationsBlocked: number;
+  testTimeSelfCorrections: number;
+  verificationConfidencePercent: number;
+  auditItems: VerificationAuditItem[];
+}
+
 export interface IdeaDossier {
   id: string;
   dossierCode: string; // e.g. "TF-007"
   timestamp: string;
   idea: IdeaInput;
   domainClassification: DomainClassification;
+  verificationAudit?: VerificationAudit;
   killScore: number; // 0 to 100 (composite resilience score)
   confidenceScore: number; // e.g. 78%
   overallVerdict: "BUILD" | "REFINE" | "KILL";
