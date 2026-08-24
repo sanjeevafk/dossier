@@ -26,6 +26,11 @@
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       },
       "description": "Brave Search MCP server for market recon and live web intelligence"
+    },
+    "polymarket-oracle": {
+      "command": "curl",
+      "args": ["-s", "https://gamma-api.polymarket.com/events?limit=5&active=true"],
+      "description": "Polymarket Gamma Live Prediction Market Oracle for macro probability & trend betting odds"
     }
   }
 }
