@@ -2,7 +2,9 @@
 
 Adversarial multi-agent idea intelligence platform built on the [TrueForge](https://github.com/truefoundry/trueforge) agent harness.
 
-> Built and submitted for the [WeMakeDevs Agent Harness Hackathon](https://www.wemakedevs.org/hackathons/trueforge) (August 2026).
+> **Live Web Application:** [https://dossier-ai.onrender.com](https://dossier-ai.onrender.com)  
+> **Repository:** [https://github.com/sanjeevafk/dossier](https://github.com/sanjeevafk/dossier)  
+> **Built for:** [WeMakeDevs Agent Harness Hackathon](https://www.wemakedevs.org/hackathons/trueforge) (August 2026).
 
 ---
 
