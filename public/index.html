@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Idea Swarm — Adversarial Multi-Agent Idea Validation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              900: '#4c1d95',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #0b0f17; color: #e2e8f0; }
+    .card-glass { background: rgba(18, 24, 38, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .card-glass:hover { border-color: rgba(139, 92, 246, 0.3); }
+    .glow-accent { box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.25); }
+    .terminal-box { background: #07090e; font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-white">
+
+  <!-- Navigation -->
+  <header class="sticky top-0 z-50 border-b border-slate-800 bg-[#0b0f17]/90 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="size-9 rounded-lg bg-gradient-to-tr from-brand-600 to-amber-500 flex items-center justify-center font-mono font-bold text-white shadow-lg shadow-brand-500/20">
+          ⚡
+        </div>
+        <div>
+          <span class="font-bold text-lg tracking-tight text-white">IDEA SWARM</span>
+          <span class="ml-2 text-xs uppercase tracking-wider font-mono px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20">TrueForge Powered</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 text-sm font-mono">
+        <div class="flex items-center gap-2 text-emerald-400 text-xs">
+          <span class="size-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>TrueForge Harness: Active</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Header -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
+    <section class="text-center max-w-3xl mx-auto mb-10">
+      <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
+        Don't ask AI if your idea is good.<br>
+        <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-purple-300 to-amber-400">Make AI try to kill it first.</span>
+      </h1>
+      <p class="text-slate-400 text-base leading-relaxed">
+        Adversarial multi-agent validation. Specialized agents cross-examine your concept, run sandboxed unit economics simulations, and halt at human approval gates before executing real tests.
+      </p>
+    </section>
+
+    <!-- Submission Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- Input Panel -->
+      <div class="lg:col-span-4">
+        <div class="card-glass rounded-2xl p-6 glow-accent sticky top-24">
+          <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <span>💡</span> Submit Concept for Swarm Review
+          </h2>
+          <form id="evalForm" class="space-y-4 text-sm">
+            <div>
+              <label class="block text-xs font-mono uppercase text-slate-400 mb-1">Concept Title</label>
+              <input type="text" id="title" class="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" value="Idea Swarm" required>
+            </div>
+            <div>
+              <label class="block text-xs font-mono uppercase text-slate-400 mb-1">Concept Summary & Value Prop</label>
+              <textarea id="summary" rows="3" class="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" required>An adversarial multi-agent platform where specialized agents stress-test startup concepts before building.</textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-mono uppercase text-slate-400 mb-1">Audience</label>
+                <input type="text" id="targetAudience" class="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" value="Founders & Hackathon Teams">
+              </div>
+              <div>
+                <label class="block text-xs font-mono uppercase text-slate-400 mb-1">Monetization</label>
+                <input type="text" id="monetization" class="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" value="$49/month SaaS">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-mono uppercase text-slate-400 mb-1">Target Monthly ($)</label>
+                <input type="number" id="pricingMonthlyUsd" class="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" value="49">
+              </div>
+              <div>
+                <label class="block text-xs font-mono uppercase text-slate-400 mb-1">Est. CAC ($)</label>
+                <input type="number" id="estimatedCacUsd" class="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" value="150">
+              </div>
+            </div>
+            <button type="submit" id="submitBtn" class="w-full mt-2 py-3 px-4 rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-500 hover:to-brand-600 text-white font-bold tracking-wide shadow-lg shadow-brand-500/25 transition-all duration-200 flex items-center justify-center gap-2">
+              <span>Unleash the Swarm</span>
+              <span id="spinner" class="hidden">⏳</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Results Display Panel -->
+      <div class="lg:col-span-8 space-y-6">
+        
+        <!-- Verdict Banner -->
+        <div id="verdictBanner" class="hidden card-glass rounded-2xl p-6 border-l-4 border-l-brand-500">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p class="font-mono text-xs uppercase text-slate-400">Swarm Consensus Verdict</p>
+              <h3 id="verdictTitle" class="text-2xl font-bold text-white mt-1">VIABLE_WITH_RISK</h3>
+              <p id="executiveSummary" class="text-sm text-slate-300 mt-1 max-w-xl"></p>
+            </div>
+            <div class="text-center sm:text-right px-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="text-xs font-mono text-slate-400 block uppercase">Resilience Score</span>
+              <span id="killScore" class="text-4xl font-extrabold text-brand-400 font-mono">62/100</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5 Specialized Agent Cards -->
+        <div id="agentCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Populated dynamically -->
+        </div>
+
+        <!-- Adversarial Debate Arena -->
+        <div id="debateSection" class="hidden card-glass rounded-2xl p-6">
+          <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <span>⚔️</span> Adversarial Cross-Examination & Debate
+          </h3>
+          <div id="debateList" class="space-y-3 font-mono text-xs"></div>
+        </div>
+
+        <!-- Sandbox Execution Results -->
+        <div id="sandboxSection" class="hidden card-glass rounded-2xl p-6">
+          <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <span>🧪</span> Sandboxed Quantitative Economics & Unit Proof
+          </h3>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center mb-4">
+            <div class="p-3 bg-slate-900/90 rounded-xl border border-slate-800">
+              <div class="text-xs font-mono text-slate-400">LTV / CAC</div>
+              <div id="metricLtvCac" class="text-lg font-bold text-emerald-400 mt-1 font-mono">-</div>
+            </div>
+            <div class="p-3 bg-slate-900/90 rounded-xl border border-slate-800">
+              <div class="text-xs font-mono text-slate-400">Payback Period</div>
+              <div id="metricPayback" class="text-lg font-bold text-cyan-400 mt-1 font-mono">-</div>
+            </div>
+            <div class="p-3 bg-slate-900/90 rounded-xl border border-slate-800">
+              <div class="text-xs font-mono text-slate-400">Est. LTV</div>
+              <div id="metricLtv" class="text-lg font-bold text-white mt-1 font-mono">-</div>
+            </div>
+            <div class="p-3 bg-slate-900/90 rounded-xl border border-slate-800">
+              <div class="text-xs font-mono text-slate-400">Monthly Compute</div>
+              <div id="metricInfra" class="text-lg font-bold text-amber-400 mt-1 font-mono">-</div>
+            </div>
+          </div>
+          <div class="terminal-box rounded-xl p-4 text-emerald-400 text-xs border border-slate-800 overflow-x-auto">
+            <div class="text-slate-500 mb-1">// TrueForge Subprocess Sandbox Execution Trace</div>
+            <pre id="sandboxStdout" class="text-xs whitespace-pre-wrap"></pre>
+          </div>
+        </div>
+
+        <!-- Human Approval Gates (Safety Checkpoint) -->
+        <div id="approvalSection" class="hidden card-glass rounded-2xl p-6 border border-amber-500/30">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <span>🛑</span> Human-in-the-Loop Approval Checkpoints
+            </h3>
+            <span class="text-xs font-mono text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded border border-amber-400/20 uppercase">
+              Action Gate Required
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            The swarm identified real-world validation actions but halted before execution. Approve or reject each action below:
+          </p>
+          <div id="approvalList" class="space-y-3"></div>
+        </div>
+
+        <!-- 7-Day Validation Roadmap -->
+        <div id="roadmapSection" class="hidden card-glass rounded-2xl p-6">
+          <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <span>🚀</span> 7-Day Actionable Validation Roadmap
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+            <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <h4 class="text-brand-400 font-bold mb-2 uppercase">Day 1–2: Discovery</h4>
+              <ul id="roadmapDay1to2" class="space-y-1.5 text-slate-300 list-disc list-inside"></ul>
+            </div>
+            <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <h4 class="text-amber-400 font-bold mb-2 uppercase">Day 3–5: Smoke Tests</h4>
+              <ul id="roadmapDay3to5" class="space-y-1.5 text-slate-300 list-disc list-inside"></ul>
+            </div>
+            <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <h4 class="text-emerald-400 font-bold mb-2 uppercase">Day 6–7: Go/No-Go</h4>
+              <ul id="roadmapDay6to7" class="space-y-1.5 text-slate-300 list-disc list-inside"></ul>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Script for API communication -->
+  <script>
+    const form = document.getElementById('evalForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const spinner = document.getElementById('spinner');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      spinner.classList.remove('hidden');
+
+      const payload = {
+        title: document.getElementById('title').value,
+        summary: document.getElementById('summary').value,
+        targetAudience: document.getElementById('targetAudience').value,
+        monetization: document.getElementById('monetization').value,
+        pricingMonthlyUsd: document.getElementById('pricingMonthlyUsd').value,
+        estimatedCacUsd: document.getElementById('estimatedCacUsd').value,
+      };
+
+      try {
+        const res = await fetch('/api/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderDossier(data.dossier);
+        } else {
+          alert("Evaluation error: " + data.error);
+        }
+      } catch (err) {
+        alert("Failed to reach Idea Swarm API: " + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        spinner.classList.add('hidden');
+      }
+    });
+
+    function renderDossier(dossier) {
+      document.getElementById('verdictBanner').classList.remove('hidden');
+      document.getElementById('verdictTitle').textContent = dossier.overallVerdict;
+      document.getElementById('executiveSummary').textContent = dossier.executiveSummary;
+      document.getElementById('killScore').textContent = `${dossier.killScore}/100`;
+
+      // Render Agent Cards
+      const container = document.getElementById('agentCardsContainer');
+      container.innerHTML = '';
+      const roleIcons = {
+        skeptic: '😈',
+        investor: '💰',
+        architect: '⚙️',
+        analyst: '📊',
+        customer: '🎯'
+      };
+
+      for (const [role, info] of Object.entries(dossier.roleAssessments)) {
+        if (role === 'synthesizer') continue;
+        const card = document.createElement('div');
+        card.className = 'card-glass rounded-xl p-4 flex flex-col justify-between';
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-bold text-sm text-white flex items-center gap-1.5">
+                <span>${roleIcons[role] || '🤖'}</span>
+                <span>${info.roleTitle}</span>
+              </span>
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded ${info.score >= 70 ? 'bg-emerald-500/20 text-emerald-400' : (info.score >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400')}">
+                ${info.score}/100
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 mb-3">${info.rationale}</p>
+            ${info.fatalFlaws.length ? `<div class="text-xs text-red-400 bg-red-950/40 border border-red-800/40 p-2 rounded mb-2"><strong>Fatal Risk:</strong> ${info.fatalFlaws[0]}</div>` : ''}
+          </div>
+          <div class="text-[11px] font-mono text-slate-500 uppercase mt-2">Verdict: ${info.verdict}</div>
+        `;
+        container.appendChild(card);
+      }
+
+      // Render Debate
+      document.getElementById('debateSection').classList.remove('hidden');
+      const debateList = document.getElementById('debateList');
+      debateList.innerHTML = '';
+      dossier.debateTrail.forEach(d => {
+        const item = document.createElement('div');
+        item.className = 'p-3 bg-slate-900/90 rounded-lg border border-slate-800';
+        item.innerHTML = `
+          <div class="flex items-center justify-between mb-1 text-slate-400">
+            <span class="text-brand-400 font-bold">${d.challenger.toUpperCase()} vs ${d.target.toUpperCase()}</span>
+            <span class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">${d.status}</span>
+          </div>
+          <div class="text-white mb-1"><span class="text-red-400 font-bold">Challenge:</span> ${d.challengePoint}</div>
+          ${d.rebuttal ? `<div class="text-slate-300"><span class="text-emerald-400 font-bold">Rebuttal:</span> ${d.rebuttal}</div>` : ''}
+        `;
+        debateList.appendChild(item);
+      });
+
+      // Render Sandbox
+      document.getElementById('sandboxSection').classList.remove('hidden');
+      document.getElementById('metricLtvCac').textContent = `${dossier.simulation.ltvCacRatio}x`;
+      document.getElementById('metricPayback').textContent = `${dossier.simulation.estimatedPaybackMonths} mo`;
+      document.getElementById('metricLtv').textContent = `$${dossier.simulation.ltvEstimateUsd}`;
+      document.getElementById('metricInfra').textContent = `$${dossier.simulation.monthlyInfraCostUsd}/mo`;
+      document.getElementById('sandboxStdout').textContent = dossier.simulation.sandboxExecutionProof.stdout;
+
+      // Render Approval Gates
+      document.getElementById('approvalSection').classList.remove('hidden');
+      const approvalList = document.getElementById('approvalList');
+      approvalList.innerHTML = '';
+      dossier.approvalGates.forEach(gate => {
+        const gDiv = document.createElement('div');
+        gDiv.className = 'p-4 bg-slate-900/90 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+        gDiv.innerHTML = `
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">${gate.actionType}</span>
+              <span id="status-${gate.id}" class="text-[11px] font-mono text-slate-400">[${gate.status}]</span>
+            </div>
+            <p class="text-xs text-slate-200 mt-1">${gate.summary}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button onclick="handleApproval('${gate.id}', 'APPROVE')" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold transition">Approve</button>
+            <button onclick="handleApproval('${gate.id}', 'REJECT')" class="px-3 py-1.5 rounded-lg bg-red-600/80 hover:bg-red-500 text-white font-mono text-xs font-bold transition">Reject</button>
+          </div>
+        `;
+        approvalList.appendChild(gDiv);
+      });
+
+      // Render Roadmap
+      document.getElementById('roadmapSection').classList.remove('hidden');
+      const setList = (id, items) => {
+        const ul = document.getElementById(id);
+        ul.innerHTML = '';
+        items.forEach(i => {
+          const li = document.createElement('li');
+          li.textContent = i;
+          ul.appendChild(li);
+        });
+      };
+      setList('roadmapDay1to2', dossier.validationRoadmap.day1to2);
+      setList('roadmapDay3to5', dossier.validationRoadmap.day3to5);
+      setList('roadmapDay6to7', dossier.validationRoadmap.day6to7);
+    }
+
+    async function handleApproval(actionId, decision) {
+      try {
+        const res = await fetch(`/api/approval/${actionId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const statusElem = document.getElementById(`status-${actionId}`);
+          if (statusElem) {
+            statusElem.textContent = `[${data.newStatus}]`;
+            statusElem.className = data.newStatus === 'APPROVED' ? 'text-xs font-mono text-emerald-400' : 'text-xs font-mono text-red-400';
+          }
+        }
+      } catch (err) {
+        alert("Approval failed: " + err.message);
+      }
+    }
+
+    // Auto-run sample on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('evalForm').dispatchEvent(new Event('submit'));
+    });
+  </script>
+</body>
+</html>

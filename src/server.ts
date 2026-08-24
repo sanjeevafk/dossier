@@ -1,5 +1,6 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
+import path from "node:path";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { IdeaInput } from "./types/index.js";
 
@@ -8,6 +9,7 @@ const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(process.cwd(), "public")));
 
 const orchestrator = new IdeaSwarmOrchestrator();
 
