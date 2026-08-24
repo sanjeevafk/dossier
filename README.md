@@ -1,6 +1,6 @@
-# Idea Swarm
+# Dossier
 
-Adversarial multi-agent idea validation platform built on the [TrueForge](https://github.com/truefoundry/trueforge) agent harness.
+Adversarial multi-agent idea intelligence platform built on the [TrueForge](https://github.com/truefoundry/trueforge) agent harness.
 
 > Built and submitted for the [WeMakeDevs Agent Harness Hackathon](https://www.wemakedevs.org/hackathons/trueforge) (August 2026).
 
@@ -8,7 +8,7 @@ Adversarial multi-agent idea validation platform built on the [TrueForge](https:
 
 ## Overview
 
-Idea Swarm stress-tests startup concepts, product features, and technical proposals before capital or engineering effort is spent. Instead of offering generic feedback, the platform deploys specialized adversarial subagents to challenge core assumptions, run quantitative unit economics simulations in an isolated sandbox, and propose validation steps guarded by human approval checkpoints.
+Dossier stress-tests startup concepts, product features, and technical proposals before capital or engineering effort is spent. Instead of offering generic feedback, the platform deploys specialized adversarial subagents to challenge core assumptions, run quantitative unit economics simulations in an isolated sandbox, and propose validation steps guarded by human approval checkpoints.
 
 ```
                            +----------------------+
