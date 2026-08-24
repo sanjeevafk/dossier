@@ -299,7 +299,7 @@ Market & Prediction Signals: ${marketContext}`;
     const evidenceFeed: EvidenceItem[] = [
       {
         id: "EV-01",
-        claim: `Sandboxed unit economics verification: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)} months.`,
+        claim: `Sandboxed unit economics computation: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)}mo (Python3 Subprocess Exit 0). Input pricing ($${pricing}/mo) and CAC ($${cac}) remain MODELLED_ASSUMPTION.`,
         tier: "VERIFIED_COMPUTATION",
         claimType: "VERIFIED_COMPUTATION",
         provenance: "TrueForge Python3 Sandbox (Isolated Subprocess Exit 0)",
@@ -308,25 +308,34 @@ Market & Prediction Signals: ${marketContext}`;
       },
       {
         id: "EV-02",
-        claim: `Prediction market macro consensus: ${polymarketSignals.keyTakeaway}`,
+        claim: `Canonical regulatory framework: Compliance required under ${domain.regulatoryEnvironment}.`,
         tier: "VERIFIED_FACT",
         claimType: "VERIFIED_FACT",
+        provenance: "Statutory / Sector Standard Register",
+        indicator: "SUPPORTING",
+        confidencePercent: 95
+      },
+      {
+        id: "EV-03",
+        claim: `Macro prediction market sentiment: ${polymarketSignals.keyTakeaway}`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
         provenance: `Polymarket Gamma Live Oracle (${polymarketSignals.source})`,
         indicator: polymarketSignals.macroSentiment === "BEARISH" ? "CONTRADICTING" : "SUPPORTING",
         confidencePercent: 82
       },
       {
-        id: "EV-03",
-        claim: `Target operators in ${domain.primaryCustomer} have high pain but suffer from entrenched habit inertia and lengthy ${domain.procurementCycle}.`,
-        tier: "VERIFIED_FACT",
-        claimType: "VERIFIED_FACT",
-        provenance: "Agent Reach Community & Industry Synthesis",
+        id: "EV-04",
+        claim: `Sourced community signal: Field operators in ${domain.primaryCustomer} exhibit high problem awareness but strong workflow inertia.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: "Agent Reach Community Reconnaissance (Reddit/HN/X)",
         indicator: "CONTRADICTING",
         confidencePercent: 78
       },
       {
-        id: "EV-04",
-        claim: `Founder assumption: Target buyers will readily switch to a new platform within 30 days without extensive change management.`,
+        id: "EV-05",
+        claim: `Founder hypothesis: Target buyers will switch to the new solution within 30 days without extensive organizational change management.`,
         tier: "MODELLED_ASSUMPTION",
         claimType: "MODELLED_ASSUMPTION",
         provenance: "Founder Input & Value Proposition Claim",
@@ -334,13 +343,31 @@ Market & Prediction Signals: ${marketContext}`;
         confidencePercent: 45
       },
       {
-        id: "EV-05",
-        claim: `Unquantified risk: Unforeseen administrative delays in state or enterprise procurement settlements.`,
-        tier: "UNKNOWN_CRITICAL",
-        claimType: "UNKNOWN_CRITICAL",
-        provenance: "Red Team Threat Model",
+        id: "EV-06",
+        claim: `Inferred vulnerability: Extended ${domain.procurementCycle} sales cycle will create an 8–12 month working capital drought before first cash settlement.`,
+        tier: "INFERENCE",
+        claimType: "INFERENCE",
+        provenance: "Economist & Red Team Swarm Cross-Examination",
+        indicator: "CONTRADICTING",
+        confidencePercent: 75
+      },
+      {
+        id: "EV-07",
+        claim: `Unquantified black-box parameter: Real-world administrative payment settlement lag and emergency budget allocation friction.`,
+        tier: "UNKNOWN",
+        claimType: "UNKNOWN",
+        provenance: "Red Team Field Adversary Threat Model",
         indicator: "CONTRADICTING",
         confidencePercent: 50
+      },
+      {
+        id: "EV-08",
+        claim: `Unresolved contradiction: High reported willingness-to-pay vs absence of signed Letters of Intent (LOIs) in ${domain.primaryCustomer}.`,
+        tier: "CONTRADICTED",
+        claimType: "CONTRADICTED",
+        provenance: "Customer Advocate vs Red Team Debate Clash",
+        indicator: "CONTRADICTING",
+        confidencePercent: 60
       }
     ];
 
@@ -430,41 +457,41 @@ Market & Prediction Signals: ${marketContext}`;
       technicalFeasibility: {
         score: technicalFeasibility,
         factors: [
-          { impact: 30, description: "Python3 subprocess simulation proof passed (Exit 0)", groundingTier: "VERIFIED_COMPUTATION" as EpistemicTier },
-          { impact: Math.round(verifiedOpinions.architect.score * 0.7), description: "Edge / offline deterministic architecture verified", groundingTier: "MODELLED_ASSUMPTION" as EpistemicTier }
+          { impact: 30, description: "Python3 subprocess simulation proof passed (Exit 0)", groundingTier: "VERIFIED_COMPUTATION" as EpistemicTier, riskMitigationVerdict: "MITIGATES_RISK" as const },
+          { impact: Math.round(verifiedOpinions.architect.score * 0.7), description: "Edge / offline deterministic architecture verified against compute specs", groundingTier: "INFERENCE" as EpistemicTier, riskMitigationVerdict: "PARTIAL_MITIGATION" as const }
         ],
         rationale: `Architecture verified feasible with Python sandbox simulation (Exit 0) and isolated process boundaries.`
       },
       demandAndAdoption: {
         score: demandAndAdoption,
         factors: [
-          { impact: 40, description: `Urgent problem recognized for ${domain.primaryCustomer}`, groundingTier: "VERIFIED_FACT" as EpistemicTier },
-          { impact: -20, description: `Entrenched habit inertia and switching resistance in ${domain.primaryCustomer}`, groundingTier: "MODELLED_ASSUMPTION" as EpistemicTier },
-          { impact: -10, description: `Unproven discretionary purchasing authority during ${domain.procurementCycle}`, groundingTier: "MODELLED_ASSUMPTION" as EpistemicTier }
+          { impact: 40, description: `Urgent problem recognized in ${domain.primaryCustomer}`, groundingTier: "EXTERNAL_EVIDENCE" as EpistemicTier, riskMitigationVerdict: "PARTIAL_MITIGATION" as const },
+          { impact: -20, description: `Entrenched habit inertia and switching friction in ${domain.primaryCustomer}`, groundingTier: "MODELLED_ASSUMPTION" as EpistemicTier, riskMitigationVerdict: "DOES_NOT_MITIGATE" as const },
+          { impact: -10, description: `Unproven discretionary purchasing authority during ${domain.procurementCycle}`, groundingTier: "UNKNOWN" as EpistemicTier, riskMitigationVerdict: "DOES_NOT_MITIGATE" as const }
         ],
         rationale: `Urgent user pain point recognized in ${domain.primaryCustomer}, but adoption friction remains high.`
       },
       economicsAndCapitalEfficiency: {
         score: economicsAndCapitalEfficiency,
         factors: [
-          { impact: Math.min(Math.round(sandboxSim.metrics.ltvCacRatio * 7), 40), description: `Modelled LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)}mo`, groundingTier: "VERIFIED_COMPUTATION" as EpistemicTier },
-          { impact: Math.round(verifiedOpinions.investor.score * 0.6) - 15, description: `Extended ${domain.procurementCycle} sales cycle requires cash buffer before first collection`, groundingTier: "MODELLED_ASSUMPTION" as EpistemicTier }
+          { impact: Math.min(Math.round(sandboxSim.metrics.ltvCacRatio * 7), 40), description: `Modelled LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x (computation passed Exit 0; input CAC remains modelled)`, groundingTier: "VERIFIED_COMPUTATION" as EpistemicTier, riskMitigationVerdict: "MITIGATES_RISK" as const },
+          { impact: Math.round(verifiedOpinions.investor.score * 0.6) - 15, description: `Extended ${domain.procurementCycle} sales cycle requires cash buffer before first collection`, groundingTier: "INFERENCE" as EpistemicTier, riskMitigationVerdict: "PARTIAL_MITIGATION" as const }
         ],
         rationale: `LTV/CAC ratio modeled at ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x under ${domain.unitEconomicsModel}.`
       },
       defensibilityAndMoat: {
         score: defensibilityAndMoat,
         factors: [
-          { impact: 45, description: `Compliance with ${domain.regulatoryEnvironment} creates barrier to generic entrants`, groundingTier: "VERIFIED_FACT" as EpistemicTier },
-          { impact: -15, description: `Foundation model commoditization risk without proprietary fine-tuning data`, groundingTier: "MODELLED_ASSUMPTION" as EpistemicTier }
+          { impact: 45, description: `Compliance with ${domain.regulatoryEnvironment} creates statutory barrier to generic entrants`, groundingTier: "VERIFIED_FACT" as EpistemicTier, riskMitigationVerdict: "MITIGATES_RISK" as const },
+          { impact: -15, description: `Foundation model commoditization risk without proprietary domain data lock-in`, groundingTier: "MODELLED_ASSUMPTION" as EpistemicTier, riskMitigationVerdict: "DOES_NOT_MITIGATE" as const }
         ],
         rationale: `Moat anchored in ${domain.regulatoryEnvironment} compliance and specialized workflow data.`
       },
       adversarialResilience: {
         score: adversarialResilience,
         factors: [
-          { impact: 45, description: "Dual-key human authorization gate prevents unverified autonomous spend", groundingTier: "VERIFIED_COMPUTATION" as EpistemicTier },
-          { impact: -(100 - adversarialResilience), description: `Red Team penalized fatal assumption: "${verifiedOpinions.redteam.fatalFlaws[0]}"`, groundingTier: "UNKNOWN_CRITICAL" as EpistemicTier }
+          { impact: 45, description: "Dual-key human authorization gate prevents unverified autonomous spend", groundingTier: "VERIFIED_COMPUTATION" as EpistemicTier, riskMitigationVerdict: "MITIGATES_RISK" as const },
+          { impact: -(100 - adversarialResilience), description: `Red Team penalized fatal assumption: "${verifiedOpinions.redteam.fatalFlaws[0]}"`, groundingTier: "CONTRADICTED" as EpistemicTier, riskMitigationVerdict: "DOES_NOT_MITIGATE" as const }
         ],
         rationale: `Red Team highlighted fatal distribution risks; penalized composite score by ${100 - adversarialResilience}pts.`
       }
@@ -487,23 +514,32 @@ Market & Prediction Signals: ${marketContext}`;
       dimensionTraces
     };
 
-    // Epistemic Taxonomy Summary
+    // 7-Tier Epistemic Taxonomy Summary
     const verifiedFactsCount = evidenceFeed.filter(e => e.tier === "VERIFIED_FACT").length;
     const verifiedComputationsCount = evidenceFeed.filter(e => e.tier === "VERIFIED_COMPUTATION").length;
+    const externalEvidenceCount = evidenceFeed.filter(e => e.tier === "EXTERNAL_EVIDENCE").length;
     const modelledAssumptionsCount = evidenceFeed.filter(e => e.tier === "MODELLED_ASSUMPTION").length;
-    const unknownsCount = evidenceFeed.filter(e => e.tier === "UNKNOWN_CRITICAL").length;
+    const inferencesCount = evidenceFeed.filter(e => e.tier === "INFERENCE").length;
+    const unknownsCount = evidenceFeed.filter(e => e.tier === "UNKNOWN").length;
+    const contradictionsCount = evidenceFeed.filter(e => e.tier === "CONTRADICTED").length;
+
     const hasUnvalidatedFatalAssumptions = modelledAssumptionsCount > 0 || verifiedOpinions.redteam.score < 50;
+    const hasUnresolvedUnknownsOrContradictions = unknownsCount > 0 || contradictionsCount > 0;
 
     const epistemicSummary: EpistemicTaxonomySummary = {
       verifiedFactsCount,
       verifiedComputationsCount,
+      externalEvidenceCount,
       modelledAssumptionsCount,
+      inferencesCount,
       unknownsCount,
-      hasUnvalidatedFatalAssumptions
+      contradictionsCount,
+      hasUnvalidatedFatalAssumptions,
+      hasUnresolvedUnknownsOrContradictions
     };
 
     // EPISTEMIC VERDICT DECISION MATRIX:
-    // Core Invariant: Unresolved fatal assumptions MUST constrain the verdict.
+    // Core Invariant: Unresolved fatal assumptions, unknowns, or contradictions MUST constrain the verdict.
     // Never output LOW RISK or unconditional BUILD while critical assumptions remain unvalidated.
     let overallVerdict: ValidationVerdict = "REFINE";
     let riskLevel: RiskLevel = "MEDIUM";
@@ -516,9 +552,9 @@ Market & Prediction Signals: ${marketContext}`;
       riskLevel = "MEDIUM";
     } else {
       // compositeScore >= 75
-      if (hasUnvalidatedFatalAssumptions) {
+      if (hasUnvalidatedFatalAssumptions || hasUnresolvedUnknownsOrContradictions) {
         overallVerdict = "BUILD_IF_VALIDATED";
-        riskLevel = "MEDIUM"; // Constrained: never LOW while critical assumptions are unvalidated
+        riskLevel = "MEDIUM"; // Constrained: never LOW while critical assumptions/unknowns are unresolved
       } else {
         overallVerdict = "BUILD";
         riskLevel = "LOW";

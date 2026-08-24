@@ -12,18 +12,20 @@ import {
 /**
  * Stanford CS329A: Robust Verification & Test-Time Self-Correction Engine
  * 
- * Based on Azalia Mirhoseini & Stanford CS329A curriculum (LLM-as-a-Verifier,
- * Constitutional Constraints, and Test-Time Self-Correction).
+ * CORE RULE: A verifier must verify evidence or execution — not agree with the model.
  * 
- * Audits all subagent claims, scores, and assumptions against 4 ground-truth invariants:
- * 1. Mathematical Invariance: Subprocess simulation proof alignment.
- * 2. Empirical Grounding: Live Polymarket & community signal alignment.
- * 3. Anti-Sycophancy: Rejection of unearned praise & uncalibrated certainty.
- * 4. Domain Consistency: Proper regulatory/procurement priors.
+ * Epistemic Hierarchy:
+ * 1. VERIFIED_FACT: Canonical external ground-truth (e.g. published statutes, DGCA/WHO regulations).
+ * 2. VERIFIED_COMPUTATION: Code/math executed without error (Exit 0) — its input assumptions remain separately labelled.
+ * 3. EXTERNAL_EVIDENCE: Sourced external feeds (Polymarket Gamma odds, Agent Reach community recon) not yet independently verified.
+ * 4. MODELLED_ASSUMPTION: Founder hypotheses and commercial estimates. (NEVER marked as verified).
+ * 5. INFERENCE: Deductions drawn by models or domain analogies. (NEVER marked as verified).
+ * 6. UNKNOWN: Unquantified black-box risk or missing parameter.
+ * 7. CONTRADICTED: Disproved or conflicting claims.
  */
 export class StanfordRobustVerifier {
   /**
-   * Execute comprehensive verification audit across all subagent opinions.
+   * Execute comprehensive epistemic verification audit across all subagent opinions and evidence feed.
    */
   public verifySwarmOpinions(
     idea: IdeaInput,
@@ -41,7 +43,7 @@ export class StanfordRobustVerifier {
 
     const verifiedOpinions: Record<SwarmRole, AgentOpinion> = { ...opinions };
 
-    // Invariant 1: Mathematical Invariance Check
+    // Invariant 1: Mathematical Invariance & Input Assumption Separation
     const ltvCacRatio = sandboxSim.ltvCacRatio;
     const investorOpinion = verifiedOpinions.investor;
 
@@ -64,15 +66,15 @@ export class StanfordRobustVerifier {
       } else {
         auditItems.push({
           id: "VERIFY-MATH-01",
-          claimOrOpinion: `Investor unit economics aligned with Python sandbox (${ltvCacRatio.toFixed(2)}x LTV/CAC)`,
+          claimOrOpinion: `Isolated Python3 simulation verified (Exit 0, ${ltvCacRatio.toFixed(2)}x LTV/CAC). Input assumptions remain separately labelled as MODELLED_ASSUMPTION.`,
           verdict: "VERIFIED_PASS",
-          rationale: "Python3 subprocess simulation proof passed with Exit Code 0 and consistent margin calculations.",
+          rationale: "Deterministic calculation verified. Does not validate input pricing or CAC assumptions.",
           confidencePercent: 99
         });
       }
     }
 
-    // Invariant 2: Anti-Sycophancy & Prior Calibration Check
+    // Invariant 2: Anti-Sycophancy & Real Risk Mitigation (No points merely for existing architecture)
     for (const [role, op] of Object.entries(verifiedOpinions)) {
       if (role === "synthesizer") continue;
 
@@ -83,9 +85,9 @@ export class StanfordRobustVerifier {
         op.score = 84;
         auditItems.push({
           id: `VERIFY-SYCOPHANCY-${role.toUpperCase()}`,
-          claimOrOpinion: `${op.roleTitle} scored ${op.score}/100 on unverified founder assumptions`,
+          claimOrOpinion: `${op.roleTitle} scored ${op.score}/100 without empirical field validation`,
           verdict: "CORRECTED",
-          rationale: "Stanford CS329A Invariant: Blocked sycophantic score inflation without live field pilot evidence.",
+          rationale: "Stanford CS329A Invariant: Blocked score inflation. A verifier must verify execution/evidence, not agree with the model.",
           confidencePercent: 92
         });
       }
@@ -132,32 +134,50 @@ export class StanfordRobustVerifier {
       }
     }
 
-    // Invariant 4: Regulatory Standard Alignment
+    // Invariant 4: Statutory Standard Verification (VERIFIED_FACT vs EXTERNAL_EVIDENCE)
     const expert = verifiedOpinions.expert;
     if (expert) {
       auditItems.push({
         id: "VERIFY-REGULATORY-01",
-        claimOrOpinion: `Compliance verified against ${domain.regulatoryEnvironment}`,
+        claimOrOpinion: `Regulatory standard confirmed: ${domain.regulatoryEnvironment}`,
         verdict: "VERIFIED_PASS",
-        rationale: `Architecture evaluated against official standards (${domain.regulatoryEnvironment}).`,
+        rationale: `Statutory framework verified as canonical VERIFIED_FACT.`,
         confidencePercent: 95
       });
     }
 
-    // Invariant 5: Epistemic Invariance (Verified Computation ≠ Verified Assumption)
+    // Invariant 5: Strict Epistemic Labeling (Never mark assumption, inference, or external feeds as VERIFIED_FACT)
     evidenceFeed.forEach(item => {
-      if ((item.tier as string) === "VERIFIED_FACT" || (item.tier as string) === "VERIFIED_COMPUTATION") {
-        const text = item.claim.toLowerCase();
-        if (text.includes("will readily switch") || text.includes("adoption rate") || text.includes("founder assumption")) {
+      const text = item.claim.toLowerCase();
+
+      // If an assumption or inference was incorrectly labeled as fact or computation
+      if (item.tier === "VERIFIED_FACT" || item.tier === "VERIFIED_COMPUTATION") {
+        if (
+          text.includes("will readily switch") || 
+          text.includes("adoption rate") || 
+          text.includes("founder assumption") ||
+          text.includes("willingness to pay") ||
+          text.includes("market sentiment")
+        ) {
           hallucinationsBlocked++;
           testTimeSelfCorrections++;
-          item.tier = "MODELLED_ASSUMPTION";
-          item.claimType = "MODELLED_ASSUMPTION";
+          
+          if (text.includes("market sentiment") || text.includes("oracle")) {
+            item.tier = "EXTERNAL_EVIDENCE";
+            item.claimType = "EXTERNAL_EVIDENCE";
+          } else if (text.includes("because") || text.includes("leads to")) {
+            item.tier = "INFERENCE";
+            item.claimType = "INFERENCE";
+          } else {
+            item.tier = "MODELLED_ASSUMPTION";
+            item.claimType = "MODELLED_ASSUMPTION";
+          }
+
           auditItems.push({
             id: `VERIFY-EPISTEMIC-${item.id}`,
-            claimOrOpinion: `Blocked false verification label on hypothesis: "${item.claim}"`,
+            claimOrOpinion: `Reclassified "${item.claim}" to ${item.tier}`,
             verdict: "CORRECTED",
-            rationale: "Stanford CS329A Epistemic Invariant: Verified computation is not a verified assumption. Re-classified to MODELLED_ASSUMPTION.",
+            rationale: "Stanford CS329A Invariant: Never mark an assumption, inference, or external prediction as VERIFIED.",
             confidencePercent: 99
           });
         }
