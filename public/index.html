@@ -77,6 +77,18 @@
       background-color: rgba(0, 0, 0, 0.5);
       backdrop-filter: blur(4px);
     }
+
+    /* Chat scrollbar */
+    .chat-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .chat-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .chat-scroll::-webkit-scrollbar-thumb {
+      background-color: #e4e4e7;
+      border-radius: 9999px;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between">
@@ -87,482 +99,596 @@
   <header class="border-b border-zinc-200/80 bg-white sticky top-0 z-30">
     <div class="max-w-7xl mx-auto px-6 md:px-12 py-4 flex items-center justify-between">
       
-      <!-- Brand Logo + Name -->
-      <a href="#" onclick="showHomeView(); return false;" class="flex items-center gap-3.5 group">
-        <div class="w-10 h-10 bg-brandYellow rounded-md flex items-center justify-center font-black text-xl text-black tracking-tight shadow-sm group-hover:bg-brandYellowHover transition">
-          DS
-        </div>
-        <span class="font-extrabold text-2xl tracking-tight text-zinc-900">
+      <!-- Brand Name (No DS box) -->
+      <a href="#" onclick="switchView('home'); return false;" class="flex items-center gap-2 group">
+        <span class="font-extrabold text-2xl tracking-tight text-zinc-950">
           DOSSIER
         </span>
       </a>
 
-      <!-- Nav Items -->
-      <nav class="flex items-center gap-8 text-sm font-semibold text-zinc-700">
-        <a href="#" onclick="showHomeView(); return false;" class="hover:text-black transition text-zinc-900">Home</a>
-        <a href="#recentDossiersSection" onclick="scrollToRecent(); return false;" class="hover:text-black transition">My Dossiers</a>
-        <a href="#" onclick="openTemplatesModal(); return false;" class="hover:text-black transition">Templates</a>
-        <a href="#" onclick="openSettingsModal(); return false;" class="hover:text-black transition">Settings</a>
+      <!-- Navigation Links: Home and Playground -->
+      <nav class="flex items-center gap-4 text-sm font-semibold">
+        <button id="navHomeBtn" onclick="switchView('home')" class="text-zinc-950 font-bold px-3 py-1.5 rounded-lg bg-zinc-100 transition cursor-pointer">
+          Home
+        </button>
+        <button id="navPlaygroundBtn" onclick="switchView('playground')" class="text-zinc-600 font-semibold px-3 py-1.5 rounded-lg hover:text-zinc-950 hover:bg-zinc-100 transition cursor-pointer flex items-center gap-2">
+          <span>Playground</span>
+          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brandYellow text-black font-mono">LIVE</span>
+        </button>
       </nav>
 
     </div>
   </header>
 
   <!-- ============================================================ -->
-  <!-- 2. MAIN CONTAINER                                            -->
+  <!-- 2. HOME VIEW                                                 -->
   <!-- ============================================================ -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-10 md:py-14 space-y-16">
-    
-    <!-- ------------------------------------------------------------ -->
-    <!-- HERO SECTION (Split: Left Pitch / Right Swarm Diagram)       -->
-    <!-- ------------------------------------------------------------ -->
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+  <div id="homeView" class="flex-1">
+    <main class="max-w-7xl w-full mx-auto px-6 md:px-12 py-10 md:py-14 space-y-16">
       
-      <!-- Left Column: Copy & Actions -->
-      <div class="lg:col-span-6 space-y-6 max-w-xl">
-        <h1 class="text-4xl sm:text-5xl lg:text-[56px] font-extrabold text-zinc-950 leading-[1.08] tracking-tight">
-          Make AI try to kill your idea before the market does.
-        </h1>
-
-        <p class="text-zinc-600 text-base sm:text-lg leading-relaxed font-normal">
-          Autonomous consensus from 6 specialized agents. Deep market recon, stress-testing, and human approval checkpoints.
-        </p>
-
-        <!-- CTA Buttons -->
-        <div class="flex flex-wrap items-center gap-4 pt-2">
-          <button onclick="openIntakeModal()" class="bg-brandYellow hover:bg-brandYellowHover text-zinc-950 font-bold text-sm px-6 py-3.5 rounded-lg shadow-sm transition inline-flex items-center justify-center cursor-pointer">
-            Launch New Dossier
-          </button>
-          <button onclick="loadSampleDossierDirect()" class="bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-300 font-semibold text-sm px-6 py-3.5 rounded-lg shadow-sm transition inline-flex items-center justify-center cursor-pointer">
-            View Sample Dossier
-          </button>
-        </div>
-      </div>
-
-      <!-- Right Column: Swarm Orbit Diagram -->
-      <div class="lg:col-span-6 flex items-center justify-center">
-        <div class="orbit-container">
-          
-          <!-- Orbit SVG Dashed Ring & Central Dossier Document -->
-          <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 520 420" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <!-- Dashed Circular Orbit line (radius 145px around center (260, 200)) -->
-            <ellipse cx="260" cy="200" rx="145" ry="145" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="4 4" fill="none" />
-
-            <!-- Center Dossier Card (at 260, 200; width 84, height 110) -->
-            <g transform="translate(218, 145)">
-              <!-- Document Base with folded corner -->
-              <path d="M 0 6 C 0 2.686 2.686 0 6 0 L 60 0 L 84 24 L 84 104 C 84 107.314 81.314 110 78 110 L 6 110 C 2.686 110 0 107.314 0 104 Z" fill="#ffffff" stroke="#000000" stroke-width="2" />
-              <!-- Dog-ear fold line -->
-              <path d="M 60 0 L 60 24 L 84 24" fill="#f4f4f5" stroke="#000000" stroke-width="2" />
-              <!-- Card Text: DS -->
-              <text x="42" y="58" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="28" fill="#000000" text-anchor="middle" letter-spacing="-1">DS</text>
-              <!-- Card Text: DOSSIER -->
-              <text x="42" y="80" font-family="'Plus Jakarta Sans', sans-serif" font-weight="800" font-size="9.5" fill="#000000" text-anchor="middle" letter-spacing="1">DOSSIER</text>
-            </g>
-          </svg>
-
-          <!-- 1. Top Node: Founder (12 o'clock) -->
-          <div class="orbit-node" style="top: 32px; left: 238px;">
-            <div class="yellow-circle-node" title="Founder Agent">
-              <!-- Person Silhouette Icon -->
-              <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-              </svg>
-            </div>
-            <div class="ml-3 text-left">
-              <div class="font-bold text-xs text-zinc-950">Founder</div>
-              <div class="text-[10px] text-zinc-500 leading-tight">Opportunity Framing</div>
-            </div>
-          </div>
-
-          <!-- 2. Top-Right Node: Market Recon (~2 o'clock) -->
-          <div class="orbit-node" style="top: 98px; left: 382px;">
-            <div class="yellow-circle-node" title="Market Recon Agent">
-              <!-- Bar Chart Icon -->
-              <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-              </svg>
-            </div>
-            <div class="ml-3 text-left">
-              <div class="font-bold text-xs text-zinc-950">Market Recon</div>
-              <div class="text-[10px] text-zinc-500 leading-tight">Competition Trends</div>
-            </div>
-          </div>
-
-          <!-- 3. Bottom-Right Node: Financial (~4 o'clock) -->
-          <div class="orbit-node" style="top: 250px; left: 382px;">
-            <div class="yellow-circle-node" title="Financial Agent">
-              <!-- Dollar Sign Icon -->
-              <span class="font-extrabold text-base text-black font-sans">$</span>
-            </div>
-            <div class="ml-3 text-left">
-              <div class="font-bold text-xs text-zinc-950">Financial</div>
-              <div class="text-[10px] text-zinc-500 leading-tight">Unit Economics</div>
-              <div class="text-[10px] text-zinc-500 leading-tight">Stress Test</div>
-            </div>
-          </div>
-
-          <!-- 4. Bottom Node: Human / User (6 o'clock) -->
-          <div class="orbit-node flex-col" style="top: 322px; left: 238px;">
-            <div class="yellow-circle-node" title="Human / User Persona Agent">
-              <!-- 2 People / Group Icon -->
-              <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-              </svg>
-            </div>
-            <div class="text-center mt-1.5">
-              <div class="font-bold text-xs text-zinc-950">Human / User</div>
-              <div class="text-[10px] text-zinc-500 leading-tight">Empathy Reality Check</div>
-            </div>
-          </div>
-
-          <!-- 5. Bottom-Left Node: Technical (~8 o'clock) -->
-          <div class="orbit-node flex-row-reverse" style="top: 250px; right: 282px;">
-            <div class="yellow-circle-node" title="Technical Architect Agent">
-              <!-- Code brackets </> -->
-              <span class="font-extrabold text-xs text-black font-mono tracking-tighter">&lt;/&gt;</span>
-            </div>
-            <div class="mr-3 text-right">
-              <div class="font-bold text-xs text-zinc-950">Technical</div>
-              <div class="text-[10px] text-zinc-500 leading-tight">Feasibility</div>
-              <div class="text-[10px] text-zinc-500 leading-tight">Architecture</div>
-            </div>
-          </div>
-
-          <!-- 6. Top-Left Node: Skeptic (~10 o'clock) -->
-          <div class="orbit-node flex-row-reverse" style="top: 98px; right: 282px;">
-            <div class="yellow-circle-node" title="Skeptic / Red Team Agent">
-              <!-- Shield with Checkmark Icon -->
-              <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-              </svg>
-            </div>
-            <div class="mr-3 text-right">
-              <div class="font-bold text-xs text-zinc-950">Skeptic</div>
-              <div class="text-[10px] text-zinc-500 leading-tight">Red Team</div>
-              <div class="text-[10px] text-zinc-500 leading-tight">Contrarian</div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ------------------------------------------------------------ -->
-    <!-- BOTTOM SECTION: HOW IT WORKS + RECENT DOSSIERS               -->
-    <!-- ------------------------------------------------------------ -->
-    <div class="pt-6 border-t border-zinc-200/80">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+      <!-- ------------------------------------------------------------ -->
+      <!-- HERO SECTION (Split: Left Pitch / Right Swarm Diagram)       -->
+      <!-- ------------------------------------------------------------ -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
         
-        <!-- HOW IT WORKS (Left Column, 7 Cols) -->
-        <div class="lg:col-span-7 space-y-6" id="howItWorksSection">
-          <h2 class="text-base font-extrabold text-zinc-900 tracking-tight">
-            How It Works
-          </h2>
+        <!-- Left Column: Copy & Actions -->
+        <div class="lg:col-span-6 space-y-6 max-w-xl">
+          <h1 class="text-4xl sm:text-5xl lg:text-[56px] font-extrabold text-zinc-950 leading-[1.08] tracking-tight">
+            Make AI try to kill your idea before the market does.
+          </h1>
 
-          <!-- 5 Steps Flow -->
-          <div class="flex items-start justify-between gap-1 sm:gap-2">
+          <p class="text-zinc-600 text-base sm:text-lg leading-relaxed font-normal">
+            Autonomous consensus from 6 specialized agents. Deep market recon, stress-testing, and human approval checkpoints.
+          </p>
+
+          <!-- CTA Buttons -->
+          <div class="flex flex-wrap items-center gap-4 pt-2">
+            <button onclick="openIntakeModal()" class="bg-brandYellow hover:bg-brandYellowHover text-zinc-950 font-bold text-sm px-6 py-3.5 rounded-lg shadow-sm transition inline-flex items-center justify-center cursor-pointer">
+              Launch New Dossier
+            </button>
+            <button onclick="loadSampleDossierDirect()" class="bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-300 font-semibold text-sm px-6 py-3.5 rounded-lg shadow-sm transition inline-flex items-center justify-center cursor-pointer">
+              View Sample Dossier
+            </button>
+            <button onclick="switchView('playground')" class="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-semibold text-sm px-5 py-3.5 rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer">
+              <span>💬</span> <span>Open Playground</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Column: Swarm Orbit Diagram -->
+        <div class="lg:col-span-6 flex items-center justify-center">
+          <div class="orbit-container">
             
-            <!-- Step 1: Submit -->
-            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
-              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
-                <!-- Document Icon -->
-                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            <!-- Orbit SVG Dashed Ring & Sleek Center Hub (No Dog-Ear Paper) -->
+            <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 520 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Dashed Circular Orbit line (radius 145px around center (260, 200)) -->
+              <ellipse cx="260" cy="200" rx="145" ry="145" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="4 4" fill="none" />
+
+              <!-- Clean Center Hub Node (No paper / dog-ear symbol) -->
+              <g transform="translate(260, 200)">
+                <!-- Inner subtle pulse circle -->
+                <circle cx="0" cy="0" r="42" fill="#ffffff" stroke="#000000" stroke-width="1.5" />
+                <circle cx="0" cy="0" r="6" fill="#facc15" stroke="#000000" stroke-width="1" />
+                <text x="0" y="20" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="10.5" fill="#000000" text-anchor="middle" letter-spacing="1.5">DOSSIER</text>
+              </g>
+            </svg>
+
+            <!-- 1. Top Node: Founder (12 o'clock) -->
+            <div class="orbit-node" style="top: 32px; left: 238px;">
+              <div class="yellow-circle-node" title="Founder Agent">
+                <!-- Person Silhouette Icon -->
+                <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                 </svg>
               </div>
-              <div class="font-bold text-xs text-zinc-900 mt-3">1. Submit</div>
-              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Drop your idea, brief or plan.</div>
+              <div class="ml-3 text-left">
+                <div class="font-bold text-xs text-zinc-950">Founder</div>
+                <div class="text-[10px] text-zinc-500 leading-tight">Opportunity Framing</div>
+              </div>
             </div>
 
-            <!-- Arrow 1 -->
-            <div class="text-zinc-400 font-light text-lg pt-4">→</div>
+            <!-- 2. Top-Right Node: Market Recon (~2 o'clock) -->
+            <div class="orbit-node" style="top: 98px; left: 382px;">
+              <div class="yellow-circle-node" title="Market Recon Agent">
+                <!-- Bar Chart Icon -->
+                <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+              </div>
+              <div class="ml-3 text-left">
+                <div class="font-bold text-xs text-zinc-950">Market Recon</div>
+                <div class="text-[10px] text-zinc-500 leading-tight">Competition Trends</div>
+              </div>
+            </div>
 
-            <!-- Step 2: Deploy Swarm -->
-            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
-              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
-                <!-- 3 People Swarm Icon -->
-                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <!-- 3. Bottom-Right Node: Financial (~4 o'clock) -->
+            <div class="orbit-node" style="top: 250px; left: 382px;">
+              <div class="yellow-circle-node" title="Financial Agent">
+                <!-- Dollar Sign Icon -->
+                <span class="font-extrabold text-base text-black font-sans">$</span>
+              </div>
+              <div class="ml-3 text-left">
+                <div class="font-bold text-xs text-zinc-950">Financial</div>
+                <div class="text-[10px] text-zinc-500 leading-tight">Unit Economics</div>
+                <div class="text-[10px] text-zinc-500 leading-tight">Stress Test</div>
+              </div>
+            </div>
+
+            <!-- 4. Bottom Node: Human / User (6 o'clock) -->
+            <div class="orbit-node flex-col" style="top: 322px; left: 238px;">
+              <div class="yellow-circle-node" title="Human / User Persona Agent">
+                <!-- 2 People / Group Icon -->
+                <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                 </svg>
               </div>
-              <div class="font-bold text-xs text-zinc-900 mt-3">2. Deploy Swarm</div>
-              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">6 agents analyze independently.</div>
+              <div class="text-center mt-1.5">
+                <div class="font-bold text-xs text-zinc-950">Human / User</div>
+                <div class="text-[10px] text-zinc-500 leading-tight">Empathy Reality Check</div>
+              </div>
             </div>
 
-            <!-- Arrow 2 -->
-            <div class="text-zinc-400 font-light text-lg pt-4">→</div>
-
-            <!-- Step 3: Debate -->
-            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
-              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
-                <!-- Speech Bubble Icon -->
-                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                </svg>
+            <!-- 5. Bottom-Left Node: Technical (~8 o'clock) -->
+            <div class="orbit-node flex-row-reverse" style="top: 250px; right: 282px;">
+              <div class="yellow-circle-node" title="Technical Architect Agent">
+                <!-- Code brackets </> -->
+                <span class="font-extrabold text-xs text-black font-mono tracking-tighter">&lt;/&gt;</span>
               </div>
-              <div class="font-bold text-xs text-zinc-900 mt-3">3. Debate</div>
-              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Agents challenge each other.</div>
+              <div class="mr-3 text-right">
+                <div class="font-bold text-xs text-zinc-950">Technical</div>
+                <div class="text-[10px] text-zinc-500 leading-tight">Feasibility</div>
+                <div class="text-[10px] text-zinc-500 leading-tight">Architecture</div>
+              </div>
             </div>
 
-            <!-- Arrow 3 -->
-            <div class="text-zinc-400 font-light text-lg pt-4">→</div>
-
-            <!-- Step 4: Evidence -->
-            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
-              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
-                <!-- Search / Magnifying Glass Icon -->
-                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            <!-- 6. Top-Left Node: Skeptic (~10 o'clock) -->
+            <div class="orbit-node flex-row-reverse" style="top: 98px; right: 282px;">
+              <div class="yellow-circle-node" title="Skeptic / Red Team Agent">
+                <!-- Shield with Checkmark Icon -->
+                <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
                 </svg>
               </div>
-              <div class="font-bold text-xs text-zinc-900 mt-3">4. Evidence</div>
-              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Web, data &amp; models gather proof.</div>
-            </div>
-
-            <!-- Arrow 4 -->
-            <div class="text-zinc-400 font-light text-lg pt-4">→</div>
-
-            <!-- Step 5: Verdict -->
-            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
-              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
-                <!-- Checkmark in Circle Icon -->
-                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
+              <div class="mr-3 text-right">
+                <div class="font-bold text-xs text-zinc-950">Skeptic</div>
+                <div class="text-[10px] text-zinc-500 leading-tight">Red Team</div>
+                <div class="text-[10px] text-zinc-500 leading-tight">Contrarian</div>
               </div>
-              <div class="font-bold text-xs text-zinc-900 mt-3">5. Verdict</div>
-              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Get dossier, verdict &amp; plan.</div>
             </div>
 
           </div>
         </div>
 
-        <!-- RECENT DOSSIERS (Right Column, 5 Cols) -->
-        <div class="lg:col-span-5 space-y-4" id="recentDossiersSection">
-          <div class="flex items-center justify-between">
+      </section>
+
+      <!-- ------------------------------------------------------------ -->
+      <!-- BOTTOM SECTION: HOW IT WORKS + RECENT DOSSIERS               -->
+      <!-- ------------------------------------------------------------ -->
+      <div class="pt-6 border-t border-zinc-200/80">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+          
+          <!-- HOW IT WORKS (Left Column, 7 Cols) -->
+          <div class="lg:col-span-7 space-y-6" id="howItWorksSection">
             <h2 class="text-base font-extrabold text-zinc-900 tracking-tight">
-              Recent Dossiers
+              How It Works
             </h2>
-            <button onclick="openIntakeModal()" class="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
-              View all
-            </button>
+
+            <!-- 5 Steps Flow -->
+            <div class="flex items-start justify-between gap-1 sm:gap-2">
+              
+              <!-- Step 1: Submit -->
+              <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+                <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                  <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                </div>
+                <div class="font-bold text-xs text-zinc-900 mt-3">1. Submit</div>
+                <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Drop your idea, brief or plan.</div>
+              </div>
+
+              <!-- Arrow 1 -->
+              <div class="text-zinc-400 font-light text-lg pt-4">→</div>
+
+              <!-- Step 2: Deploy Swarm -->
+              <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+                <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                  <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                  </svg>
+                </div>
+                <div class="font-bold text-xs text-zinc-900 mt-3">2. Deploy Swarm</div>
+                <div class="text-[11px] text-zinc-500 mt-1 leading-snug">6 agents analyze independently.</div>
+              </div>
+
+              <!-- Arrow 2 -->
+              <div class="text-zinc-400 font-light text-lg pt-4">→</div>
+
+              <!-- Step 3: Debate -->
+              <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+                <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                  <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                  </svg>
+                </div>
+                <div class="font-bold text-xs text-zinc-900 mt-3">3. Debate</div>
+                <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Agents challenge each other.</div>
+              </div>
+
+              <!-- Arrow 3 -->
+              <div class="text-zinc-400 font-light text-lg pt-4">→</div>
+
+              <!-- Step 4: Evidence -->
+              <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+                <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                  <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                  </svg>
+                </div>
+                <div class="font-bold text-xs text-zinc-900 mt-3">4. Evidence</div>
+                <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Web, data &amp; models gather proof.</div>
+              </div>
+
+              <!-- Arrow 4 -->
+              <div class="text-zinc-400 font-light text-lg pt-4">→</div>
+
+              <!-- Step 5: Verdict -->
+              <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+                <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                  <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+                <div class="font-bold text-xs text-zinc-900 mt-3">5. Verdict</div>
+                <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Get dossier, verdict &amp; plan.</div>
+              </div>
+
+            </div>
           </div>
 
-          <!-- Dossier Cards List -->
-          <div class="border border-zinc-200/90 rounded-xl bg-white divide-y divide-zinc-100 shadow-xs overflow-hidden">
-            
-            <!-- Item 1: AI Study Companion -->
-            <div onclick="loadPreset('study_companion')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
-              <div class="flex items-center gap-3">
-                <!-- Document Icon -->
-                <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <div>
-                  <div class="font-bold text-xs text-zinc-950">AI Study Companion</div>
-                  <div class="text-[11px] text-zinc-500 font-mono mt-0.5">TF-007 • Aug 24, 2026</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-badgeGreenBg text-badgeGreenText tracking-wider">
-                  BUILD
-                </span>
-                <span class="text-xs font-semibold text-zinc-600 font-mono">
-                  7.8/10
-                </span>
-              </div>
+          <!-- RECENT DOSSIERS (Right Column, 5 Cols) -->
+          <div class="lg:col-span-5 space-y-4" id="recentDossiersSection">
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-extrabold text-zinc-900 tracking-tight">
+                Recent Dossiers
+              </h2>
+              <button onclick="openIntakeModal()" class="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
+                View all
+              </button>
             </div>
 
-            <!-- Item 2: Hyperlocal EV Charging -->
-            <div onclick="loadPreset('ev_charging')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
-              <div class="flex items-center gap-3">
-                <!-- Document Icon -->
-                <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <div>
-                  <div class="font-bold text-xs text-zinc-950">Hyperlocal EV Charging</div>
-                  <div class="text-[11px] text-zinc-500 font-mono mt-0.5">TF-006 • Aug 23, 2026</div>
+            <!-- Dossier Cards List -->
+            <div class="border border-zinc-200/90 rounded-xl bg-white divide-y divide-zinc-100 shadow-xs overflow-hidden">
+              
+              <!-- Item 1: AI Study Companion -->
+              <div onclick="loadPreset('study_companion')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
+                <div class="flex items-center gap-3">
+                  <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <div>
+                    <div class="font-bold text-xs text-zinc-950">AI Study Companion</div>
+                    <div class="text-[11px] text-zinc-500 font-mono mt-0.5">TF-007 • Aug 24, 2026</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-badgeGreenBg text-badgeGreenText tracking-wider">
+                    BUILD
+                  </span>
+                  <span class="text-xs font-semibold text-zinc-600 font-mono">
+                    7.8/10
+                  </span>
                 </div>
               </div>
-              <div class="flex items-center gap-3">
-                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-badgeAmberBg text-badgeAmberText tracking-wider">
-                  REFINE
-                </span>
-                <span class="text-xs font-semibold text-zinc-600 font-mono">
-                  5.9/10
-                </span>
-              </div>
-            </div>
 
-            <!-- Item 3: Voice-first CRM for SMBs -->
-            <div onclick="loadPreset('voice_crm')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
-              <div class="flex items-center gap-3">
-                <!-- Document Icon -->
-                <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <div>
-                  <div class="font-bold text-xs text-zinc-950">Voice-first CRM for SMBs</div>
-                  <div class="text-[11px] text-zinc-500 font-mono mt-0.5">TF-005 • Aug 22, 2026</div>
+              <!-- Item 2: Hyperlocal EV Charging -->
+              <div onclick="loadPreset('ev_charging')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
+                <div class="flex items-center gap-3">
+                  <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <div>
+                    <div class="font-bold text-xs text-zinc-950">Hyperlocal EV Charging</div>
+                    <div class="text-[11px] text-zinc-500 font-mono mt-0.5">TF-006 • Aug 23, 2026</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-badgeAmberBg text-badgeAmberText tracking-wider">
+                    REFINE
+                  </span>
+                  <span class="text-xs font-semibold text-zinc-600 font-mono">
+                    5.9/10
+                  </span>
                 </div>
               </div>
-              <div class="flex items-center gap-3">
-                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-badgeRedBg text-badgeRedText tracking-wider">
-                  KILL
-                </span>
-                <span class="text-xs font-semibold text-zinc-600 font-mono">
-                  3.2/10
-                </span>
-              </div>
-            </div>
 
+              <!-- Item 3: Voice-first CRM for SMBs -->
+              <div onclick="loadPreset('voice_crm')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
+                <div class="flex items-center gap-3">
+                  <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <div>
+                    <div class="font-bold text-xs text-zinc-950">Voice-first CRM for SMBs</div>
+                    <div class="text-[11px] text-zinc-500 font-mono mt-0.5">TF-005 • Aug 22, 2026</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-badgeRedBg text-badgeRedText tracking-wider">
+                    KILL
+                  </span>
+                  <span class="text-xs font-semibold text-zinc-600 font-mono">
+                    3.2/10
+                  </span>
+                </div>
+              </div>
+
+            </div>
           </div>
+
         </div>
-
       </div>
-    </div>
 
-    <!-- ------------------------------------------------------------ -->
-    <!-- 3. RENDERED DOSSIER REPORT VIEW (Expands after Evaluation)   -->
-    <!-- ------------------------------------------------------------ -->
-    <section id="resultsSection" class="hidden pt-6 border-t border-zinc-200/90 space-y-6">
-      <div class="p-6 md:p-8 bg-zinc-50/70 rounded-2xl border border-zinc-200 space-y-6 shadow-xs">
-        
-        <!-- Header Banner -->
-        <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-zinc-200 pb-6">
+      <!-- ------------------------------------------------------------ -->
+      <!-- 3. RENDERED DOSSIER REPORT VIEW (Expands after Evaluation)   -->
+      <!-- ------------------------------------------------------------ -->
+      <section id="resultsSection" class="hidden pt-6 border-t border-zinc-200/90 space-y-6">
+        <div class="p-6 md:p-8 bg-zinc-50/70 rounded-2xl border border-zinc-200 space-y-6 shadow-xs">
+          
+          <!-- Header Banner -->
+          <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-zinc-200 pb-6">
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 font-mono text-xs">
+                <span class="px-2 py-0.5 bg-red-100 text-red-700 font-bold rounded text-[10px] tracking-wider uppercase">
+                  EVIDENCE-FIRST DOSSIER
+                </span>
+                <span class="text-zinc-500" id="resDossierCode">DOSSIER // TF-007</span>
+                <span class="text-emerald-600 font-bold" id="resDossierStatus">STATUS: COMPILED</span>
+              </div>
+
+              <h2 id="resSubjectTitle" class="text-2xl sm:text-3xl font-extrabold text-zinc-950 tracking-tight">
+                AI STUDY COMPANION
+              </h2>
+              
+              <!-- Domain Classification Badge Row -->
+              <div id="resDomainBanner" class="inline-flex flex-wrap items-center gap-2 font-mono text-xs p-2 bg-white rounded-lg border border-zinc-200">
+                <span class="text-amber-700 font-bold" id="resDomainArchetype">DOMAIN: CONSUMER AI</span>
+                <span class="text-zinc-300">•</span>
+                <span class="text-zinc-600" id="resDomainCustomer">CUSTOMER: PARENTS &amp; STUDENTS</span>
+                <span class="text-zinc-300">•</span>
+                <span class="text-zinc-600" id="resDomainCycle">CYCLE: B2C MONTHLY</span>
+              </div>
+
+              <p id="resExecutiveSummary" class="text-sm text-zinc-700 mt-2 max-w-3xl leading-relaxed"></p>
+            </div>
+
+            <!-- Verdict Cards -->
+            <div class="flex sm:flex-row md:flex-col gap-3 shrink-0">
+              <div class="bg-white border border-zinc-200 p-4 rounded-xl text-center md:text-right min-w-[170px] shadow-2xs">
+                <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">OVERALL VERDICT</span>
+                <span id="resVerdictBadge" class="font-mono text-2xl font-black text-emerald-600 mt-0.5 block">BUILD</span>
+              </div>
+              <div class="bg-white border border-zinc-200 p-3.5 rounded-xl text-center md:text-right min-w-[170px] font-mono text-xs shadow-2xs space-y-1">
+                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RESILIENCE:</span><span id="resScoreVal" class="text-zinc-900 font-bold">78/100</span></div>
+                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">CONFIDENCE:</span><span id="resConfidence" class="text-zinc-900 font-bold">84%</span></div>
+                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RISK:</span><span id="resRiskLevel" class="text-amber-600 font-bold">MEDIUM</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5-Dimensional Resilience Breakdown -->
           <div class="space-y-2">
-            <div class="flex items-center gap-3 font-mono text-xs">
-              <span class="px-2 py-0.5 bg-red-100 text-red-700 font-bold rounded text-[10px] tracking-wider uppercase">
-                EVIDENCE-FIRST DOSSIER
-              </span>
-              <span class="text-zinc-500" id="resDossierCode">DOSSIER // TF-007</span>
-              <span class="text-emerald-600 font-bold" id="resDossierStatus">STATUS: COMPILED</span>
+            <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+              Transparent 5-Dimensional Resilience Score
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono text-xs" id="resilienceGrid"></div>
+          </div>
+
+          <!-- Domain Specialist Agent Consensus Grid -->
+          <div class="space-y-2">
+            <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+              6-Agent Swarm Perspectives &amp; Mandates
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs" id="consensusGrid"></div>
+          </div>
+
+          <!-- Evidence & Weakest Assumption Row -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
+            <div class="p-4 bg-white border border-emerald-300 rounded-xl space-y-2 shadow-2xs">
+              <div class="flex items-center justify-between text-emerald-700 font-bold">
+                <span>🔬 STRONGEST VERIFIED EVIDENCE</span>
+                <span id="strongestEvidenceType" class="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">VERIFIED</span>
+              </div>
+              <p id="strongestEvidenceText" class="text-zinc-800 text-xs font-sans leading-relaxed"></p>
+              <div id="strongestEvidenceProv" class="text-[10px] text-zinc-500 italic"></div>
             </div>
 
-            <h2 id="resSubjectTitle" class="text-2xl sm:text-3xl font-extrabold text-zinc-950 tracking-tight">
-              AI STUDY COMPANION
-            </h2>
-            
-            <!-- Domain Classification Badge Row -->
-            <div id="resDomainBanner" class="inline-flex flex-wrap items-center gap-2 font-mono text-xs p-2 bg-white rounded-lg border border-zinc-200">
-              <span class="text-amber-700 font-bold" id="resDomainArchetype">DOMAIN: CONSUMER AI</span>
-              <span class="text-zinc-300">•</span>
-              <span class="text-zinc-600" id="resDomainCustomer">CUSTOMER: PARENTS &amp; STUDENTS</span>
-              <span class="text-zinc-300">•</span>
-              <span class="text-zinc-600" id="resDomainCycle">CYCLE: B2C MONTHLY</span>
-            </div>
-
-            <p id="resExecutiveSummary" class="text-sm text-zinc-700 mt-2 max-w-3xl leading-relaxed"></p>
-          </div>
-
-          <!-- Verdict Cards -->
-          <div class="flex sm:flex-row md:flex-col gap-3 shrink-0">
-            <div class="bg-white border border-zinc-200 p-4 rounded-xl text-center md:text-right min-w-[170px] shadow-2xs">
-              <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">OVERALL VERDICT</span>
-              <span id="resVerdictBadge" class="font-mono text-2xl font-black text-emerald-600 mt-0.5 block">BUILD</span>
-            </div>
-            <div class="bg-white border border-zinc-200 p-3.5 rounded-xl text-center md:text-right min-w-[170px] font-mono text-xs shadow-2xs space-y-1">
-              <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RESILIENCE:</span><span id="resScoreVal" class="text-zinc-900 font-bold">78/100</span></div>
-              <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">CONFIDENCE:</span><span id="resConfidence" class="text-zinc-900 font-bold">84%</span></div>
-              <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RISK:</span><span id="resRiskLevel" class="text-amber-600 font-bold">MEDIUM</span></div>
+            <div class="p-4 bg-white border border-red-300 rounded-xl space-y-2 shadow-2xs">
+              <div class="flex items-center justify-between text-red-700 font-bold">
+                <span>⚠️ WEAKEST FATAL ASSUMPTION</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-red-50 text-red-700">CRITICAL RISK</span>
+              </div>
+              <p id="weakestAssumptionText" class="text-zinc-800 text-xs font-sans leading-relaxed"></p>
+              <div id="weakestAssumptionDisproof" class="text-[10px] text-amber-700"></div>
             </div>
           </div>
-        </div>
 
-        <!-- 5-Dimensional Resilience Breakdown -->
-        <div class="space-y-2">
-          <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
-            Transparent 5-Dimensional Resilience Score
-          </h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono text-xs" id="resilienceGrid"></div>
-        </div>
-
-        <!-- Domain Specialist Agent Consensus Grid -->
-        <div class="space-y-2">
-          <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
-            6-Agent Swarm Perspectives &amp; Mandates
-          </h3>
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs" id="consensusGrid"></div>
-        </div>
-
-        <!-- Evidence & Weakest Assumption Row -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
-          <div class="p-4 bg-white border border-emerald-300 rounded-xl space-y-2 shadow-2xs">
-            <div class="flex items-center justify-between text-emerald-700 font-bold">
-              <span>🔬 STRONGEST VERIFIED EVIDENCE</span>
-              <span id="strongestEvidenceType" class="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">VERIFIED</span>
+          <!-- Kill Conditions & Cheapest Validation Experiment Row -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
+            <div class="p-4 bg-white border border-zinc-200 rounded-xl space-y-2 shadow-2xs">
+              <div class="text-red-700 font-bold">💀 STRICT KILL CONDITIONS (FALSIFIABLE)</div>
+              <ul id="killConditionsList" class="space-y-1.5 text-zinc-700 text-xs font-sans list-disc list-inside"></ul>
             </div>
-            <p id="strongestEvidenceText" class="text-zinc-800 text-xs font-sans leading-relaxed"></p>
-            <div id="strongestEvidenceProv" class="text-[10px] text-zinc-500 italic"></div>
-          </div>
 
-          <div class="p-4 bg-white border border-red-300 rounded-xl space-y-2 shadow-2xs">
-            <div class="flex items-center justify-between text-red-700 font-bold">
-              <span>⚠️ WEAKEST FATAL ASSUMPTION</span>
-              <span class="text-[10px] px-2 py-0.5 rounded bg-red-50 text-red-700">CRITICAL RISK</span>
-            </div>
-            <p id="weakestAssumptionText" class="text-zinc-800 text-xs font-sans leading-relaxed"></p>
-            <div id="weakestAssumptionDisproof" class="text-[10px] text-amber-700"></div>
-          </div>
-        </div>
-
-        <!-- Kill Conditions & Cheapest Validation Experiment Row -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
-          <div class="p-4 bg-white border border-zinc-200 rounded-xl space-y-2 shadow-2xs">
-            <div class="text-red-700 font-bold">💀 STRICT KILL CONDITIONS (FALSIFIABLE)</div>
-            <ul id="killConditionsList" class="space-y-1.5 text-zinc-700 text-xs font-sans list-disc list-inside"></ul>
-          </div>
-
-          <div class="p-4 bg-white border border-amber-300 rounded-xl space-y-2 shadow-2xs">
-            <div class="text-amber-800 font-bold">🧪 CHEAPEST VALIDATION EXPERIMENT</div>
-            <div id="cheapestExpTitle" class="font-bold text-zinc-900 text-xs font-sans"></div>
-            <p id="cheapestExpDesc" class="text-zinc-700 text-xs font-sans"></p>
-            <div class="flex justify-between items-center text-[10px] pt-2 border-t border-zinc-100 text-zinc-500">
-              <span id="cheapestExpCostTime">Cost: $0 | Time: 4 Days</span>
-              <span id="cheapestExpMetric" class="text-emerald-700 font-bold"></span>
+            <div class="p-4 bg-white border border-amber-300 rounded-xl space-y-2 shadow-2xs">
+              <div class="text-amber-800 font-bold">🧪 CHEAPEST VALIDATION EXPERIMENT</div>
+              <div id="cheapestExpTitle" class="font-bold text-zinc-900 text-xs font-sans"></div>
+              <p id="cheapestExpDesc" class="text-zinc-700 text-xs font-sans"></p>
+              <div class="flex justify-between items-center text-[10px] pt-2 border-t border-zinc-100 text-zinc-500">
+                <span id="cheapestExpCostTime">Cost: $0 | Time: 4 Days</span>
+                <span id="cheapestExpMetric" class="text-emerald-700 font-bold"></span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Unresolved Contradictions Clash -->
-        <div class="space-y-2">
-          <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
-            Unresolved Contradictions &amp; Agent Rebuttals
-          </h3>
-          <div id="contradictionsList" class="space-y-3 font-mono text-xs"></div>
-        </div>
-
-        <!-- Sandbox Simulation Output -->
-        <div class="p-4 bg-zinc-900 text-zinc-200 border border-zinc-800 rounded-xl font-mono text-xs space-y-2 shadow-xs">
-          <div class="text-emerald-400 font-bold flex justify-between">
-            <span>PYTHON3 SANDBOXED ECONOMICS SIMULATION</span>
-            <span>EXIT 0</span>
+          <!-- Unresolved Contradictions Clash -->
+          <div class="space-y-2">
+            <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+              Unresolved Contradictions &amp; Agent Rebuttals
+            </h3>
+            <div id="contradictionsList" class="space-y-3 font-mono text-xs"></div>
           </div>
-          <pre id="sandboxStdout" class="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed overflow-x-auto"></pre>
-        </div>
 
-        <!-- Human Approval Gate -->
-        <div class="p-5 border border-amber-300 bg-amber-50/50 rounded-xl space-y-3">
-          <div class="flex justify-between items-center text-amber-900 font-mono text-xs font-bold">
-            <span>🛑 DUAL-KEY HUMAN APPROVAL CHECKPOINT (TRUEFORGE SAFETY)</span>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-amber-200/80 text-amber-900">AWAITING AUTHORIZATION</span>
+          <!-- Sandbox Simulation Output -->
+          <div class="p-4 bg-zinc-900 text-zinc-200 border border-zinc-800 rounded-xl font-mono text-xs space-y-2 shadow-xs">
+            <div class="text-emerald-400 font-bold flex justify-between">
+              <span>PYTHON3 SANDBOXED ECONOMICS SIMULATION</span>
+              <span>EXIT 0</span>
+            </div>
+            <pre id="sandboxStdout" class="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed overflow-x-auto"></pre>
           </div>
-          <div id="approvalList" class="space-y-3"></div>
+
+          <!-- Human Approval Gate -->
+          <div class="p-5 border border-amber-300 bg-amber-50/50 rounded-xl space-y-3">
+            <div class="flex justify-between items-center text-amber-900 font-mono text-xs font-bold">
+              <span>🛑 DUAL-KEY HUMAN APPROVAL CHECKPOINT (TRUEFORGE SAFETY)</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-amber-200/80 text-amber-900">AWAITING AUTHORIZATION</span>
+            </div>
+            <div id="approvalList" class="space-y-3"></div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 3. PLAYGROUND / CHAT INTERFACE VIEW                          -->
+  <!-- ============================================================ -->
+  <div id="playgroundView" class="flex-1 hidden">
+    <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 md:px-12 py-8 flex flex-col h-[calc(100vh-80px)]">
+      
+      <!-- Playground Header Bar -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-200">
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-extrabold text-zinc-950 tracking-tight">Swarm Playground</h1>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-brandYellow text-black">INTERACTIVE</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-0.5">Live adversarial debrief, stress-testing, and epistemic verification across 6 agent personas.</p>
         </div>
 
+        <!-- Concept Switcher Bar -->
+        <div class="flex items-center gap-2 bg-zinc-50 p-1.5 rounded-xl border border-zinc-200">
+          <span class="text-[11px] font-mono text-zinc-500 pl-2">Active Concept:</span>
+          <select id="chatConceptSelect" onchange="updateChatConcept()" class="bg-white border border-zinc-300 text-zinc-900 text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brandYellowHover">
+            <option value="study_companion">AI Study Companion ($29/mo B2C)</option>
+            <option value="micro_saas">Autonomous Micro-SaaS ($79/mo)</option>
+            <option value="ev_charging">Hyperlocal EV Charging ($19/mo)</option>
+            <option value="ai_auditor">AI SOC2 Auditor ($499/mo B2B)</option>
+            <option value="custom">✏️ Custom Concept...</option>
+          </select>
+          <button onclick="clearChatHistory()" class="text-xs text-zinc-500 hover:text-red-600 px-2 py-1 font-mono transition" title="Clear chat history">
+            Reset
+          </button>
+        </div>
       </div>
-    </section>
 
-  </main>
+      <!-- Agent Role Selection Chips -->
+      <div class="py-3 flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-zinc-100">
+        <span class="text-[11px] font-mono font-bold text-zinc-400 uppercase shrink-0">Debate Lens:</span>
+        <button onclick="setChatRole('all')" id="roleBtn-all" class="role-chip px-3 py-1 rounded-full text-xs font-bold bg-zinc-900 text-white transition shrink-0">
+          🌐 Full Swarm Debate
+        </button>
+        <button onclick="setChatRole('skeptic')" id="roleBtn-skeptic" class="role-chip px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition shrink-0">
+          🛡️ The Skeptic (Red Team)
+        </button>
+        <button onclick="setChatRole('investor')" id="roleBtn-investor" class="role-chip px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition shrink-0">
+          💰 The Investor (VC)
+        </button>
+        <button onclick="setChatRole('architect')" id="roleBtn-architect" class="role-chip px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition shrink-0">
+          ⚙️ Technical Architect
+        </button>
+        <button onclick="setChatRole('market')" id="roleBtn-market" class="role-chip px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition shrink-0">
+          🔍 Market Recon
+        </button>
+        <button onclick="setChatRole('customer')" id="roleBtn-customer" class="role-chip px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition shrink-0">
+          👤 Customer Persona
+        </button>
+        <button onclick="setChatRole('founder')" id="roleBtn-founder" class="role-chip px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition shrink-0">
+          🎯 Founder Synthesizer
+        </button>
+      </div>
+
+      <!-- Main Chat Messages Area -->
+      <div id="chatMessages" class="flex-1 overflow-y-auto chat-scroll py-6 space-y-4 pr-2">
+        <!-- Initial Swarm Welcome Message -->
+        <div class="flex items-start gap-3 max-w-3xl">
+          <div class="w-8 h-8 rounded-full bg-brandYellow border border-black flex items-center justify-center font-bold text-xs text-black shrink-0">
+            DS
+          </div>
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-xs text-zinc-900">Swarm Orchestrator</span>
+              <span class="px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-zinc-100 text-zinc-600 border border-zinc-200">HARNESS READY</span>
+              <span class="text-[10px] text-zinc-400 font-mono">Just now</span>
+            </div>
+            <div class="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs text-zinc-800 leading-relaxed space-y-2">
+              <p>Welcome to the <strong>Dossier Adversarial Playground</strong>. All 6 specialized subagents are loaded and standing by to stress-test your concept:</p>
+              <ul class="list-disc list-inside text-zinc-600 space-y-0.5 pl-1">
+                <li><strong>The Skeptic:</strong> Targets fatal vulnerabilities and habit churn.</li>
+                <li><strong>The Investor:</strong> Computes LTV/CAC bounds and defensible moats.</li>
+                <li><strong>The Architect:</strong> Analyzes token unit economics, latency, and sandbox security.</li>
+              </ul>
+              <p class="text-zinc-500 pt-1">Select a debate lens above or pick a quick challenge below to initiate a turn.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Suggestion Chips -->
+      <div class="pt-2 pb-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <span class="text-[10px] font-mono text-zinc-400 uppercase shrink-0">Quick Queries:</span>
+        <button onclick="sendQuickMessage('Challenge my pricing model and calculate churn risk.')" class="px-2.5 py-1 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-[11px] text-zinc-700 transition shrink-0 shadow-2xs">
+          🔥 Challenge pricing &amp; churn
+        </button>
+        <button onclick="sendQuickMessage('What is the single biggest fatal flaw in this distribution strategy?')" class="px-2.5 py-1 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-[11px] text-zinc-700 transition shrink-0 shadow-2xs">
+          💀 Find the fatal flaw
+        </button>
+        <button onclick="sendQuickMessage('Simulate our unit economics and API inference cost ceiling.')" class="px-2.5 py-1 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-[11px] text-zinc-700 transition shrink-0 shadow-2xs">
+          📊 Compute token unit economics
+        </button>
+        <button onclick="sendQuickMessage('What is the cheapest 7-day falsifiable validation experiment we can run?')" class="px-2.5 py-1 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-[11px] text-zinc-700 transition shrink-0 shadow-2xs">
+          🧪 Propose cheapest 7-day test
+        </button>
+      </div>
+
+      <!-- Chat Input Form -->
+      <form id="chatForm" onsubmit="handleChatSubmit(event)" class="relative flex items-center gap-2 pt-2 border-t border-zinc-200">
+        <input 
+          type="text" 
+          id="chatInput" 
+          class="flex-1 bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:outline-none focus:border-brandYellowHover focus:bg-white transition"
+          placeholder="Ask the swarm to stress-test an assumption, probe unit economics, or debate your concept..." 
+          required
+        >
+        <button 
+          type="submit" 
+          id="chatSubmitBtn" 
+          class="bg-brandYellow hover:bg-brandYellowHover text-zinc-950 font-bold text-xs px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+        >
+          <span id="chatBtnText">Send</span>
+          <span id="chatSpinner" class="hidden animate-spin">◴</span>
+        </button>
+      </form>
+
+    </div>
+  </div>
 
   <!-- ============================================================ -->
-  <!-- 4. MODALS & OVERLAYS                                         -->
+  <!-- 4. INTAKE MODAL                                              -->
   <!-- ============================================================ -->
-  
-  <!-- Intake Modal -->
   <div id="intakeModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
     <div class="bg-white border border-zinc-300 rounded-2xl max-w-xl w-full p-6 md:p-8 space-y-5 shadow-2xl relative">
       <div class="flex items-center justify-between border-b border-zinc-200 pb-3">
@@ -609,6 +735,240 @@
   <!-- 5. JAVASCRIPT LOGIC                                          -->
   <!-- ============================================================ -->
   <script>
+    let currentChatRole = 'all';
+    let currentIdeaContext = {
+      title: "AI Study Companion",
+      summary: "An automated real-time study companion for high school students that monitors browser homework sessions, diagnoses knowledge gaps, and provides parental progress alerts.",
+      targetAudience: "Parents & Students",
+      monetization: "$29/month"
+    };
+
+    function switchView(viewName) {
+      const homeView = document.getElementById('homeView');
+      const playgroundView = document.getElementById('playgroundView');
+      const navHome = document.getElementById('navHomeBtn');
+      const navPlayground = document.getElementById('navPlaygroundBtn');
+
+      if (viewName === 'playground') {
+        homeView.classList.add('hidden');
+        playgroundView.classList.remove('hidden');
+        navPlayground.classList.add('bg-zinc-100', 'text-zinc-950', 'font-bold');
+        navPlayground.classList.remove('text-zinc-600');
+        navHome.classList.remove('bg-zinc-100', 'text-zinc-950');
+        navHome.classList.add('text-zinc-600');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        playgroundView.classList.add('hidden');
+        homeView.classList.remove('hidden');
+        navHome.classList.add('bg-zinc-100', 'text-zinc-950', 'font-bold');
+        navHome.classList.remove('text-zinc-600');
+        navPlayground.classList.remove('bg-zinc-100', 'text-zinc-950');
+        navPlayground.classList.add('text-zinc-600');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function setChatRole(role) {
+      currentChatRole = role;
+      document.querySelectorAll('.role-chip').forEach(btn => {
+        btn.classList.remove('bg-zinc-900', 'text-white', 'font-bold');
+        btn.classList.add('bg-zinc-100', 'text-zinc-700', 'font-semibold');
+      });
+      const activeBtn = document.getElementById(`roleBtn-${role}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-zinc-100', 'text-zinc-700', 'font-semibold');
+        activeBtn.classList.add('bg-zinc-900', 'text-white', 'font-bold');
+      }
+    }
+
+    function updateChatConcept() {
+      const val = document.getElementById('chatConceptSelect').value;
+      if (val === 'study_companion') {
+        currentIdeaContext = {
+          title: "AI Study Companion",
+          summary: "Real-time AI homework monitor diagnosing knowledge gaps with parental WhatsApp notifications.",
+          targetAudience: "Parents & Students",
+          monetization: "$29/month"
+        };
+      } else if (val === 'micro_saas') {
+        currentIdeaContext = {
+          title: "Autonomous Micro-SaaS Agent",
+          summary: "Monitors Stripe chargebacks and customer churn, executes automated recovery workflows in a sandbox.",
+          targetAudience: "SaaS Founders",
+          monetization: "$79/month"
+        };
+      } else if (val === 'ev_charging') {
+        currentIdeaContext = {
+          title: "Hyperlocal EV Charging",
+          summary: "P2P driveway EV charging reservation and dynamic kilowatt pricing platform.",
+          targetAudience: "EV Owners & Homeowners",
+          monetization: "$19/month"
+        };
+      } else if (val === 'ai_auditor') {
+        currentIdeaContext = {
+          title: "AI SOC2 Auditor",
+          summary: "Scans cloud infra for SOC2/HIPAA compliance violations and writes remediation scripts.",
+          targetAudience: "B2B CTOs",
+          monetization: "$499/month"
+        };
+      } else if (val === 'custom') {
+        const customTitle = prompt("Enter Idea Name:", "My AI Project");
+        const customSummary = prompt("Enter Idea Operational Summary:", "An automated solution that solves...");
+        if (customTitle && customSummary) {
+          currentIdeaContext = {
+            title: customTitle,
+            summary: customSummary,
+            targetAudience: "Target Users",
+            monetization: "Subscription"
+          };
+        }
+      }
+      appendSystemNote(`Swarm context updated to: "${currentIdeaContext.title}"`);
+    }
+
+    function sendQuickMessage(text) {
+      document.getElementById('chatInput').value = text;
+      handleChatSubmit(new Event('submit'));
+    }
+
+    async function handleChatSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const submitBtn = document.getElementById('chatSubmitBtn');
+      const btnText = document.getElementById('chatBtnText');
+      const spinner = document.getElementById('chatSpinner');
+
+      // Append user message
+      appendUserMessage(text);
+      input.value = '';
+
+      submitBtn.disabled = true;
+      btnText.textContent = "...";
+      spinner.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            role: currentChatRole,
+            ideaContext: currentIdeaContext
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          appendAgentMessage(data.agentName, data.reply, data.epistemicState);
+        } else {
+          appendAgentMessage("System Alert", "Error: " + (data.error || "Execution failed"), "ERROR");
+        }
+      } catch (err) {
+        appendAgentMessage("System Alert", "Network error: " + err.message, "ERROR");
+      } finally {
+        submitBtn.disabled = false;
+        btnText.textContent = "Send";
+        spinner.classList.add('hidden');
+      }
+    }
+
+    function appendUserMessage(text) {
+      const container = document.getElementById('chatMessages');
+      const div = document.createElement('div');
+      div.className = 'flex items-start justify-end gap-3 max-w-3xl ml-auto';
+      div.innerHTML = `
+        <div class="space-y-1 text-right">
+          <div class="text-[10px] text-zinc-400 font-mono">You</div>
+          <div class="p-3.5 bg-zinc-900 text-white rounded-2xl rounded-tr-xs text-xs font-sans leading-relaxed">
+            ${escapeHtml(text)}
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function appendAgentMessage(agentName, markdownText, epistemicState) {
+      const container = document.getElementById('chatMessages');
+      const div = document.createElement('div');
+      div.className = 'flex items-start gap-3 max-w-3xl';
+      
+      const badgeColor = epistemicState === 'CHALLENGE_FLAGGED' ? 'bg-red-50 text-red-700 border-red-200' :
+        (epistemicState === 'VERIFIED_COMPUTATION' || epistemicState === 'VERIFIED_FACT' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+        'bg-amber-50 text-amber-800 border-amber-200');
+
+      const formattedHtml = formatChatMarkdown(markdownText);
+
+      div.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-brandYellow border border-black flex items-center justify-center font-bold text-xs text-black shrink-0">
+          ${agentName.includes('Skeptic') ? '🛡️' : (agentName.includes('Investor') ? '💰' : (agentName.includes('Architect') ? '⚙️' : 'DS'))}
+        </div>
+        <div class="space-y-1.5 flex-1">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-xs text-zinc-900">${escapeHtml(agentName)}</span>
+            <span class="px-2 py-0.2 rounded text-[9px] font-mono font-bold border ${badgeColor}">
+              ${escapeHtml(epistemicState)}
+            </span>
+            <span class="text-[10px] text-zinc-400 font-mono">Just now</span>
+          </div>
+          <div class="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl rounded-tl-xs text-xs text-zinc-800 leading-relaxed font-sans space-y-2">
+            ${formattedHtml}
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function appendSystemNote(note) {
+      const container = document.getElementById('chatMessages');
+      const div = document.createElement('div');
+      div.className = 'text-center my-2';
+      div.innerHTML = `<span class="text-[10px] font-mono text-zinc-500 bg-zinc-100 px-3 py-1 rounded-full border border-zinc-200">ℹ️ ${escapeHtml(note)}</span>`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function clearChatHistory() {
+      const container = document.getElementById('chatMessages');
+      container.innerHTML = `
+        <div class="flex items-start gap-3 max-w-3xl">
+          <div class="w-8 h-8 rounded-full bg-brandYellow border border-black flex items-center justify-center font-bold text-xs text-black shrink-0">
+            DS
+          </div>
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-xs text-zinc-900">Swarm Orchestrator</span>
+              <span class="px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-zinc-100 text-zinc-600 border border-zinc-200">RESET COMPLETE</span>
+            </div>
+            <div class="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs text-zinc-800 leading-relaxed">
+              Playground session reset. All 6 subagents ready for a fresh debate on <strong>"${currentIdeaContext.title}"</strong>.
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function formatChatMarkdown(txt) {
+      let out = escapeHtml(txt);
+      out = out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      out = out.replace(/\n\n/g, '</p><p>');
+      out = out.replace(/\n/g, '<br>');
+      return `<p>${out}</p>`;
+    }
+
+    function escapeHtml(string) {
+      return String(string)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Modal and Home Helpers
     function openIntakeModal() {
       document.getElementById('intakeModal').classList.remove('hidden');
     }
@@ -620,15 +980,6 @@
     }
     function scrollToHowItWorks() {
       document.getElementById('howItWorksSection').scrollIntoView({ behavior: 'smooth' });
-    }
-    function showHomeView() {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    function openTemplatesModal() {
-      loadPreset('ai_auditor');
-    }
-    function openSettingsModal() {
-      alert("Dossier Configuration:\n• TrueForge Harness: Online\n• Multi-Agent Swarm: 6 Active Roles\n• Python3 Sandbox: Local Isolation\n• Human Safety Gate: Dual-Key Active");
     }
 
     function loadPreset(key) {
