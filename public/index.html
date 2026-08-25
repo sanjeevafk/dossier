@@ -1,694 +1,614 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DOSSIER // Adversarial Idea Intelligence</title>
+  <title>DOSSIER — Make AI try to kill your idea before the market does.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
-            display: ['"Syne"', 'sans-serif'],
-            mono: ['"IBM Plex Mono"', 'monospace'],
-            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
           },
           colors: {
-            bgdark: '#07080a',
-            sidebar: '#0a0c10',
-            card: '#0f1218',
-            panel: '#12151e',
-            bordercol: '#1e222e',
-            borderlight: '#282d3c',
-            amberacc: '#f59e0b',
-            amberdim: '#d97706',
-            bone: '#e8e4dc',
-            emeraldacc: '#10b981',
-            crimsonacc: '#ef4444',
+            brandYellow: '#facc15',
+            brandYellowHover: '#eab308',
+            brandYellowLight: '#fef08a',
+            badgeGreenBg: '#e6f4ea',
+            badgeGreenText: '#137333',
+            badgeAmberBg: '#fef7e0',
+            badgeAmberText: '#b06000',
+            badgeRedBg: '#fce8e6',
+            badgeRedText: '#c5221f',
           }
         }
       }
     }
   </script>
   <style>
-    :root {
-      --bg: #07080a;
-      --border: #1e222e;
-    }
     body {
-      background-color: var(--bg);
-      color: #94a3b8;
-      background-image: 
-        radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.03) 0%, transparent 65%),
-        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
-      background-size: 100% 100%, 32px 32px, 32px 32px;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: #ffffff;
+      color: #09090b;
+      -webkit-font-smoothing: antialiased;
     }
-    .folder-3d {
-      width: 170px;
-      height: 220px;
-      background: linear-gradient(145deg, #181b22, #0d0f14);
-      border: 1px solid #282d3c;
-      border-radius: 6px;
-      box-shadow: 
-        -10px 10px 30px rgba(0,0,0,0.8),
-        inset 1px 1px 0 rgba(255,255,255,0.08),
-        inset -1px -1px 0 rgba(0,0,0,0.5);
+    
+    /* Custom SVG Orbit styling */
+    .orbit-container {
       position: relative;
-      transform: perspective(800px) rotateY(-14deg) rotateX(6deg);
-      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      width: 100%;
+      max-width: 520px;
+      height: 420px;
+      margin: 0 auto;
     }
-    .folder-3d:hover {
-      transform: perspective(800px) rotateY(-6deg) rotateX(2deg) scale(1.03);
-    }
-    .folder-back {
+
+    .orbit-node {
       position: absolute;
-      top: -4px;
-      right: -8px;
-      width: 170px;
-      height: 220px;
-      background: #11131a;
-      border: 1px solid #232734;
-      border-radius: 6px;
-      z-index: 1;
-      transform: perspective(800px) rotateY(-14deg) rotateX(6deg);
+      display: flex;
+      align-items: center;
+      transition: transform 0.2s ease;
     }
-    .classified-stamp-small {
-      border: 1.5px solid rgba(239, 68, 68, 0.65);
-      color: rgba(239, 68, 68, 0.8);
-      font-family: 'IBM Plex Mono', monospace;
-      font-weight: 700;
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      transform: rotate(-12deg);
-      padding: 1px 6px;
-      display: inline-block;
+
+    .orbit-node:hover {
+      transform: scale(1.04);
     }
-    .step-circle {
-      width: 52px;
-      height: 52px;
+
+    .yellow-circle-node {
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
-      background: #0e1117;
-      border: 1px solid #202432;
+      background-color: #facc15;
+      border: 1.5px solid #000000;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s ease;
+      flex-shrink: 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
-    .step-circle:hover {
-      border-color: #f59e0b;
-      background: #151821;
-    }
-    .tactical-node {
-      background: #0d0f15;
-      border: 1px solid #1e222e;
-      border-radius: 4px;
-      padding: 6px 12px;
-      font-family: 'IBM Plex Mono', monospace;
-      transition: all 0.2s ease;
-    }
-    .tactical-node:hover {
-      border-color: #f59e0b;
-      transform: translateY(-1px);
-    }
-    .tactical-node.active-node {
-      border-color: #f59e0b;
-      background: #16130e;
+
+    /* Modal Backdrop */
+    .modal-backdrop {
+      background-color: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col font-sans selection:bg-amberacc selection:text-black">
+<body class="min-h-screen flex flex-col justify-between">
 
-  <!-- 1. Top Global System Bar -->
-  <div class="border-b border-bordercol bg-sidebar/95 text-[11px] font-mono py-1.5 px-6 flex items-center justify-between text-zinc-400">
-    <div class="flex items-center gap-3">
-      <span class="text-amberacc font-bold tracking-wider">CLEARANCE LEVEL 5 // EYES ONLY</span>
-      <span class="text-zinc-600">|</span>
-      <span class="text-zinc-500">DOSSIER REGISTRY: FILE TF-007</span>
-    </div>
-    <div class="flex items-center gap-3 text-zinc-400">
-      <span class="flex items-center gap-1.5 text-emeraldacc">
-        <span class="size-1.5 rounded-full bg-emeraldacc animate-pulse"></span>
-        ORCAROUTER + TRUEFORGE HARNESS ONLINE
-      </span>
-      <span class="text-zinc-500 hidden sm:inline" id="topClock">2026-08-24 15:04:52 UTC</span>
-    </div>
-  </div>
-
-  <!-- 2. Main Brand Bar & Top Nav -->
-  <div class="border-b border-bordercol bg-bgdark/95 px-6 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-3.5">
-      <div class="size-10 bg-amberacc text-black font-mono font-black text-xl flex items-center justify-center rounded-sm tracking-tighter shadow-md">
-        DS
-      </div>
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="font-display font-black text-2xl text-bone tracking-wider">DOSSIER</span>
-          <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-amberacc/15 text-amberacc border border-amberacc/30 uppercase">
-            V1.0
-          </span>
-        </div>
-        <p class="text-[10px] font-mono tracking-widest text-zinc-500 uppercase">ADVERSARIAL IDEA INTELLIGENCE</p>
-      </div>
-    </div>
-
-    <div class="flex flex-col items-end gap-1">
-      <div class="flex items-center gap-2">
-        <button onclick="loadPreset('ai_auditor')" class="text-[11px] font-mono px-3 py-1 rounded border border-bordercol hover:border-amberacc/60 bg-card text-zinc-300 transition">
-          Preset: AI Auditor
-        </button>
-        <button onclick="loadPreset('micro_saas')" class="text-[11px] font-mono px-3 py-1 rounded border border-bordercol hover:border-amberacc/60 bg-card text-zinc-300 transition">
-          Preset: Micro-SaaS
-        </button>
-      </div>
-      <div class="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500">
-        <span class="size-1.5 rounded-full bg-emeraldacc"></span>
-        <span class="text-emeraldacc">ORCAROUTER + TRUEFORGE HARNESS ONLINE</span>
-        <span class="text-zinc-600 hidden md:inline">•</span>
-        <span class="text-zinc-500 hidden md:inline" id="subClock">2026-08-24 15:04:53 UTC</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3. Main Split View: Sidebar + Main Stage -->
-  <div class="flex-1 flex max-w-full">
-    
-    <!-- LEFT SIDEBAR -->
-    <aside class="w-60 shrink-0 border-r border-bordercol bg-sidebar p-4 flex flex-col justify-between hidden md:flex">
-      <div class="space-y-5">
-        
-        <!-- Top Clearance Badge -->
-        <div class="p-2.5 rounded border border-amberacc/30 bg-amberacc/5 flex items-center gap-2.5 font-mono">
-          <span class="text-amberacc text-base">🔒</span>
-          <div>
-            <div class="text-[10px] font-bold text-amberacc uppercase tracking-wider">CLEARANCE LEVEL 5</div>
-            <div class="text-[9px] text-zinc-500 uppercase">EYES ONLY</div>
-          </div>
-        </div>
-
-        <!-- Navigation Menu Items -->
-        <nav class="space-y-1 font-mono text-xs">
-          <button onclick="showHomeView()" class="w-full flex items-center gap-3 px-3 py-2 rounded text-left transition bg-[#17140e] text-amberacc font-bold border border-amberacc/40">
-            <span>🏠</span> <span>HOME</span>
-          </button>
-          <button onclick="openIntakeModal()" class="w-full flex items-center gap-3 px-3 py-2 rounded text-left transition text-zinc-400 hover:text-bone hover:bg-card">
-            <span>➕</span> <span>NEW DOSSIER</span>
-          </button>
-          <button onclick="scrollToRecent()" class="w-full flex items-center gap-3 px-3 py-2 rounded text-left transition text-zinc-400 hover:text-bone hover:bg-card">
-            <span>🗂</span> <span>MY DOSSIERS</span>
-          </button>
-          <button onclick="openSwarmModal()" class="w-full flex items-center gap-3 px-3 py-2 rounded text-left transition text-zinc-400 hover:text-bone hover:bg-card">
-            <span>👥</span> <span>AGENT SWARM</span>
-          </button>
-          <button onclick="loadPreset('ai_auditor')" class="w-full flex items-center gap-3 px-3 py-2 rounded text-left transition text-zinc-400 hover:text-bone hover:bg-card">
-            <span>📄</span> <span>TEMPLATES</span>
-          </button>
-          <button onclick="scrollToHowItWorks()" class="w-full flex items-center gap-3 px-3 py-2 rounded text-left transition text-zinc-400 hover:text-bone hover:bg-card">
-            <span>🛡</span> <span>METHODS</span>
-          </button>
-          <button onclick="alert('Configuration: TrueForge Harness, OrcaRouter Auto Model, Local Python3 Sandbox.')" class="w-full flex items-center gap-3 px-3 py-2 rounded text-left transition text-zinc-400 hover:text-bone hover:bg-card">
-            <span>⚙</span> <span>SETTINGS</span>
-          </button>
-        </nav>
-      </div>
-
-      <!-- Bottom Swarm Status Widget -->
-      <div class="p-3.5 rounded border border-bordercol bg-card font-mono text-xs space-y-2.5">
-        <div class="flex items-center justify-between border-b border-bordercol/60 pb-1.5">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">SWARM STATUS</span>
-          <span class="text-[10px] text-emeraldacc font-bold flex items-center gap-1">
-            <span class="size-1.5 rounded-full bg-emeraldacc"></span> ONLINE
-          </span>
-        </div>
-        <div>
-          <div class="text-[11px] text-bone font-bold">6 Specialized Agents</div>
-          <div class="text-[10px] text-zinc-500">All systems nominal</div>
-        </div>
-        <div class="space-y-1 text-[11px] text-zinc-400 pt-1">
-          <div class="flex items-center gap-2"><span class="size-1.5 rounded-full bg-emeraldacc"></span> <span>Founder</span></div>
-          <div class="flex items-center gap-2"><span class="size-1.5 rounded-full bg-emeraldacc"></span> <span>Market Recon</span></div>
-          <div class="flex items-center gap-2"><span class="size-1.5 rounded-full bg-emeraldacc"></span> <span>Technical</span></div>
-          <div class="flex items-center gap-2"><span class="size-1.5 rounded-full bg-emeraldacc"></span> <span>Skeptic</span></div>
-          <div class="flex items-center gap-2"><span class="size-1.5 rounded-full bg-emeraldacc"></span> <span>Financial</span></div>
-          <div class="flex items-center gap-2"><span class="size-1.5 rounded-full bg-emeraldacc"></span> <span>Human / User</span></div>
-        </div>
-        <div class="text-[9px] text-zinc-600 border-t border-bordercol/40 pt-1.5">
-          Last sync: 15:04:52 UTC
-        </div>
-      </div>
-    </aside>
-
-    <!-- RIGHT MAIN CONTENT STAGE -->
-    <main class="flex-1 p-6 md:p-8 space-y-12 max-w-7xl mx-auto overflow-y-auto">
+  <!-- ============================================================ -->
+  <!-- 1. TOP NAVIGATION BAR                                        -->
+  <!-- ============================================================ -->
+  <header class="border-b border-zinc-200/80 bg-white sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-6 md:px-12 py-4 flex items-center justify-between">
       
-      <!-- HERO & 3D DOSSIER DIAGRAM SECTION -->
-      <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
-        
-        <!-- Left Hero Content -->
-        <div class="lg:col-span-7 space-y-6">
-          <div class="font-mono text-xs text-amberacc font-bold uppercase tracking-widest">
-            // ADVERSARIAL PRE-MORTEM
-          </div>
-          
-          <h1 class="font-display text-4xl md:text-5xl lg:text-[54px] font-extrabold text-bone leading-[1.08] tracking-tight">
-            Make AI try to kill your idea before the market does.
-          </h1>
-
-          <p class="text-zinc-400 font-sans text-sm md:text-base leading-relaxed max-w-xl">
-            Autonomous consensus from 6 specialized subagents. Deep market recon, sandboxed financial stress-testing, and dual-key human approval checkpoints.
-          </p>
-
-          <!-- Action Buttons -->
-          <div class="flex flex-wrap items-center gap-4 pt-1">
-            <button onclick="openIntakeModal()" class="px-6 py-3.5 bg-amberacc hover:bg-amber-400 text-black font-mono font-bold uppercase tracking-wider text-xs rounded-sm transition flex items-center gap-2 shadow-xl shadow-amberacc/15 cursor-pointer">
-              <span>LAUNCH NEW DOSSIER</span> <span>→</span>
-            </button>
-            <button onclick="loadSampleDossierDirect()" class="px-5 py-3.5 bg-card hover:bg-surface border border-bordercol hover:border-zinc-600 text-bone font-mono font-bold uppercase tracking-wider text-xs rounded-sm transition flex items-center gap-2 cursor-pointer">
-              <span>📄</span> <span>VIEW SAMPLE DOSSIER</span>
-            </button>
-          </div>
-
-          <!-- 3 Feature Badges -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-bordercol/60">
-            <div class="space-y-1">
-              <div class="flex items-center gap-1.5 text-xs font-mono font-bold text-amberacc uppercase">
-                <span>🛡</span> <span>ADVERSARIAL BY DESIGN</span>
-              </div>
-              <p class="text-[11px] text-zinc-400 font-sans leading-normal">
-                Agents challenge assumptions and stress-test every claim.
-              </p>
-            </div>
-            <div class="space-y-1">
-              <div class="flex items-center gap-1.5 text-xs font-mono font-bold text-amberacc uppercase">
-                <span>🔍</span> <span>EVIDENCE FIRST</span>
-              </div>
-              <p class="text-[11px] text-zinc-400 font-sans leading-normal">
-                Every verdict is backed by sources, data and logic.
-              </p>
-            </div>
-            <div class="space-y-1">
-              <div class="flex items-center gap-1.5 text-xs font-mono font-bold text-amberacc uppercase">
-                <span>🔒</span> <span>HUMAN IN THE LOOP</span>
-              </div>
-              <p class="text-[11px] text-zinc-400 font-sans leading-normal">
-                Dual-key approvals for critical checkpoints.
-              </p>
-            </div>
-          </div>
+      <!-- Brand Logo + Name -->
+      <a href="#" onclick="showHomeView(); return false;" class="flex items-center gap-3.5 group">
+        <div class="w-10 h-10 bg-brandYellow rounded-md flex items-center justify-center font-black text-xl text-black tracking-tight shadow-sm group-hover:bg-brandYellowHover transition">
+          DS
         </div>
+        <span class="font-extrabold text-2xl tracking-tight text-zinc-900">
+          DOSSIER
+        </span>
+      </a>
 
-        <!-- Right 3D Dossier Folder & Agent Nodes Diagram -->
-        <div class="lg:col-span-5 flex items-center justify-center relative min-h-[380px] select-none">
-          
-          <!-- Outer Radar Orbit Lines -->
-          <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-            <div class="w-80 h-80 rounded-full border border-dashed border-amberacc"></div>
-            <div class="w-64 h-64 rounded-full border border-bordercol absolute"></div>
-          </div>
+      <!-- Nav Items -->
+      <nav class="flex items-center gap-8 text-sm font-semibold text-zinc-700">
+        <a href="#" onclick="showHomeView(); return false;" class="hover:text-black transition text-zinc-900">Home</a>
+        <a href="#recentDossiersSection" onclick="scrollToRecent(); return false;" class="hover:text-black transition">My Dossiers</a>
+        <a href="#" onclick="openTemplatesModal(); return false;" class="hover:text-black transition">Templates</a>
+        <a href="#" onclick="openSettingsModal(); return false;" class="hover:text-black transition">Settings</a>
+      </nav>
 
-          <!-- 3D Dossier Folder -->
-          <div class="relative z-10">
-            <div class="folder-back"></div>
-            <div class="folder-3d p-4 flex flex-col justify-between">
-              <div class="flex justify-between items-start font-mono text-[9px]">
-                <span class="size-2 rounded-full bg-amberacc/80"></span>
-                <span class="text-amberacc font-bold">TF-007</span>
-              </div>
-              
-              <div class="text-center my-auto space-y-1">
-                <div class="size-8 bg-amberacc text-black font-mono font-black text-sm flex items-center justify-center rounded-sm mx-auto shadow">
-                  DS
-                </div>
-                <div class="font-display font-black text-sm text-bone tracking-widest mt-2">DOSSIER</div>
-              </div>
+    </div>
+  </header>
 
-              <div class="text-center pt-2">
-                <span class="classified-stamp-small">EYES ONLY</span>
-              </div>
-            </div>
-          </div>
+  <!-- ============================================================ -->
+  <!-- 2. MAIN CONTAINER                                            -->
+  <!-- ============================================================ -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-10 md:py-14 space-y-16">
+    
+    <!-- ------------------------------------------------------------ -->
+    <!-- HERO SECTION (Split: Left Pitch / Right Swarm Diagram)       -->
+    <!-- ------------------------------------------------------------ -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+      
+      <!-- Left Column: Copy & Actions -->
+      <div class="lg:col-span-6 space-y-6 max-w-xl">
+        <h1 class="text-4xl sm:text-5xl lg:text-[56px] font-extrabold text-zinc-950 leading-[1.08] tracking-tight">
+          Make AI try to kill your idea before the market does.
+        </h1>
 
-          <!-- 6 Floating Tactical Agent Nodes Around the Folder -->
-          <!-- Node 1: Founder (Top Left) -->
-          <div class="absolute top-2 left-2 tactical-node text-left">
-            <div class="text-[10px] font-bold text-amberacc uppercase">FOUNDER</div>
-            <div class="text-[9px] text-zinc-400">Opportunity Framing</div>
-          </div>
+        <p class="text-zinc-600 text-base sm:text-lg leading-relaxed font-normal">
+          Autonomous consensus from 6 specialized agents. Deep market recon, stress-testing, and human approval checkpoints.
+        </p>
 
-          <!-- Node 2: Skeptic (Middle Left) -->
-          <div class="absolute top-[42%] -left-4 tactical-node active-node text-left">
-            <div class="text-[10px] font-bold text-amberacc uppercase">SKEPTIC</div>
-            <div class="text-[9px] text-zinc-300">Red Team Contrarian</div>
-          </div>
-
-          <!-- Node 3: Technical (Bottom Left) -->
-          <div class="absolute bottom-4 left-4 tactical-node text-left">
-            <div class="text-[10px] font-bold text-amberacc uppercase">TECHNICAL</div>
-            <div class="text-[9px] text-zinc-400">Feasibility Architecture</div>
-          </div>
-
-          <!-- Node 4: Market Recon (Top Right) -->
-          <div class="absolute top-2 right-2 tactical-node text-left">
-            <div class="text-[10px] font-bold text-amberacc uppercase">MARKET RECON</div>
-            <div class="text-[9px] text-zinc-400 flex items-center gap-1"><span class="size-1 rounded-full bg-amberacc"></span> Competition Trends</div>
-          </div>
-
-          <!-- Node 5: Financial (Middle Right) -->
-          <div class="absolute top-[42%] -right-4 tactical-node text-left">
-            <div class="text-[10px] font-bold text-amberacc uppercase">FINANCIAL</div>
-            <div class="text-[9px] text-zinc-400">Unit Economics Stress Test</div>
-          </div>
-
-          <!-- Node 6: Human / User (Bottom Right) -->
-          <div class="absolute bottom-4 right-4 tactical-node text-left">
-            <div class="text-[10px] font-bold text-amberacc uppercase">HUMAN / USER</div>
-            <div class="text-[9px] text-zinc-400 flex items-center gap-1"><span class="size-1 rounded-full bg-amberacc"></span> Empathy Reality Check</div>
-          </div>
-
+        <!-- CTA Buttons -->
+        <div class="flex flex-wrap items-center gap-4 pt-2">
+          <button onclick="openIntakeModal()" class="bg-brandYellow hover:bg-brandYellowHover text-zinc-950 font-bold text-sm px-6 py-3.5 rounded-lg shadow-sm transition inline-flex items-center justify-center cursor-pointer">
+            Launch New Dossier
+          </button>
+          <button onclick="loadSampleDossierDirect()" class="bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-300 font-semibold text-sm px-6 py-3.5 rounded-lg shadow-sm transition inline-flex items-center justify-center cursor-pointer">
+            View Sample Dossier
+          </button>
         </div>
-
-      </section>
-
-      <!-- HOW IT WORKS & RECENT DOSSIERS BOTTOM ROW -->
-      <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pt-4 border-t border-bordercol/80">
-        
-        <!-- HOW IT WORKS (Left Column, 7 cols) -->
-        <div class="lg:col-span-7 space-y-4" id="howItWorksSection">
-          <div class="flex items-center gap-1.5 font-mono text-xs font-bold text-amberacc uppercase tracking-wider">
-            <span>HOW IT WORKS</span>
-            <span class="text-amberacc">▼</span>
-          </div>
-
-          <!-- 5-Step Process Indicator -->
-          <div class="grid grid-cols-5 gap-2 text-center font-mono">
-            
-            <!-- Step 1 -->
-            <div class="flex flex-col items-center space-y-2">
-              <div class="step-circle text-zinc-300">
-                <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-              </div>
-              <div class="text-[10px] font-bold text-bone uppercase">1. SUBMIT</div>
-              <p class="text-[9px] text-zinc-500 font-sans leading-tight">Drop your idea, brief or plan.</p>
-            </div>
-
-            <!-- Step 2 -->
-            <div class="flex flex-col items-center space-y-2">
-              <div class="step-circle text-zinc-300">
-                <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-              </div>
-              <div class="text-[10px] font-bold text-bone uppercase">2. DEPLOY SWARM</div>
-              <p class="text-[9px] text-zinc-500 font-sans leading-tight">6 agents analyze independently.</p>
-            </div>
-
-            <!-- Step 3 -->
-            <div class="flex flex-col items-center space-y-2">
-              <div class="step-circle text-zinc-300">
-                <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-              </div>
-              <div class="text-[10px] font-bold text-bone uppercase">3. DEBATE</div>
-              <p class="text-[9px] text-zinc-500 font-sans leading-tight">Agents challenge each other.</p>
-            </div>
-
-            <!-- Step 4 -->
-            <div class="flex flex-col items-center space-y-2">
-              <div class="step-circle text-zinc-300">
-                <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-              </div>
-              <div class="text-[10px] font-bold text-bone uppercase">4. EVIDENCE</div>
-              <p class="text-[9px] text-zinc-500 font-sans leading-tight">Web, data & models gather proof.</p>
-            </div>
-
-            <!-- Step 5 -->
-            <div class="flex flex-col items-center space-y-2">
-              <div class="step-circle text-zinc-300">
-                <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              </div>
-              <div class="text-[10px] font-bold text-bone uppercase">5. VERDICT</div>
-              <p class="text-[9px] text-zinc-500 font-sans leading-tight">Get dossier, verdict & plan.</p>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- RECENT DOSSIERS (Right Column, 5 cols) -->
-        <div class="lg:col-span-5 space-y-3" id="recentDossiersSection">
-          <div class="flex items-center justify-between font-mono text-xs border-b border-bordercol/80 pb-2">
-            <span class="font-bold uppercase tracking-wider text-bone">RECENT DOSSIERS</span>
-            <button onclick="openIntakeModal()" class="text-amberacc hover:underline font-bold text-[11px] flex items-center gap-1">
-              <span>VIEW ALL</span> <span>→</span>
-            </button>
-          </div>
-
-          <div class="space-y-2 font-mono text-xs">
-            
-            <!-- Row 1 -->
-            <div onclick="loadPreset('study_companion')" class="p-3 bg-card hover:bg-panel border border-bordercol rounded flex items-center justify-between cursor-pointer transition">
-              <div class="flex items-center gap-3">
-                <span class="text-zinc-500">📄</span>
-                <div>
-                  <div class="font-bold text-bone text-xs">AI Study Companion</div>
-                  <div class="text-[10px] text-zinc-500">TF-007 • Aug 24, 2026</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="px-2 py-0.5 rounded bg-emeraldacc/15 text-emeraldacc border border-emeraldacc/30 text-[10px] font-bold">BUILD</span>
-                <span class="text-zinc-400 text-xs font-bold">7.8/10</span>
-              </div>
-            </div>
-
-            <!-- Row 2 -->
-            <div onclick="loadPreset('ev_charging')" class="p-3 bg-card hover:bg-panel border border-bordercol rounded flex items-center justify-between cursor-pointer transition">
-              <div class="flex items-center gap-3">
-                <span class="text-zinc-500">📄</span>
-                <div>
-                  <div class="font-bold text-bone text-xs">Hyperlocal EV Charging</div>
-                  <div class="text-[10px] text-zinc-500">TF-006 • Aug 23, 2026</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="px-2 py-0.5 rounded bg-amberacc/15 text-amberacc border border-amberacc/30 text-[10px] font-bold">REFINE</span>
-                <span class="text-zinc-400 text-xs font-bold">5.9/10</span>
-              </div>
-            </div>
-
-            <!-- Row 3 -->
-            <div onclick="loadPreset('voice_crm')" class="p-3 bg-card hover:bg-panel border border-bordercol rounded flex items-center justify-between cursor-pointer transition">
-              <div class="flex items-center gap-3">
-                <span class="text-zinc-500">📄</span>
-                <div>
-                  <div class="font-bold text-bone text-xs">Voice-first CRM for SMBs</div>
-                  <div class="text-[10px] text-zinc-500">TF-005 • Aug 22, 2026</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="px-2 py-0.5 rounded bg-crimsonacc/15 text-crimsonacc border border-crimsonacc/30 text-[10px] font-bold">KILL</span>
-                <span class="text-zinc-400 text-xs font-bold">3.2/10</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-      </section>
-
-      <!-- RESULTS SECTION (Rendered Dossier View) -->
-      <section id="resultsSection" class="hidden pt-6 border-t border-bordercol space-y-6">
-        <div class="p-6 md:p-8 bg-card rounded border border-bordercol space-y-6">
-          
-          <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-bordercol pb-6">
-            <div>
-              <div class="flex items-center gap-3 mb-2 font-mono text-xs">
-                <span class="classified-stamp-small text-crimsonacc border-crimsonacc">EVIDENCE-FIRST DOSSIER</span>
-                <span class="text-zinc-500" id="resDossierCode">DOSSIER // TF-007</span>
-                <span class="text-emeraldacc" id="resDossierStatus">STATUS: COMPILED</span>
-              </div>
-              <h2 id="resSubjectTitle" class="font-display text-3xl font-extrabold text-bone tracking-tight mt-1">AI STUDY COMPANION</h2>
-              
-              <!-- Domain Classification Badge Row -->
-              <div id="resDomainBanner" class="mt-3 inline-flex flex-wrap items-center gap-2 font-mono text-[11px] p-2 bg-panel rounded border border-bordercol">
-                <span class="text-amberacc font-bold" id="resDomainArchetype">DOMAIN: HEALTHCARE</span>
-                <span class="text-zinc-600">•</span>
-                <span class="text-zinc-400" id="resDomainCustomer">CUSTOMER: FRONT-LINE CHW</span>
-                <span class="text-zinc-600">•</span>
-                <span class="text-zinc-400" id="resDomainCycle">CYCLE: 6-12 MO B2G</span>
-              </div>
-
-              <p id="resExecutiveSummary" class="text-xs md:text-sm text-zinc-300 mt-3 max-w-3xl font-sans leading-relaxed"></p>
-            </div>
-
-            <div class="flex sm:flex-row md:flex-col gap-3 shrink-0">
-              <div class="bg-panel border border-bordercol p-4 rounded text-center md:text-right min-w-[160px]">
-                <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block">OVERALL VERDICT</span>
-                <span id="resVerdictBadge" class="font-mono text-2xl font-black text-amberacc mt-0.5 block">REFINE</span>
-              </div>
-              <div class="bg-panel border border-bordercol p-3 rounded text-center md:text-right min-w-[160px] font-mono text-xs">
-                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RESILIENCE:</span><span id="resScoreVal" class="text-amberacc font-bold">68/100</span></div>
-                <div class="flex justify-between md:justify-end gap-3 mt-1"><span class="text-zinc-500">CONFIDENCE:</span><span id="resConfidence" class="text-bone font-bold">78%</span></div>
-                <div class="flex justify-between md:justify-end gap-3 mt-1"><span class="text-zinc-500">RISK:</span><span id="resRiskLevel" class="text-amberacc font-bold">MEDIUM</span></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 5-Dimensional Resilience Breakdown -->
-          <div>
-            <h3 class="font-mono text-xs font-bold text-bone uppercase tracking-wider mb-3">TRANSPARENT 5-DIMENSIONAL RESILIENCE SCORE</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono text-xs" id="resilienceGrid"></div>
-          </div>
-
-          <!-- Domain Specialist Agent Consensus Grid -->
-          <div>
-            <h3 class="font-mono text-xs font-bold text-bone uppercase tracking-wider mb-3">DOMAIN SPECIALIST AGENT RECON</h3>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs" id="consensusGrid"></div>
-          </div>
-
-          <!-- Evidence & Weakest Assumption Row -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
-            <div class="p-4 bg-panel border border-emeraldacc/40 rounded space-y-2">
-              <div class="flex items-center justify-between text-emeraldacc font-bold">
-                <span>🔬 STRONGEST VERIFIED EVIDENCE</span>
-                <span id="strongestEvidenceType" class="text-[9px] px-1.5 py-0.5 rounded bg-emeraldacc/10">VERIFIED</span>
-              </div>
-              <p id="strongestEvidenceText" class="text-zinc-200 text-[11px] leading-relaxed"></p>
-              <div id="strongestEvidenceProv" class="text-[10px] text-zinc-500 italic"></div>
-            </div>
-
-            <div class="p-4 bg-panel border border-crimsonacc/40 rounded space-y-2">
-              <div class="flex items-center justify-between text-crimsonacc font-bold">
-                <span>⚠️ WEAKEST FATAL ASSUMPTION</span>
-                <span class="text-[9px] px-1.5 py-0.5 rounded bg-crimsonacc/10">CRITICAL RISK</span>
-              </div>
-              <p id="weakestAssumptionText" class="text-zinc-200 text-[11px] leading-relaxed"></p>
-              <div id="weakestAssumptionDisproof" class="text-[10px] text-amberacc/90"></div>
-            </div>
-          </div>
-
-          <!-- Kill Conditions & Cheapest Validation Experiment Row -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
-            <div class="p-4 bg-panel border border-bordercol rounded space-y-2.5">
-              <div class="text-crimsonacc font-bold">💀 STRICT KILL CONDITIONS (FALSIFIABLE)</div>
-              <ul id="killConditionsList" class="space-y-1 text-zinc-300 text-[11px] list-disc list-inside"></ul>
-            </div>
-
-            <div class="p-4 bg-panel border border-amberacc/40 rounded space-y-2.5">
-              <div class="text-amberacc font-bold">🧪 CHEAPEST VALIDATION EXPERIMENT</div>
-              <div id="cheapestExpTitle" class="font-bold text-bone text-xs"></div>
-              <p id="cheapestExpDesc" class="text-zinc-300 text-[11px]"></p>
-              <div class="flex justify-between items-center text-[10px] pt-1 border-t border-bordercol/60 text-zinc-400">
-                <span id="cheapestExpCostTime">Cost: $0 | Time: 4 Days</span>
-                <span id="cheapestExpMetric" class="text-emeraldacc font-bold"></span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Unresolved Contradictions Clash -->
-          <div>
-            <h3 class="font-mono text-xs font-bold text-amberacc uppercase tracking-wider mb-3">UNRESOLVED CONTRADICTIONS &amp; REBUTTALS</h3>
-            <div id="contradictionsList" class="space-y-3 font-mono text-xs"></div>
-          </div>
-
-          <!-- Sandbox Execution -->
-          <div class="p-4 bg-panel border border-bordercol rounded font-mono text-xs space-y-2">
-            <div class="text-emeraldacc font-bold flex justify-between">
-              <span>PYTHON3 SANDBOXED SIMULATION PROOF</span>
-              <span>EXIT 0</span>
-            </div>
-            <pre id="sandboxStdout" class="text-[11px] text-zinc-300 whitespace-pre-wrap leading-relaxed"></pre>
-          </div>
-
-          <!-- Approval Gates -->
-          <div class="p-5 border border-amberacc/50 bg-[#16130e] rounded space-y-3">
-            <div class="flex justify-between items-center text-amberacc font-mono text-xs font-bold">
-              <span>🛑 DUAL-KEY HUMAN APPROVAL CHECKPOINT (TRUEFORGE SAFETY)</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded bg-amberacc/20">AWAITING AUTHORIZATION</span>
-            </div>
-            <div id="approvalList" class="space-y-3"></div>
-          </div>
-
-        </div>
-      </section>
-
-    </main>
-  </div>
-
-  <!-- INTAKE MODAL (Opens on Launch New Dossier) -->
-  <div id="intakeModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-sidebar border border-bordercol rounded max-w-2xl w-full p-6 md:p-8 space-y-5 shadow-2xl relative">
-      <div class="flex items-center justify-between border-b border-bordercol pb-3">
-        <div class="flex items-center gap-2 font-mono text-xs font-bold text-bone uppercase">
-          <span class="text-amberacc">▶</span> [ DOSSIER INTAKE // NEW INVESTIGATION ]
-        </div>
-        <button onclick="closeIntakeModal()" class="text-zinc-500 hover:text-white font-mono text-base">✕</button>
       </div>
 
-      <form id="modalEvalForm" class="space-y-4 font-mono text-xs">
+      <!-- Right Column: Swarm Orbit Diagram -->
+      <div class="lg:col-span-6 flex items-center justify-center">
+        <div class="orbit-container">
+          
+          <!-- Orbit SVG Dashed Ring & Central Dossier Document -->
+          <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 520 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Dashed Circular Orbit line (radius 145px around center (260, 200)) -->
+            <ellipse cx="260" cy="200" rx="145" ry="145" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="4 4" fill="none" />
+
+            <!-- Center Dossier Card (at 260, 200; width 84, height 110) -->
+            <g transform="translate(218, 145)">
+              <!-- Document Base with folded corner -->
+              <path d="M 0 6 C 0 2.686 2.686 0 6 0 L 60 0 L 84 24 L 84 104 C 84 107.314 81.314 110 78 110 L 6 110 C 2.686 110 0 107.314 0 104 Z" fill="#ffffff" stroke="#000000" stroke-width="2" />
+              <!-- Dog-ear fold line -->
+              <path d="M 60 0 L 60 24 L 84 24" fill="#f4f4f5" stroke="#000000" stroke-width="2" />
+              <!-- Card Text: DS -->
+              <text x="42" y="58" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="28" fill="#000000" text-anchor="middle" letter-spacing="-1">DS</text>
+              <!-- Card Text: DOSSIER -->
+              <text x="42" y="80" font-family="'Plus Jakarta Sans', sans-serif" font-weight="800" font-size="9.5" fill="#000000" text-anchor="middle" letter-spacing="1">DOSSIER</text>
+            </g>
+          </svg>
+
+          <!-- 1. Top Node: Founder (12 o'clock) -->
+          <div class="orbit-node" style="top: 32px; left: 238px;">
+            <div class="yellow-circle-node" title="Founder Agent">
+              <!-- Person Silhouette Icon -->
+              <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+            </div>
+            <div class="ml-3 text-left">
+              <div class="font-bold text-xs text-zinc-950">Founder</div>
+              <div class="text-[10px] text-zinc-500 leading-tight">Opportunity Framing</div>
+            </div>
+          </div>
+
+          <!-- 2. Top-Right Node: Market Recon (~2 o'clock) -->
+          <div class="orbit-node" style="top: 98px; left: 382px;">
+            <div class="yellow-circle-node" title="Market Recon Agent">
+              <!-- Bar Chart Icon -->
+              <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+            </div>
+            <div class="ml-3 text-left">
+              <div class="font-bold text-xs text-zinc-950">Market Recon</div>
+              <div class="text-[10px] text-zinc-500 leading-tight">Competition Trends</div>
+            </div>
+          </div>
+
+          <!-- 3. Bottom-Right Node: Financial (~4 o'clock) -->
+          <div class="orbit-node" style="top: 250px; left: 382px;">
+            <div class="yellow-circle-node" title="Financial Agent">
+              <!-- Dollar Sign Icon -->
+              <span class="font-extrabold text-base text-black font-sans">$</span>
+            </div>
+            <div class="ml-3 text-left">
+              <div class="font-bold text-xs text-zinc-950">Financial</div>
+              <div class="text-[10px] text-zinc-500 leading-tight">Unit Economics</div>
+              <div class="text-[10px] text-zinc-500 leading-tight">Stress Test</div>
+            </div>
+          </div>
+
+          <!-- 4. Bottom Node: Human / User (6 o'clock) -->
+          <div class="orbit-node flex-col" style="top: 322px; left: 238px;">
+            <div class="yellow-circle-node" title="Human / User Persona Agent">
+              <!-- 2 People / Group Icon -->
+              <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+            </div>
+            <div class="text-center mt-1.5">
+              <div class="font-bold text-xs text-zinc-950">Human / User</div>
+              <div class="text-[10px] text-zinc-500 leading-tight">Empathy Reality Check</div>
+            </div>
+          </div>
+
+          <!-- 5. Bottom-Left Node: Technical (~8 o'clock) -->
+          <div class="orbit-node flex-row-reverse" style="top: 250px; right: 282px;">
+            <div class="yellow-circle-node" title="Technical Architect Agent">
+              <!-- Code brackets </> -->
+              <span class="font-extrabold text-xs text-black font-mono tracking-tighter">&lt;/&gt;</span>
+            </div>
+            <div class="mr-3 text-right">
+              <div class="font-bold text-xs text-zinc-950">Technical</div>
+              <div class="text-[10px] text-zinc-500 leading-tight">Feasibility</div>
+              <div class="text-[10px] text-zinc-500 leading-tight">Architecture</div>
+            </div>
+          </div>
+
+          <!-- 6. Top-Left Node: Skeptic (~10 o'clock) -->
+          <div class="orbit-node flex-row-reverse" style="top: 98px; right: 282px;">
+            <div class="yellow-circle-node" title="Skeptic / Red Team Agent">
+              <!-- Shield with Checkmark Icon -->
+              <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+              </svg>
+            </div>
+            <div class="mr-3 text-right">
+              <div class="font-bold text-xs text-zinc-950">Skeptic</div>
+              <div class="text-[10px] text-zinc-500 leading-tight">Red Team</div>
+              <div class="text-[10px] text-zinc-500 leading-tight">Contrarian</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ------------------------------------------------------------ -->
+    <!-- BOTTOM SECTION: HOW IT WORKS + RECENT DOSSIERS               -->
+    <!-- ------------------------------------------------------------ -->
+    <div class="pt-6 border-t border-zinc-200/80">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        
+        <!-- HOW IT WORKS (Left Column, 7 Cols) -->
+        <div class="lg:col-span-7 space-y-6" id="howItWorksSection">
+          <h2 class="text-base font-extrabold text-zinc-900 tracking-tight">
+            How It Works
+          </h2>
+
+          <!-- 5 Steps Flow -->
+          <div class="flex items-start justify-between gap-1 sm:gap-2">
+            
+            <!-- Step 1: Submit -->
+            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                <!-- Document Icon -->
+                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </div>
+              <div class="font-bold text-xs text-zinc-900 mt-3">1. Submit</div>
+              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Drop your idea, brief or plan.</div>
+            </div>
+
+            <!-- Arrow 1 -->
+            <div class="text-zinc-400 font-light text-lg pt-4">→</div>
+
+            <!-- Step 2: Deploy Swarm -->
+            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                <!-- 3 People Swarm Icon -->
+                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+              </div>
+              <div class="font-bold text-xs text-zinc-900 mt-3">2. Deploy Swarm</div>
+              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">6 agents analyze independently.</div>
+            </div>
+
+            <!-- Arrow 2 -->
+            <div class="text-zinc-400 font-light text-lg pt-4">→</div>
+
+            <!-- Step 3: Debate -->
+            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                <!-- Speech Bubble Icon -->
+                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+              </div>
+              <div class="font-bold text-xs text-zinc-900 mt-3">3. Debate</div>
+              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Agents challenge each other.</div>
+            </div>
+
+            <!-- Arrow 3 -->
+            <div class="text-zinc-400 font-light text-lg pt-4">→</div>
+
+            <!-- Step 4: Evidence -->
+            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                <!-- Search / Magnifying Glass Icon -->
+                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+              </div>
+              <div class="font-bold text-xs text-zinc-900 mt-3">4. Evidence</div>
+              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Web, data &amp; models gather proof.</div>
+            </div>
+
+            <!-- Arrow 4 -->
+            <div class="text-zinc-400 font-light text-lg pt-4">→</div>
+
+            <!-- Step 5: Verdict -->
+            <div class="flex flex-col items-center text-center max-w-[90px] sm:max-w-[100px]">
+              <div class="w-14 h-14 rounded-full bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center text-zinc-800 shadow-2xs hover:bg-zinc-200/60 transition cursor-default">
+                <!-- Checkmark in Circle Icon -->
+                <svg class="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <div class="font-bold text-xs text-zinc-900 mt-3">5. Verdict</div>
+              <div class="text-[11px] text-zinc-500 mt-1 leading-snug">Get dossier, verdict &amp; plan.</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- RECENT DOSSIERS (Right Column, 5 Cols) -->
+        <div class="lg:col-span-5 space-y-4" id="recentDossiersSection">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-extrabold text-zinc-900 tracking-tight">
+              Recent Dossiers
+            </h2>
+            <button onclick="openIntakeModal()" class="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
+              View all
+            </button>
+          </div>
+
+          <!-- Dossier Cards List -->
+          <div class="border border-zinc-200/90 rounded-xl bg-white divide-y divide-zinc-100 shadow-xs overflow-hidden">
+            
+            <!-- Item 1: AI Study Companion -->
+            <div onclick="loadPreset('study_companion')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
+              <div class="flex items-center gap-3">
+                <!-- Document Icon -->
+                <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <div>
+                  <div class="font-bold text-xs text-zinc-950">AI Study Companion</div>
+                  <div class="text-[11px] text-zinc-500 font-mono mt-0.5">TF-007 • Aug 24, 2026</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-badgeGreenBg text-badgeGreenText tracking-wider">
+                  BUILD
+                </span>
+                <span class="text-xs font-semibold text-zinc-600 font-mono">
+                  7.8/10
+                </span>
+              </div>
+            </div>
+
+            <!-- Item 2: Hyperlocal EV Charging -->
+            <div onclick="loadPreset('ev_charging')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
+              <div class="flex items-center gap-3">
+                <!-- Document Icon -->
+                <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <div>
+                  <div class="font-bold text-xs text-zinc-950">Hyperlocal EV Charging</div>
+                  <div class="text-[11px] text-zinc-500 font-mono mt-0.5">TF-006 • Aug 23, 2026</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-badgeAmberBg text-badgeAmberText tracking-wider">
+                  REFINE
+                </span>
+                <span class="text-xs font-semibold text-zinc-600 font-mono">
+                  5.9/10
+                </span>
+              </div>
+            </div>
+
+            <!-- Item 3: Voice-first CRM for SMBs -->
+            <div onclick="loadPreset('voice_crm')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
+              <div class="flex items-center gap-3">
+                <!-- Document Icon -->
+                <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <div>
+                  <div class="font-bold text-xs text-zinc-950">Voice-first CRM for SMBs</div>
+                  <div class="text-[11px] text-zinc-500 font-mono mt-0.5">TF-005 • Aug 22, 2026</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-badgeRedBg text-badgeRedText tracking-wider">
+                  KILL
+                </span>
+                <span class="text-xs font-semibold text-zinc-600 font-mono">
+                  3.2/10
+                </span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------------------ -->
+    <!-- 3. RENDERED DOSSIER REPORT VIEW (Expands after Evaluation)   -->
+    <!-- ------------------------------------------------------------ -->
+    <section id="resultsSection" class="hidden pt-6 border-t border-zinc-200/90 space-y-6">
+      <div class="p-6 md:p-8 bg-zinc-50/70 rounded-2xl border border-zinc-200 space-y-6 shadow-xs">
+        
+        <!-- Header Banner -->
+        <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-zinc-200 pb-6">
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 font-mono text-xs">
+              <span class="px-2 py-0.5 bg-red-100 text-red-700 font-bold rounded text-[10px] tracking-wider uppercase">
+                EVIDENCE-FIRST DOSSIER
+              </span>
+              <span class="text-zinc-500" id="resDossierCode">DOSSIER // TF-007</span>
+              <span class="text-emerald-600 font-bold" id="resDossierStatus">STATUS: COMPILED</span>
+            </div>
+
+            <h2 id="resSubjectTitle" class="text-2xl sm:text-3xl font-extrabold text-zinc-950 tracking-tight">
+              AI STUDY COMPANION
+            </h2>
+            
+            <!-- Domain Classification Badge Row -->
+            <div id="resDomainBanner" class="inline-flex flex-wrap items-center gap-2 font-mono text-xs p-2 bg-white rounded-lg border border-zinc-200">
+              <span class="text-amber-700 font-bold" id="resDomainArchetype">DOMAIN: CONSUMER AI</span>
+              <span class="text-zinc-300">•</span>
+              <span class="text-zinc-600" id="resDomainCustomer">CUSTOMER: PARENTS &amp; STUDENTS</span>
+              <span class="text-zinc-300">•</span>
+              <span class="text-zinc-600" id="resDomainCycle">CYCLE: B2C MONTHLY</span>
+            </div>
+
+            <p id="resExecutiveSummary" class="text-sm text-zinc-700 mt-2 max-w-3xl leading-relaxed"></p>
+          </div>
+
+          <!-- Verdict Cards -->
+          <div class="flex sm:flex-row md:flex-col gap-3 shrink-0">
+            <div class="bg-white border border-zinc-200 p-4 rounded-xl text-center md:text-right min-w-[170px] shadow-2xs">
+              <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">OVERALL VERDICT</span>
+              <span id="resVerdictBadge" class="font-mono text-2xl font-black text-emerald-600 mt-0.5 block">BUILD</span>
+            </div>
+            <div class="bg-white border border-zinc-200 p-3.5 rounded-xl text-center md:text-right min-w-[170px] font-mono text-xs shadow-2xs space-y-1">
+              <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RESILIENCE:</span><span id="resScoreVal" class="text-zinc-900 font-bold">78/100</span></div>
+              <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">CONFIDENCE:</span><span id="resConfidence" class="text-zinc-900 font-bold">84%</span></div>
+              <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RISK:</span><span id="resRiskLevel" class="text-amber-600 font-bold">MEDIUM</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5-Dimensional Resilience Breakdown -->
+        <div class="space-y-2">
+          <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+            Transparent 5-Dimensional Resilience Score
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono text-xs" id="resilienceGrid"></div>
+        </div>
+
+        <!-- Domain Specialist Agent Consensus Grid -->
+        <div class="space-y-2">
+          <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+            6-Agent Swarm Perspectives &amp; Mandates
+          </h3>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs" id="consensusGrid"></div>
+        </div>
+
+        <!-- Evidence & Weakest Assumption Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
+          <div class="p-4 bg-white border border-emerald-300 rounded-xl space-y-2 shadow-2xs">
+            <div class="flex items-center justify-between text-emerald-700 font-bold">
+              <span>🔬 STRONGEST VERIFIED EVIDENCE</span>
+              <span id="strongestEvidenceType" class="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">VERIFIED</span>
+            </div>
+            <p id="strongestEvidenceText" class="text-zinc-800 text-xs font-sans leading-relaxed"></p>
+            <div id="strongestEvidenceProv" class="text-[10px] text-zinc-500 italic"></div>
+          </div>
+
+          <div class="p-4 bg-white border border-red-300 rounded-xl space-y-2 shadow-2xs">
+            <div class="flex items-center justify-between text-red-700 font-bold">
+              <span>⚠️ WEAKEST FATAL ASSUMPTION</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-red-50 text-red-700">CRITICAL RISK</span>
+            </div>
+            <p id="weakestAssumptionText" class="text-zinc-800 text-xs font-sans leading-relaxed"></p>
+            <div id="weakestAssumptionDisproof" class="text-[10px] text-amber-700"></div>
+          </div>
+        </div>
+
+        <!-- Kill Conditions & Cheapest Validation Experiment Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
+          <div class="p-4 bg-white border border-zinc-200 rounded-xl space-y-2 shadow-2xs">
+            <div class="text-red-700 font-bold">💀 STRICT KILL CONDITIONS (FALSIFIABLE)</div>
+            <ul id="killConditionsList" class="space-y-1.5 text-zinc-700 text-xs font-sans list-disc list-inside"></ul>
+          </div>
+
+          <div class="p-4 bg-white border border-amber-300 rounded-xl space-y-2 shadow-2xs">
+            <div class="text-amber-800 font-bold">🧪 CHEAPEST VALIDATION EXPERIMENT</div>
+            <div id="cheapestExpTitle" class="font-bold text-zinc-900 text-xs font-sans"></div>
+            <p id="cheapestExpDesc" class="text-zinc-700 text-xs font-sans"></p>
+            <div class="flex justify-between items-center text-[10px] pt-2 border-t border-zinc-100 text-zinc-500">
+              <span id="cheapestExpCostTime">Cost: $0 | Time: 4 Days</span>
+              <span id="cheapestExpMetric" class="text-emerald-700 font-bold"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Unresolved Contradictions Clash -->
+        <div class="space-y-2">
+          <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+            Unresolved Contradictions &amp; Agent Rebuttals
+          </h3>
+          <div id="contradictionsList" class="space-y-3 font-mono text-xs"></div>
+        </div>
+
+        <!-- Sandbox Simulation Output -->
+        <div class="p-4 bg-zinc-900 text-zinc-200 border border-zinc-800 rounded-xl font-mono text-xs space-y-2 shadow-xs">
+          <div class="text-emerald-400 font-bold flex justify-between">
+            <span>PYTHON3 SANDBOXED ECONOMICS SIMULATION</span>
+            <span>EXIT 0</span>
+          </div>
+          <pre id="sandboxStdout" class="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed overflow-x-auto"></pre>
+        </div>
+
+        <!-- Human Approval Gate -->
+        <div class="p-5 border border-amber-300 bg-amber-50/50 rounded-xl space-y-3">
+          <div class="flex justify-between items-center text-amber-900 font-mono text-xs font-bold">
+            <span>🛑 DUAL-KEY HUMAN APPROVAL CHECKPOINT (TRUEFORGE SAFETY)</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-amber-200/80 text-amber-900">AWAITING AUTHORIZATION</span>
+          </div>
+          <div id="approvalList" class="space-y-3"></div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- 4. MODALS & OVERLAYS                                         -->
+  <!-- ============================================================ -->
+  
+  <!-- Intake Modal -->
+  <div id="intakeModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+    <div class="bg-white border border-zinc-300 rounded-2xl max-w-xl w-full p-6 md:p-8 space-y-5 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-zinc-200 pb-3">
+        <div class="flex items-center gap-2 font-bold text-sm text-zinc-900">
+          <div class="w-6 h-6 bg-brandYellow rounded flex items-center justify-center text-xs font-black text-black">DS</div>
+          <span>Launch New Dossier Investigation</span>
+        </div>
+        <button onclick="closeIntakeModal()" class="text-zinc-400 hover:text-zinc-800 font-bold text-lg cursor-pointer">✕</button>
+      </div>
+
+      <form id="modalEvalForm" class="space-y-4 font-sans text-xs">
         <div>
-          <label class="block uppercase text-zinc-400 mb-1">Concept Codename / Title</label>
-          <input type="text" id="modalTitle" class="w-full bg-bgdark border border-bordercol px-3 py-2 text-bone rounded focus:outline-none focus:border-amberacc" value="AI Study Companion" required>
+          <label class="block font-bold text-zinc-700 mb-1 uppercase tracking-wider text-[11px]">Idea Title / Concept Codename</label>
+          <input type="text" id="modalTitle" class="w-full bg-zinc-50 border border-zinc-300 px-3.5 py-2.5 text-zinc-900 rounded-lg focus:outline-none focus:border-brandYellowHover focus:bg-white text-sm" placeholder="e.g. Autonomous Micro-SaaS Agent" value="AI Study Companion" required>
         </div>
 
         <div>
-          <label class="block uppercase text-zinc-400 mb-1">Operational Summary & Value Prop</label>
-          <textarea id="modalSummary" rows="3" class="w-full bg-bgdark border border-bordercol px-3 py-2 text-bone rounded font-sans text-xs focus:outline-none focus:border-amberacc" required>An automated real-time study companion for high school students that monitors browser homework sessions, diagnoses knowledge gaps, and provides parental progress alerts via WhatsApp.</textarea>
+          <label class="block font-bold text-zinc-700 mb-1 uppercase tracking-wider text-[11px]">Operational Summary &amp; Value Proposition</label>
+          <textarea id="modalSummary" rows="3" class="w-full bg-zinc-50 border border-zinc-300 px-3.5 py-2.5 text-zinc-900 rounded-lg focus:outline-none focus:border-brandYellowHover focus:bg-white text-sm" placeholder="Describe the core problem, customer pain, and execution strategy..." required>An automated real-time study companion for high school students that monitors browser homework sessions, diagnoses knowledge gaps, and provides parental progress alerts via WhatsApp.</textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block uppercase text-zinc-400 mb-1 text-[10px]">Target Buyer</label>
-            <input type="text" id="modalTarget" class="w-full bg-bgdark border border-bordercol px-2.5 py-1.5 text-bone rounded" value="Parents & Students">
+            <label class="block font-bold text-zinc-700 mb-1 uppercase tracking-wider text-[10px]">Target Buyer / Persona</label>
+            <input type="text" id="modalTarget" class="w-full bg-zinc-50 border border-zinc-300 px-3 py-2 text-zinc-900 rounded-lg text-xs" value="Parents & Students">
           </div>
           <div>
-            <label class="block uppercase text-zinc-400 mb-1 text-[10px]">Price ($ / Mo)</label>
-            <input type="number" id="modalPrice" class="w-full bg-bgdark border border-bordercol px-2.5 py-1.5 text-bone rounded" value="29">
+            <label class="block font-bold text-zinc-700 mb-1 uppercase tracking-wider text-[10px]">Price ($ / Month)</label>
+            <input type="number" id="modalPrice" class="w-full bg-zinc-50 border border-zinc-300 px-3 py-2 text-zinc-900 rounded-lg text-xs" value="29">
           </div>
         </div>
 
-        <button type="submit" id="modalSubmitBtn" class="w-full py-3.5 bg-amberacc hover:bg-amber-400 text-black font-mono font-bold uppercase tracking-wider text-xs rounded transition flex items-center justify-center gap-2">
-          <span id="modalBtnText">INITIATE INVESTIGATION →</span>
-          <span id="modalSpinner" class="hidden animate-spin">◴</span>
-        </button>
+        <div class="pt-2">
+          <button type="submit" id="modalSubmitBtn" class="w-full py-3.5 bg-brandYellow hover:bg-brandYellowHover text-zinc-950 font-bold text-sm rounded-lg shadow-sm transition flex items-center justify-center gap-2 cursor-pointer">
+            <span id="modalBtnText">Deploy Swarm &amp; Generate Dossier →</span>
+            <span id="modalSpinner" class="hidden animate-spin">◴</span>
+          </button>
+        </div>
       </form>
     </div>
   </div>
 
-  <!-- 4. Footer -->
-  <footer class="border-t border-bordercol bg-sidebar py-4 px-6 text-xs font-mono text-zinc-500">
-    <div class="max-w-full flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-2 text-zinc-400">
-        <span>🔒</span>
-        <span class="font-bold text-zinc-300 uppercase">EYES ONLY</span>
-        <span class="text-zinc-600 hidden sm:inline">•</span>
-        <span class="text-zinc-500 hidden sm:inline">Unauthorized access is logged, traced and prosecuted.</span>
-      </div>
-      <div class="text-center text-zinc-400">
-        DOSSIER // Built for WeMakeDevs Agent Harness Hackathon (August 2026)
-      </div>
-      <div class="flex items-center gap-4 text-zinc-400">
-        <a href="https://github.com/sanjeevafk/dossier" target="_blank" class="hover:text-amberacc transition">GitHub Source</a>
-        <span>•</span>
-        <a href="https://github.com/truefoundry/trueforge" target="_blank" class="hover:text-amberacc transition">TrueForge Harness</a>
-      </div>
-    </div>
-  </footer>
-
+  <!-- ============================================================ -->
+  <!-- 5. JAVASCRIPT LOGIC                                          -->
+  <!-- ============================================================ -->
   <script>
-    function updateClock() {
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const timeStr = `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())} UTC`;
-      const el1 = document.getElementById('topClock');
-      const el2 = document.getElementById('subClock');
-      if (el1) el1.textContent = timeStr;
-      if (el2) el2.textContent = timeStr;
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
     function openIntakeModal() {
       document.getElementById('intakeModal').classList.remove('hidden');
     }
@@ -704,16 +624,18 @@
     function showHomeView() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    function openSwarmModal() {
-      alert("6 Subagents Active: 01 Market Analyst, 02 Customer Advocate, 03 Technical Architect, 04 Investor, 05 Red Team (Skeptic), 06 Domain Expert.");
+    function openTemplatesModal() {
+      loadPreset('ai_auditor');
+    }
+    function openSettingsModal() {
+      alert("Dossier Configuration:\n• TrueForge Harness: Online\n• Multi-Agent Swarm: 6 Active Roles\n• Python3 Sandbox: Local Isolation\n• Human Safety Gate: Dual-Key Active");
     }
 
     function loadPreset(key) {
-      openIntakeModal();
       if (key === 'ai_auditor') {
-        document.getElementById('modalTitle').value = "AI SOC2 Auditor";
-        document.getElementById('modalSummary').value = "Scans cloud infra for SOC2/HIPAA compliance violations, writes remediation scripts in a sandbox, and halts for human approval before patching.";
-        document.getElementById('modalTarget').value = "B2B CTOs";
+        document.getElementById('modalTitle').value = "AI SOC2 Compliance Auditor";
+        document.getElementById('modalSummary').value = "Scans cloud infrastructure for SOC2/HIPAA violations, writes remediation scripts in a sandboxed runtime, and halts for human approval before applying patches.";
+        document.getElementById('modalTarget').value = "B2B CTOs & DevOps";
         document.getElementById('modalPrice').value = "499";
       } else if (key === 'micro_saas') {
         document.getElementById('modalTitle').value = "Autonomous Micro-SaaS Agent";
@@ -736,6 +658,7 @@
         document.getElementById('modalTarget').value = "Plumbers & Electricians";
         document.getElementById('modalPrice').value = "39";
       }
+      openIntakeModal();
     }
 
     function loadSampleDossierDirect() {
@@ -750,7 +673,7 @@
       const spinner = document.getElementById('modalSpinner');
 
       submitBtn.disabled = true;
-      btnText.textContent = "EXECUTING SWARM RECON...";
+      btnText.textContent = "Deploying Swarm & Executing Recon...";
       spinner.classList.remove('hidden');
 
       const payload = {
@@ -780,7 +703,7 @@
         alert("Failed to reach API: " + err.message);
       } finally {
         submitBtn.disabled = false;
-        btnText.textContent = "INITIATE INVESTIGATION →";
+        btnText.textContent = "Deploy Swarm & Generate Dossier →";
         spinner.classList.add('hidden');
       }
     });
@@ -804,58 +727,38 @@
 
       const verdictBadge = document.getElementById('resVerdictBadge');
       verdictBadge.textContent = dossier.overallVerdict === 'BUILD_IF_VALIDATED' ? 'BUILD IF VALIDATED' : dossier.overallVerdict;
-      verdictBadge.className = (dossier.overallVerdict === 'BUILD' || dossier.overallVerdict === 'BUILD_IF_VALIDATED') ? 'font-mono text-xl md:text-2xl font-black text-emeraldacc mt-0.5 block' :
-        (dossier.overallVerdict === 'REFINE' ? 'font-mono text-2xl font-black text-amberacc mt-0.5 block' : 'font-mono text-2xl font-black text-crimsonacc mt-0.5 block');
-
-      if (dossier.epistemicSummary) {
-        const es = dossier.epistemicSummary;
-        let esEl = document.getElementById('resEpistemicBanner');
-        if (!esEl) {
-          esEl = document.createElement('div');
-          esEl.id = 'resEpistemicBanner';
-          esEl.className = 'mt-2 text-[10px] font-mono text-zinc-400 flex flex-wrap gap-2';
-          document.getElementById('resDomainBanner').parentNode.insertBefore(esEl, document.getElementById('resExecutiveSummary'));
-        }
-        esEl.innerHTML = `
-          <span class="px-2 py-0.5 rounded bg-emeraldacc/10 text-emeraldacc border border-emeraldacc/30">${es.verifiedFactsCount} Verified Facts</span>
-          <span class="px-2 py-0.5 rounded bg-emeraldacc/10 text-emeraldacc border border-emeraldacc/30">${es.verifiedComputationsCount} Computations (Exit 0)</span>
-          <span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">${es.externalEvidenceCount} External Evidence</span>
-          <span class="px-2 py-0.5 rounded bg-amberacc/10 text-amberacc border border-amberacc/30">${es.modelledAssumptionsCount} Modelled Hypotheses</span>
-          <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">${es.inferencesCount} Inferences</span>
-          <span class="px-2 py-0.5 rounded bg-crimsonacc/10 text-crimsonacc border border-crimsonacc/30">${es.unknownsCount} Unknowns</span>
-          <span class="px-2 py-0.5 rounded bg-crimsonacc/10 text-crimsonacc border border-crimsonacc/30">${es.contradictionsCount} Contradictions</span>
-        `;
-      }
+      verdictBadge.className = (dossier.overallVerdict === 'BUILD' || dossier.overallVerdict === 'BUILD_IF_VALIDATED') ? 'font-mono text-2xl font-black text-emerald-600 mt-0.5 block' :
+        (dossier.overallVerdict === 'REFINE' ? 'font-mono text-2xl font-black text-amber-600 mt-0.5 block' : 'font-mono text-2xl font-black text-red-600 mt-0.5 block');
 
       // Render 5-Dimensional Resilience Breakdown
       const resilienceGrid = document.getElementById('resilienceGrid');
       if (resilienceGrid && dossier.resilienceBreakdown) {
         const rb = dossier.resilienceBreakdown;
         resilienceGrid.innerHTML = `
-          <div class="p-3 bg-panel rounded border border-bordercol">
-            <div class="text-[10px] text-zinc-400 uppercase">Feasibility (20%)</div>
-            <div class="text-base font-extrabold text-emeraldacc mt-0.5">${rb.technicalFeasibility}%</div>
-            <div class="text-[9px] text-zinc-500 mt-1">Process isolation &amp; latency</div>
+          <div class="p-3 bg-white rounded-xl border border-zinc-200">
+            <div class="text-[10px] text-zinc-500 uppercase">Feasibility (20%)</div>
+            <div class="text-base font-extrabold text-emerald-600 mt-0.5">${rb.technicalFeasibility}%</div>
+            <div class="text-[9px] text-zinc-400 mt-1 font-sans">Process isolation &amp; latency</div>
           </div>
-          <div class="p-3 bg-panel rounded border border-bordercol">
-            <div class="text-[10px] text-zinc-400 uppercase">Demand &amp; Adoption (25%)</div>
-            <div class="text-base font-extrabold text-amberacc mt-0.5">${rb.demandAndAdoption}%</div>
-            <div class="text-[9px] text-zinc-500 mt-1">User urgency vs inertia</div>
+          <div class="p-3 bg-white rounded-xl border border-zinc-200">
+            <div class="text-[10px] text-zinc-500 uppercase">Demand &amp; Adoption (25%)</div>
+            <div class="text-base font-extrabold text-amber-600 mt-0.5">${rb.demandAndAdoption}%</div>
+            <div class="text-[9px] text-zinc-400 mt-1 font-sans">User urgency vs inertia</div>
           </div>
-          <div class="p-3 bg-panel rounded border border-bordercol">
-            <div class="text-[10px] text-zinc-400 uppercase">Economics &amp; CAC (20%)</div>
-            <div class="text-base font-extrabold text-emeraldacc mt-0.5">${rb.economicsAndCapitalEfficiency}%</div>
-            <div class="text-[9px] text-zinc-500 mt-1">LTV/CAC &amp; margin payback</div>
+          <div class="p-3 bg-white rounded-xl border border-zinc-200">
+            <div class="text-[10px] text-zinc-500 uppercase">Economics &amp; CAC (20%)</div>
+            <div class="text-base font-extrabold text-emerald-600 mt-0.5">${rb.economicsAndCapitalEfficiency}%</div>
+            <div class="text-[9px] text-zinc-400 mt-1 font-sans">LTV/CAC &amp; payback</div>
           </div>
-          <div class="p-3 bg-panel rounded border border-bordercol">
-            <div class="text-[10px] text-zinc-400 uppercase">Defensibility (15%)</div>
-            <div class="text-base font-extrabold text-cyan-400 mt-0.5">${rb.defensibilityAndMoat}%</div>
-            <div class="text-[9px] text-zinc-500 mt-1">Regulatory &amp; workflow moat</div>
+          <div class="p-3 bg-white rounded-xl border border-zinc-200">
+            <div class="text-[10px] text-zinc-500 uppercase">Defensibility (15%)</div>
+            <div class="text-base font-extrabold text-cyan-600 mt-0.5">${rb.defensibilityAndMoat}%</div>
+            <div class="text-[9px] text-zinc-400 mt-1 font-sans">Workflow &amp; data moat</div>
           </div>
-          <div class="p-3 bg-panel rounded border border-bordercol">
-            <div class="text-[10px] text-zinc-400 uppercase">Adversarial (20%)</div>
-            <div class="text-base font-extrabold text-crimsonacc mt-0.5">${rb.adversarialResilience}%</div>
-            <div class="text-[9px] text-zinc-500 mt-1">Red team attack resilience</div>
+          <div class="p-3 bg-white rounded-xl border border-zinc-200">
+            <div class="text-[10px] text-zinc-500 uppercase">Adversarial (20%)</div>
+            <div class="text-base font-extrabold text-red-600 mt-0.5">${rb.adversarialResilience}%</div>
+            <div class="text-[9px] text-zinc-400 mt-1 font-sans">Red team attack resilience</div>
           </div>
         `;
       }
@@ -866,12 +769,12 @@
       for (const [role, info] of Object.entries(dossier.roleAssessments)) {
         if (role === 'synthesizer') continue;
         const box = document.createElement('div');
-        const scoreColor = info.score >= 70 ? 'text-emeraldacc' : (info.score >= 50 ? 'text-amberacc' : 'text-crimsonacc');
-        box.className = 'p-3 bg-panel rounded border border-bordercol text-center';
+        const scoreColor = info.score >= 70 ? 'text-emerald-600' : (info.score >= 50 ? 'text-amber-600' : 'text-red-600');
+        box.className = 'p-3 bg-white rounded-xl border border-zinc-200 text-center';
         box.innerHTML = `
           <div class="text-[10px] text-zinc-500 uppercase">${info.roleTitle.replace(/^\d+\s*\/\/\s*/, '')}</div>
           <div class="text-base font-extrabold ${scoreColor} mt-0.5">${info.score}%</div>
-          <div class="text-[9px] text-zinc-400 uppercase mt-0.5">${info.verdict}</div>
+          <div class="text-[9px] text-zinc-400 uppercase mt-0.5 font-bold">${info.verdict}</div>
         `;
         consensusGrid.appendChild(box);
       }
@@ -913,11 +816,11 @@
       contradictionsList.innerHTML = '';
       dossier.contradictions.forEach(c => {
         const item = document.createElement('div');
-        item.className = 'p-3.5 bg-panel rounded border border-bordercol space-y-1.5';
+        item.className = 'p-3.5 bg-white rounded-xl border border-zinc-200 space-y-1.5';
         item.innerHTML = `
-          <div class="text-crimsonacc text-xs"><span class="font-bold">${c.agentA}:</span> "${c.claimA}"</div>
-          <div class="text-amberacc text-xs"><span class="font-bold">${c.agentB}:</span> "${c.claimB}"</div>
-          <div class="text-[10px] text-zinc-400 italic pt-1 border-t border-bordercol/60">${c.guidance}</div>
+          <div class="text-red-700 text-xs"><span class="font-bold">${c.agentA}:</span> "${c.claimA}"</div>
+          <div class="text-amber-700 text-xs"><span class="font-bold">${c.agentB}:</span> "${c.claimB}"</div>
+          <div class="text-[10px] text-zinc-500 italic pt-1 border-t border-zinc-100 font-sans">${c.guidance}</div>
         `;
         contradictionsList.appendChild(item);
       });
@@ -930,22 +833,22 @@
       approvalList.innerHTML = '';
       dossier.approvalGates.forEach(gate => {
         const item = document.createElement('div');
-        item.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-panel rounded border border-bordercol';
+        item.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-white rounded-xl border border-zinc-200';
         item.innerHTML = `
           <div>
-            <div class="text-bone font-mono text-xs font-bold">${gate.summary}</div>
+            <div class="text-zinc-900 font-sans text-xs font-bold">${gate.summary}</div>
             <div class="text-zinc-500 font-mono text-[10px] uppercase mt-0.5">Action: ${gate.actionType} • Dual-Key Safety: Active</div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <button onclick="handleApprovalAction('${gate.id}', 'APPROVED')" class="px-3 py-1.5 bg-emeraldacc/20 hover:bg-emeraldacc/30 text-emeraldacc border border-emeraldacc/40 font-mono text-xs font-bold rounded transition">AUTHORIZE</button>
-            <button onclick="handleApprovalAction('${gate.id}', 'REJECTED')" class="px-3 py-1.5 bg-crimsonacc/20 hover:bg-crimsonacc/30 text-crimsonacc border border-crimsonacc/40 font-mono text-xs font-bold rounded transition">VETO</button>
+            <button onclick="handleApprovalAction('${gate.id}', 'APPROVED')" class="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-mono text-xs font-bold rounded-lg transition cursor-pointer">AUTHORIZE</button>
+            <button onclick="handleApprovalAction('${gate.id}', 'REJECTED')" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs font-bold rounded-lg transition cursor-pointer">VETO</button>
           </div>
         `;
         approvalList.appendChild(item);
       });
     }
 
-    async function handleApproval(actionId, decision) {
+    async function handleApprovalAction(actionId, decision) {
       try {
         const res = await fetch(`/api/approval/${actionId}`, {
           method: 'POST',
