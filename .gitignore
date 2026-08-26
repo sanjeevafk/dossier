@@ -59,3 +59,4 @@ logs/
 *.swo
 .DS_Store
 Thumbs.db
+BLOG_POST_LOCAL.md
