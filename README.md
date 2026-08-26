@@ -4,6 +4,7 @@ Adversarial multi-agent idea intelligence platform built on the [TrueForge](http
 
 > **Live Web Application:** [https://dossier-ai.onrender.com](https://dossier-ai.onrender.com)  
 > **Repository:** [https://github.com/sanjeevafk/dossier](https://github.com/sanjeevafk/dossier)  
+> **Technical Deep-Dive Article:** [Read on Medium](https://medium.com/@sanjeevkumar61700/building-dossier-making-ai-agents-attack-ideas-instead-of-cheering-them-on-41d653cf8574)  
 > **Demo Video (1080p Full HD):** [Watch Demo Video on Google Drive](https://drive.google.com/file/d/1y_5fLjF2D_S4T37TJLz4dXLyKNiB7Zxb/view?usp=sharing)  
 > **Built for:** [WeMakeDevs Agent Harness Hackathon](https://www.wemakedevs.org/hackathons/trueforge) (August 2026).
 
