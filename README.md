@@ -164,6 +164,15 @@ cp -r skills/dossier ~/.agents/skills/
 
 ---
 
+## Qodo Code Review Evidence
+
+- **Pull Request:** [PR #1: TrueForge Swarm Architecture & Epistemic Verification Suite](https://github.com/sanjeevafk/dossier/pull/1)
+- **Qodo Findings & Actions Taken:**
+  - *Finding 1 (Subprocess Timeout & Memory Safety):* Qodo identified potential unhandled timeout exceptions in isolated Python 3 subprocess executions. Refactored `src/tools/sandbox.ts` to enforce explicit 10,000ms bounds and graceful exit signal catching.
+  - *Finding 2 (Epistemic Enum Completeness):* Qodo flagged loose string typings in multi-agent debate synthesis. Enforced strict Zod schema validation across all 7 Stanford CS329A epistemic state transitions.
+
+---
+
 ## License
 
 MIT (c) [sanjeevafk](https://github.com/sanjeevafk)
