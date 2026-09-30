@@ -1,25 +1,6 @@
 # Dossier
 
-Adversarial multi-agent idea intelligence platform built on the [TrueForge](https://github.com/truefoundry/trueforge) agent harness.
-
-> **Live Web Application:** [https://dossier-ai.onrender.com](https://dossier-ai.onrender.com)  
-> **Repository:** [https://github.com/sanjeevafk/dossier](https://github.com/sanjeevafk/dossier)  
-> **Technical Deep-Dive Article:** [Read on Medium](https://medium.com/@sanjeevkumar61700/building-dossier-making-ai-agents-attack-ideas-instead-of-cheering-them-on-41d653cf8574)  
-> **Demo Video (1080p Full HD):** [Watch Demo Video on Google Drive](https://drive.google.com/file/d/1y_5fLjF2D_S4T37TJLz4dXLyKNiB7Zxb/view?usp=sharing)  
-> **Built for:** [WeMakeDevs Agent Harness Hackathon](https://www.wemakedevs.org/hackathons/trueforge) (August 2026).
-
----
-
-## Demo Video
-
-🎬 **[Watch the 2-Minute High-Definition Demo Video on Google Drive](https://drive.google.com/file/d/1y_5fLjF2D_S4T37TJLz4dXLyKNiB7Zxb/view?usp=sharing)**
-
-A comprehensive walkthrough demonstrating:
-1. **Adversarial Swarm Execution** with domain classification (`VanRakshak` Hardware Robotics).
-2. **Stanford CS329A Epistemic Verification** separating facts from modelled assumptions.
-3. **TrueForge Isolated Python3 Sandbox** executing Exit 0 unit economics simulation.
-4. **Dual-Key Human Approval Checkpoints** enforcing operator authorization.
-5. **Terminal Benchmarks & Stress Tests** (`pnpm run benchmark` & `pnpm run test:stress`).
+Adversarial multi-agent platform that stress-tests startup ideas, product features, and technical proposals before capital or engineering effort is spent.
 
 ---
 
@@ -34,7 +15,7 @@ Dossier stress-tests startup concepts, product features, and technical proposals
                                       |
                                       v
                       +-------------------------------+
-                      | TrueForge Harness Runtime     |
+                      | Agent Harness Runtime       |
                       +---------------+---------------+
                                       |
           +---------------------------+---------------------------+
@@ -80,7 +61,7 @@ Dossier stress-tests startup concepts, product features, and technical proposals
 
 ## Architecture & Safety Guarantees
 
-- **Harness Runtime:** Built on the TrueForge agent loop for session persistence and subagent delegation.
+- **Harness Runtime:** Provides session persistence and subagent delegation.
 - **Tool Protocol:** Leverages Model Context Protocol (MCP) for market intelligence and competitor discovery.
 - **Sandboxed Execution:** Executes financial modeling and compute cost calculations inside an isolated Python subprocess.
 - **Human Approval Checkpoints:** Pauses turn execution before external outreach (cold validation emails, landing page deployment) until approved by an operator.
@@ -129,7 +110,7 @@ pnpm run benchmark   # 10-concept domain resilience benchmark
 
 ## Model Context Protocol (MCP) & Agent Skill
 
-Dossier is packaged as both a **standalone MCP server** and an **Agent Skill** (`skills/dossier/SKILL.md`) that any agent framework (Claude Code, Cursor, Goose, TrueForge, OpenAI Swarm) can plug into.
+Dossier is packaged as both a **standalone MCP server** and an **Agent Skill** (`skills/dossier/SKILL.md`) that any agent framework can plug into.
 
 ### 1. Connecting via MCP (`dossier.mcp.json`)
 
@@ -165,16 +146,7 @@ cp -r skills/dossier ~/.agents/skills/
 
 ---
 
-## Qodo Code Review Evidence
-
-- **Pull Request:** [PR #1: TrueForge Swarm Architecture & Epistemic Verification Suite](https://github.com/sanjeevafk/dossier/pull/1)
-- **Qodo Findings & Actions Taken:**
-  - *Finding 1 (Subprocess Timeout & Memory Safety):* Qodo identified potential unhandled timeout exceptions in isolated Python 3 subprocess executions. Refactored `src/tools/sandbox.ts` to enforce explicit 10,000ms bounds and graceful exit signal catching.
-  - *Finding 2 (Epistemic Enum Completeness):* Qodo flagged loose string typings in multi-agent debate synthesis. Enforced strict Zod schema validation across all 7 Stanford CS329A epistemic state transitions.
-
----
-
 ## License
 
-MIT (c) [sanjeevafk](https://github.com/sanjeevafk)
+MIT
 
