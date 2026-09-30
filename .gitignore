@@ -43,6 +43,10 @@ dist/
 .next/
 out/
 
+# Local evaluation runs & generated dossiers
+reports/
+scripts/evaluate_*.ts
+
 # TrueForge / Runtime Local State
 *.db
 *.sqlite

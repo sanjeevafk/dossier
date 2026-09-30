@@ -9,7 +9,25 @@ export function classifyIdeaDomain(idea: IdeaInput): DomainClassification {
 
   let archetype: IdeaDomainArchetype = "general_startup";
 
-  if (
+  if (idea.projectType === "Research" || (text.includes("research") && !text.includes("saas") && !text.includes("cybersecurity")) || text.includes("paper") || text.includes("formal verification") || text.includes("deeptech") || text.includes("algorithm")) {
+    archetype = "deeptech_research";
+  } else if (
+    text.includes("cybersecurity") ||
+    text.includes("ciso") ||
+    text.includes("rag security") ||
+    text.includes("prompt injection") ||
+    text.includes("defense-in-depth") ||
+    text.includes("b2b") ||
+    text.includes("enterprise") ||
+    text.includes("saas") ||
+    text.includes("soc2") ||
+    text.includes("crm") ||
+    text.includes("security") ||
+    text.includes("compliance") ||
+    text.includes("invoice")
+  ) {
+    archetype = "b2b_saas";
+  } else if (
     text.includes("health") ||
     text.includes("clinical") ||
     text.includes("triage") ||
@@ -48,24 +66,14 @@ export function classifyIdeaDomain(idea: IdeaInput): DomainClassification {
   ) {
     archetype = "b2g_govtech";
   } else if (
-    text.includes("b2b") ||
-    text.includes("enterprise") ||
-    text.includes("saas") ||
-    text.includes("soc2") ||
-    text.includes("crm") ||
-    text.includes("security") ||
-    text.includes("compliance") ||
-    text.includes("invoice")
-  ) {
-    archetype = "b2b_saas";
-  } else if (
     text.includes("web3") ||
     text.includes("defi") ||
     text.includes("crypto") ||
     text.includes("smart contract") ||
     text.includes("solidity") ||
     text.includes("escrow") ||
-    text.includes("token")
+    text.includes("tokenomics") ||
+    text.includes("erc20")
   ) {
     archetype = "web3_defi";
   } else if (
@@ -77,14 +85,6 @@ export function classifyIdeaDomain(idea: IdeaInput): DomainClassification {
     text.includes("freemium")
   ) {
     archetype = "consumer_social";
-  } else if (
-    text.includes("research") ||
-    text.includes("paper") ||
-    text.includes("formal verification") ||
-    text.includes("deeptech") ||
-    text.includes("algorithm")
-  ) {
-    archetype = "deeptech_research";
   }
 
   switch (archetype) {
