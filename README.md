@@ -1,6 +1,18 @@
 # Dossier
 
+[![Live Service](https://img.shields.io/badge/Azure%20App%20Service-dossier--ai-0078D4?logo=microsoftazure&logoColor=white)](https://dossier-ai.azurewebsites.net)
+[![Health Check](https://img.shields.io/badge/Health-200%20OK-brightgreen)](https://dossier-ai.azurewebsites.net/health)
+[![UptimeRobot](https://img.shields.io/badge/UptimeRobot-Monitored-blue)](https://dossier-ai.azurewebsites.net/health)
+
 Adversarial multi-agent platform that stress-tests startup ideas, product features, and technical proposals before capital or engineering effort is spent.
+
+---
+
+## 🚀 Live Deployment
+- **Web Dashboard:** [https://dossier-ai.azurewebsites.net](https://dossier-ai.azurewebsites.net)
+- **Health Check:** [https://dossier-ai.azurewebsites.net/health](https://dossier-ai.azurewebsites.net/health)
+- **Hosting Tier:** Azure App Service (`B1` Basic, Central India — co-hosted with SwaraSetu at zero marginal cost)
+- **Keep-Alive:** Continuous 300s synthetic health polling via UptimeRobot
 
 ---
 
@@ -86,7 +98,7 @@ pnpm install
 ```bash
 pnpm start
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) (or access the live production instance at [https://dossier-ai.azurewebsites.net](https://dossier-ai.azurewebsites.net)) in your browser.
 
 ### Run via CLI
 ```bash

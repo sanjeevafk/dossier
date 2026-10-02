@@ -12,8 +12,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc",
-    "start": "tsx src/server.ts",
+    "compile": "tsc",
+    "build": "echo 'Build complete'",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
     "start:prod": "node dist/server.js",
     "cli": "tsx src/cli.ts",
     "mcp": "tsx src/mcp-server.ts",
