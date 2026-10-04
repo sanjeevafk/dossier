@@ -47,6 +47,8 @@ out/
 reports/
 scripts/evaluate_*.ts
 docs/local/
+local/
+local
 
 # TrueForge / Runtime Local State
 *.db
