@@ -46,6 +46,7 @@ out/
 # Local evaluation runs & generated dossiers
 reports/
 scripts/evaluate_*.ts
+docs/local/
 
 # TrueForge / Runtime Local State
 *.db
