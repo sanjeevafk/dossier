@@ -33,29 +33,66 @@ export async function runEconomicsSimulation(
   llmTokensPerRequest: number,
   requestsPerUserMonthly: number
 ): Promise<SandboxExecutionResult> {
+  // Sanitize and validate inputs against injection and mathematical invalidity
+  const cleanPricing = Math.max(0, Number(pricingMonthlyUsd) || 0);
+  const cleanChurn = Math.min(1.0, Math.max(0.001, Number(expectedMonthlyChurnRate) || 0.05));
+  const cleanCac = Math.max(0, Number(estimatedCacUsd) || 0);
+  const cleanUsers = Math.max(1, Math.round(Number(expectedUsersMonth12) || 1000));
+  const cleanTokens = Math.max(0, Math.round(Number(llmTokensPerRequest) || 500));
+  const cleanReqs = Math.max(0, Math.round(Number(requestsPerUserMonthly) || 30));
+
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "trueforge-sandbox-"));
   const scriptPath = path.join(tmpDir, "simulate_economics.py");
+  const inputPath = path.join(tmpDir, "inputs.json");
+
+  const inputPayload = {
+    pricing_monthly: cleanPricing,
+    churn_rate: cleanChurn,
+    cac: cleanCac,
+    users_m12: cleanUsers,
+    tokens_per_req: cleanTokens,
+    reqs_monthly: cleanReqs
+  };
 
   const pythonScript = `
 import json
 import sys
 
-def compute_economics(pricing_monthly, churn_rate, cac, users_m12, tokens_per_req, reqs_monthly):
-    # LTV = ARPU / Churn Rate
+def compute_economics(data):
+    pricing_monthly = max(0.0, float(data.get("pricing_monthly", 49.0)))
+    churn_rate = max(0.001, min(1.0, float(data.get("churn_rate", 0.05))))
+    cac = max(0.0, float(data.get("cac", 150.0)))
+    users_m12 = max(1, int(data.get("users_m12", 1000)))
+    tokens_per_req = max(0, int(data.get("tokens_per_req", 500)))
+    reqs_monthly = max(0, int(data.get("reqs_monthly", 30)))
+
     gross_margin = 0.80
-    ltv = (pricing_monthly * gross_margin) / max(churn_rate, 0.01)
-    ltv_cac_ratio = round(ltv / max(cac, 1.0), 2)
-    payback_months = round(cac / max(pricing_monthly * gross_margin, 1.0), 1)
-    
-    # Infra Cost: LLM tokens estimate ($2.5 per 1M blended tokens) + Hosting base
+    arpu = pricing_monthly * gross_margin
+
+    if arpu <= 0:
+        ltv = 0.0
+        ltv_cac_ratio = 0.0
+        payback_months = 999.0
+    else:
+        ltv = round(arpu / churn_rate, 2)
+        if cac <= 0:
+            ltv_cac_ratio = 99.9
+            payback_months = 0.0
+        else:
+            ltv_cac_ratio = round(min(ltv / cac, 99.9), 2)
+            payback_months = round(min(cac / arpu, 999.0), 1)
+
     total_tokens_monthly = users_m12 * reqs_monthly * tokens_per_req
     llm_cost_monthly = (total_tokens_monthly / 1_000_000.0) * 2.50
     hosting_base = 150.0 + (users_m12 * 0.05)
     monthly_infra = round(llm_cost_monthly + hosting_base, 2)
-    
-    # TAM rough benchmark based on pricing
+
     annual_contract_value = pricing_monthly * 12
-    tam_estimate = f"$\{(annual_contract_value * 500_000) / 1_000_000_000:.1f}B" if annual_contract_value > 200 else f"$\{(pricing_monthly * 12 * 5_000_000) / 1_000_000_000:.1f}B"
+    if annual_contract_value > 200:
+        tam_num = (annual_contract_value * 500_000) / 1_000_000_000
+    else:
+        tam_num = (pricing_monthly * 12 * 5_000_000) / 1_000_000_000
+    tam_estimate = f"$\{max(tam_num, 0.1):.1f}B"
 
     result = {
         "cacEstimateUsd": round(cac, 2),
@@ -64,26 +101,25 @@ def compute_economics(pricing_monthly, churn_rate, cac, users_m12, tokens_per_re
         "estimatedPaybackMonths": payback_months,
         "monthlyInfraCostUsd": monthly_infra,
         "tamEstimateUsd": tam_estimate,
-        "simulationNotes": f"Simulated on {users_m12} active users with {churn_rate*100}% churn and {tokens_per_req} tokens/req."
+        "simulationNotes": f"Simulated on {users_m12} active users with {round(churn_rate*100, 2)}% churn and {tokens_per_req} tokens/req."
     }
     print(json.dumps(result))
 
 if __name__ == "__main__":
-    compute_economics(
-        float(${pricingMonthlyUsd}),
-        float(${expectedMonthlyChurnRate}),
-        float(${estimatedCacUsd}),
-        int(${expectedUsersMonth12}),
-        int(${llmTokensPerRequest}),
-        int(${requestsPerUserMonthly})
-    )
+    if len(sys.argv) > 1:
+        with open(sys.argv[1], "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = json.loads(sys.stdin.read())
+    compute_economics(data)
 `;
 
   try {
+    await fs.writeFile(inputPath, JSON.stringify(inputPayload), "utf-8");
     await fs.writeFile(scriptPath, pythonScript, "utf-8");
 
-    // Execute within isolated process context
-    const { stdout, stderr } = await execAsync(`python3 "${scriptPath}"`, {
+    // Execute within isolated process context with strict timeout
+    const { stdout, stderr } = await execAsync(`python3 "${scriptPath}" "${inputPath}"`, {
       timeout: 10000,
       maxBuffer: 1024 * 1024
     });
@@ -100,9 +136,10 @@ if __name__ == "__main__":
   } catch (error: any) {
     // Fallback calculation if python runtime execution fails
     const grossMargin = 0.80;
-    const ltv = (pricingMonthlyUsd * grossMargin) / Math.max(expectedMonthlyChurnRate, 0.01);
-    const ltvCacRatio = Number((ltv / Math.max(estimatedCacUsd, 1.0)).toFixed(2));
-    const payback = Number((estimatedCacUsd / Math.max(pricingMonthlyUsd * grossMargin, 1.0)).toFixed(1));
+    const arpu = cleanPricing * grossMargin;
+    const ltv = arpu > 0 ? Number((arpu / cleanChurn).toFixed(2)) : 0;
+    const ltvCacRatio = cleanCac > 0 ? Number(Math.min(ltv / cleanCac, 99.9).toFixed(2)) : 99.9;
+    const payback = arpu > 0 ? Number(Math.min(cleanCac / arpu, 999.0).toFixed(1)) : 999.0;
     const numericExitCode = typeof error.code === "number" ? error.code : 1;
 
     return {
@@ -111,8 +148,8 @@ if __name__ == "__main__":
       stdout: error.stdout || "",
       stderr: error.message || "",
       metrics: {
-        cacEstimateUsd: estimatedCacUsd,
-        ltvEstimateUsd: Number(ltv.toFixed(2)),
+        cacEstimateUsd: cleanCac,
+        ltvEstimateUsd: ltv,
         ltvCacRatio: ltvCacRatio,
         estimatedPaybackMonths: payback,
         monthlyInfraCostUsd: 250.0,

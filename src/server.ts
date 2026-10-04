@@ -3,7 +3,8 @@ import cors from "cors";
 import path from "node:path";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
-import { generateAgentTurn } from "./services/llm.js";
+import { generateAgentTurn, getLLMStatus } from "./services/llm.js";
+import { dossierStorage } from "./services/storage.js";
 import { SWARM_ROLES } from "./config/prompts.js";
 import { IdeaInput, SwarmRole } from "./types/index.js";
 
@@ -16,15 +17,74 @@ app.use(express.static(path.join(process.cwd(), "public")));
 
 const orchestrator = new IdeaSwarmOrchestrator();
 
-// Health check
+// Health check with detailed telemetry
 app.get("/health", (req: Request, res: Response) => {
-  res.json({ status: "ok", service: "dossier-trueforge", timestamp: new Date().toISOString() });
+  const llmStatus = getLLMStatus();
+  res.json({
+    status: "ok",
+    service: "dossier-trueforge",
+    timestamp: new Date().toISOString(),
+    llm: llmStatus,
+    sandbox: { provider: process.env.SANDBOX_PROVIDER || "local", runtime: "python3-subprocess" }
+  });
+});
+
+// List recent dossiers
+app.get("/api/dossiers", async (req: Request, res: Response) => {
+  try {
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 20;
+    const dossiers = await dossierStorage.listDossiers(limit);
+    res.json({ success: true, count: dossiers.length, dossiers });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Retrieve specific dossier by ID or code
+app.get("/api/dossiers/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const dossier = await dossierStorage.getDossier(id);
+    if (!dossier) {
+      res.status(404).json({ success: false, error: `Dossier '${id}' not found` });
+      return;
+    }
+    res.json({ success: true, dossier });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Export dossier as Markdown or JSON
+app.get("/api/dossiers/:id/export", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const format = String(req.query.format || "markdown").toLowerCase();
+    const dossier = await dossierStorage.getDossier(id);
+    if (!dossier) {
+      res.status(404).json({ success: false, error: `Dossier '${id}' not found` });
+      return;
+    }
+
+    if (format === "json") {
+      res.setHeader("Content-Disposition", `attachment; filename="dossier_${id}.json"`);
+      res.setHeader("Content-Type", "application/json");
+      res.send(JSON.stringify(dossier, null, 2));
+    } else {
+      const markdown = dossierStorage.exportDossierMarkdown(dossier);
+      res.setHeader("Content-Disposition", `attachment; filename="dossier_${id}.md"`);
+      res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+      res.send(markdown);
+    }
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Evaluate endpoint
 app.post("/api/evaluate", async (req: Request, res: Response) => {
   try {
-    const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd } = req.body;
+    const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
 
     if (!title || !summary) {
       res.status(400).json({ error: "Missing required fields: 'title' and 'summary'" });
@@ -40,18 +100,19 @@ app.post("/api/evaluate", async (req: Request, res: Response) => {
 
     const dossier = await orchestrator.evaluateIdea(ideaInput, {
       pricingMonthlyUsd: pricingMonthlyUsd ? parseFloat(pricingMonthlyUsd) : undefined,
-      estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined
+      estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined,
+      useLiveLLM: useLiveLLM !== false
     });
 
-    res.json({ success: true, dossier });
+    res.json({ success: true, dossier, llmStatus: getLLMStatus() });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message || "Evaluation failed" });
   }
 });
 
-// Approval action gate endpoint (Human-in-the-loop)
-app.post("/api/approval/:actionId", (req: Request, res: Response) => {
-  const { actionId } = req.params;
+// Approval action gate endpoint (Persistent Human-in-the-loop)
+app.post("/api/approval/:actionId", async (req: Request, res: Response) => {
+  const actionId = String(req.params.actionId);
   const { decision } = req.body; // 'APPROVE' | 'REJECT'
 
   if (!["APPROVE", "REJECT"].includes(decision)) {
@@ -59,11 +120,18 @@ app.post("/api/approval/:actionId", (req: Request, res: Response) => {
     return;
   }
 
+  const result = await dossierStorage.updateApprovalStatus(
+    actionId,
+    decision === "APPROVE" ? "APPROVED" : "REJECTED"
+  );
+
   res.json({
     success: true,
     actionId,
     newStatus: decision === "APPROVE" ? "APPROVED" : "REJECTED",
-    message: `Action ${actionId} has been successfully updated by human operator.`
+    persisted: result.updated,
+    dossierId: result.dossierId,
+    message: `Action ${actionId} has been successfully ${decision === "APPROVE" ? "approved" : "rejected"} by human operator.`
   });
 });
 

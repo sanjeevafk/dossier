@@ -11,6 +11,7 @@ import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { StanfordRobustVerifier } from "./core/verifier.js";
 import { runEconomicsSimulation } from "./tools/sandbox.js";
 import { runStressTestSuite } from "./stress-test.js";
+import { dossierStorage } from "./services/storage.js";
 import { IdeaInput, AgentOpinion, DebateChallenge, ApprovalAction, EvidenceItem } from "./types/index.js";
 
 /**
@@ -157,6 +158,51 @@ class DossierMCPServer {
                 }
               },
               required: ["claims"]
+            }
+          },
+          {
+            name: "list_dossiers",
+            description: "Lists all compiled and historical intelligence dossiers stored in the Dossier archive.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                limit: { type: "number", description: "Maximum number of records to return (default: 20)" }
+              }
+            }
+          },
+          {
+            name: "get_dossier",
+            description: "Retrieves a complete compiled intelligence dossier by ID or Dossier Code.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Dossier ID or Code (e.g. 'DOSSIER-473589' or 'TF-007-B2B')" }
+              },
+              required: ["id"]
+            }
+          },
+          {
+            name: "export_dossier",
+            description: "Exports a compiled dossier report in publication-grade GitHub Flavored Markdown or structured JSON.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Dossier ID or Code" },
+                format: { type: "string", enum: ["markdown", "json"], description: "Export format (default: markdown)" }
+              },
+              required: ["id"]
+            }
+          },
+          {
+            name: "update_approval_gate",
+            description: "Submits a human operator decision (APPROVED or REJECTED) on an action approval gate, persisting state.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                actionId: { type: "string", description: "Approval Gate ID (e.g. 'GATE-01')" },
+                decision: { type: "string", enum: ["APPROVE", "REJECT"], description: "Operator authorization decision" }
+              },
+              required: ["actionId", "decision"]
             }
           }
         ]
@@ -329,6 +375,102 @@ class DossierMCPServer {
                       totalClaimsAudited: audited.length,
                       claims: audited,
                       ruleNote: "Per Stanford CS329A: Unvalidated assumptions and model agreements can never be labelled VERIFIED."
+                    },
+                    null,
+                    2
+                  )
+                }
+              ]
+            };
+          }
+
+          case "list_dossiers": {
+            const limit = Number(args?.limit || 20);
+            const dossiers = await dossierStorage.listDossiers(limit);
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      total: dossiers.length,
+                      dossiers
+                    },
+                    null,
+                    2
+                  )
+                }
+              ]
+            };
+          }
+
+          case "get_dossier": {
+            const id = String(args?.id || "");
+            const dossier = await dossierStorage.getDossier(id);
+
+            if (!dossier) {
+              return {
+                content: [{ type: "text", text: `Error: Dossier '${id}' not found in archive.` }],
+                isError: true
+              };
+            }
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(dossier, null, 2)
+                }
+              ]
+            };
+          }
+
+          case "export_dossier": {
+            const id = String(args?.id || "");
+            const format = String(args?.format || "markdown").toLowerCase();
+            const dossier = await dossierStorage.getDossier(id);
+
+            if (!dossier) {
+              return {
+                content: [{ type: "text", text: `Error: Dossier '${id}' not found.` }],
+                isError: true
+              };
+            }
+
+            const exportContent = format === "json"
+              ? JSON.stringify(dossier, null, 2)
+              : dossierStorage.exportDossierMarkdown(dossier);
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: exportContent
+                }
+              ]
+            };
+          }
+
+          case "update_approval_gate": {
+            const actionId = String(args?.actionId || "");
+            const decision = args?.decision === "APPROVE" ? "APPROVED" : "REJECTED";
+
+            const result = await dossierStorage.updateApprovalStatus(actionId, decision as "APPROVED" | "REJECTED");
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      success: result.updated,
+                      actionId,
+                      decision,
+                      dossierId: result.dossierId,
+                      message: result.updated
+                        ? `Approval gate ${actionId} successfully updated to ${decision}.`
+                        : `Approval gate ${actionId} not found in any active dossier.`
                     },
                     null,
                     2

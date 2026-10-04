@@ -341,7 +341,7 @@
             </div>
 
             <!-- Dossier Cards List -->
-            <div class="border border-zinc-200/90 rounded-xl bg-white divide-y divide-zinc-100 shadow-xs overflow-hidden">
+            <div id="recentDossiersList" class="border border-zinc-200/90 rounded-xl bg-white divide-y divide-zinc-100 shadow-xs overflow-hidden">
               
               <!-- Item 1: AI Study Companion -->
               <div onclick="loadPreset('study_companion')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
@@ -443,6 +443,16 @@
               </div>
 
               <p id="resExecutiveSummary" class="text-sm text-zinc-700 mt-2 max-w-3xl leading-relaxed"></p>
+
+              <!-- Export Buttons -->
+              <div class="flex flex-wrap items-center gap-2 pt-3">
+                <button onclick="downloadDossierExport('markdown')" class="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                  <span>⬇️ Export Markdown (.md)</span>
+                </button>
+                <button onclick="downloadDossierExport('json')" class="px-3.5 py-1.5 bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-900 rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                  <span>⬇️ Export JSON</span>
+                </button>
+              </div>
             </div>
 
             <!-- Verdict Cards -->
@@ -1162,24 +1172,45 @@
       // Render Sandbox
       document.getElementById('sandboxStdout').textContent = dossier.simulation.sandboxExecutionProof.stdout;
 
+      // Store active dossier ID for exports
+      window.currentRenderedDossierId = dossier.id;
+
       // Render Approvals
       const approvalList = document.getElementById('approvalList');
       approvalList.innerHTML = '';
       dossier.approvalGates.forEach(gate => {
+        const isApproved = gate.status === 'APPROVED';
+        const isRejected = gate.status === 'REJECTED';
+        const isPending = !isApproved && !isRejected;
+
+        const badgeClass = isApproved ? 'bg-emerald-100 text-emerald-800' : (isRejected ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800');
+
         const item = document.createElement('div');
         item.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-white rounded-xl border border-zinc-200';
         item.innerHTML = `
           <div>
-            <div class="text-zinc-900 font-sans text-xs font-bold">${gate.summary}</div>
+            <div class="flex items-center gap-2">
+              <span class="text-zinc-900 font-sans text-xs font-bold">${escapeHtml(gate.summary)}</span>
+              <span id="gate-badge-${gate.id}" class="text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase ${badgeClass}">${gate.status}</span>
+            </div>
             <div class="text-zinc-500 font-mono text-[10px] uppercase mt-0.5">Action: ${gate.actionType} • Dual-Key Safety: Active</div>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <button onclick="handleApprovalAction('${gate.id}', 'APPROVED')" class="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-mono text-xs font-bold rounded-lg transition cursor-pointer">AUTHORIZE</button>
-            <button onclick="handleApprovalAction('${gate.id}', 'REJECTED')" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs font-bold rounded-lg transition cursor-pointer">VETO</button>
+          <div id="gate-btns-${gate.id}" class="flex items-center gap-2 shrink-0">
+            ${isPending ? `
+              <button onclick="handleApprovalAction('${gate.id}', 'APPROVE')" class="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-mono text-xs font-bold rounded-lg transition cursor-pointer">AUTHORIZE</button>
+              <button onclick="handleApprovalAction('${gate.id}', 'REJECT')" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs font-bold rounded-lg transition cursor-pointer">VETO</button>
+            ` : `
+              <span class="text-xs font-mono font-bold ${isApproved ? 'text-emerald-700' : 'text-red-700'}">
+                ${isApproved ? '✔ AUTHORIZED BY OPERATOR' : '✖ VETOED BY OPERATOR'}
+              </span>
+            `}
           </div>
         `;
         approvalList.appendChild(item);
       });
+
+      // Refresh recent dossiers sidebar
+      loadRecentDossiers();
     }
 
     async function handleApprovalAction(actionId, decision) {
@@ -1191,12 +1222,93 @@
         });
         const data = await res.json();
         if (data.success) {
-          alert(`Action marked as ${data.newStatus}`);
+          const badge = document.getElementById(`gate-badge-${actionId}`);
+          if (badge) {
+            badge.textContent = data.newStatus;
+            badge.className = data.newStatus === 'APPROVED'
+              ? 'text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase bg-emerald-100 text-emerald-800'
+              : 'text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase bg-red-100 text-red-800';
+          }
+          const btnGroup = document.getElementById(`gate-btns-${actionId}`);
+          if (btnGroup) {
+            btnGroup.innerHTML = `<span class="text-xs font-mono font-bold ${data.newStatus === 'APPROVED' ? 'text-emerald-700' : 'text-red-700'}">${data.newStatus === 'APPROVED' ? '✔ AUTHORIZED BY OPERATOR' : '✖ VETOED BY OPERATOR'}</span>`;
+          }
+        } else {
+          alert("Approval failed: " + data.error);
         }
       } catch (err) {
         alert("Failed to update approval: " + err.message);
       }
     }
+
+    function downloadDossierExport(format) {
+      if (!window.currentRenderedDossierId) {
+        alert("No active dossier compiled yet.");
+        return;
+      }
+      window.open(`/api/dossiers/${window.currentRenderedDossierId}/export?format=${format}`, '_blank');
+    }
+
+    async function loadRecentDossiers() {
+      try {
+        const res = await fetch('/api/dossiers?limit=5');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.dossiers) && data.dossiers.length > 0) {
+          const container = document.getElementById('recentDossiersList');
+          if (!container) return;
+
+          container.innerHTML = data.dossiers.map(d => {
+            const isBuild = d.verdict === 'BUILD' || d.verdict === 'BUILD_IF_VALIDATED';
+            const isRefine = d.verdict === 'REFINE';
+            const badgeBg = isBuild ? 'bg-badgeGreenBg text-badgeGreenText' : (isRefine ? 'bg-badgeAmberBg text-badgeAmberText' : 'bg-badgeRedBg text-badgeRedText');
+            const scoreFormatted = (d.score / 10).toFixed(1);
+            const dateStr = d.timestamp ? d.timestamp.slice(0, 10) : 'Recent';
+
+            return `
+              <div onclick="loadDossierById('${d.id}')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer transition">
+                <div class="flex items-center gap-3">
+                  <svg class="w-5 h-5 text-zinc-800 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <div>
+                    <div class="font-bold text-xs text-zinc-950">${escapeHtml(d.title)}</div>
+                    <div class="text-[11px] text-zinc-500 font-mono mt-0.5">${escapeHtml(d.dossierCode)} • ${dateStr}</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="px-2.5 py-0.5 rounded text-[11px] font-bold ${badgeBg} tracking-wider">
+                    ${escapeHtml(d.verdict)}
+                  </span>
+                  <span class="text-xs font-semibold text-zinc-600 font-mono">
+                    ${scoreFormatted}/10
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        // Fallback gracefully to default items
+      }
+    }
+
+    async function loadDossierById(id) {
+      try {
+        const res = await fetch(`/api/dossiers/${id}`);
+        const data = await res.json();
+        if (data.success && data.dossier) {
+          renderDossier(data.dossier);
+          document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+      } catch (err) {
+        alert("Failed to load dossier: " + err.message);
+      }
+    }
+
+    // Initialize recent dossiers on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadRecentDossiers();
+    });
   </script>
 </body>
 </html>

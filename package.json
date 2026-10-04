@@ -13,7 +13,7 @@
   },
   "scripts": {
     "compile": "tsc",
-    "build": "echo 'Build complete'",
+    "build": "tsc",
     "start": "node dist/server.js",
     "dev": "tsx src/server.ts",
     "start:prod": "node dist/server.js",

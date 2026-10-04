@@ -9,7 +9,16 @@ export function classifyIdeaDomain(idea: IdeaInput): DomainClassification {
 
   let archetype: IdeaDomainArchetype = "general_startup";
 
-  if (idea.projectType === "Research" || (text.includes("research") && !text.includes("saas") && !text.includes("cybersecurity")) || text.includes("paper") || text.includes("formal verification") || text.includes("deeptech") || text.includes("algorithm")) {
+  if (
+    text.includes("dating") ||
+    text.includes("matchmaking") ||
+    text.includes("matrimony") ||
+    text.includes("social") ||
+    text.includes("chat") ||
+    text.includes("consumer")
+  ) {
+    archetype = "consumer_social";
+  } else if (idea.projectType === "Research" || (text.includes("research") && !text.includes("saas") && !text.includes("cybersecurity")) || text.includes("paper") || text.includes("formal verification") || text.includes("deeptech") || text.includes("algorithm")) {
     archetype = "deeptech_research";
   } else if (
     text.includes("cybersecurity") ||
