@@ -263,3 +263,14 @@ export interface IdeaDossier {
   };
   approvalGates: ApprovalAction[];
 }
+
+export type SwarmEvent =
+  | { type: "stage"; stage: string; detail: string; timestamp: string }
+  | { type: "domain"; domain: DomainClassification }
+  | { type: "agent_opinion"; role: SwarmRole; roleTitle: string; verdict: Verdict; score: number; fatalFlaw?: string }
+  | { type: "sandbox_metrics"; metrics: any; runtime: string; exitCode: number }
+  | { type: "crossfire_clash"; challenger: string; target: string; challengePoint: string; rebuttal?: string; status: string }
+  | { type: "audit_correction"; detail: string; hallucinationsBlocked: number }
+  | { type: "dossier_complete"; dossier: IdeaDossier }
+  | { type: "error"; message: string };
+

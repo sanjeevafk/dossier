@@ -110,6 +110,66 @@ app.post("/api/evaluate", async (req: Request, res: Response) => {
   }
 });
 
+// Evaluate with Real-Time Server-Sent Events (SSE) Stream
+app.post("/api/evaluate/stream", async (req: Request, res: Response) => {
+  const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
+
+  if (!title || !summary) {
+    res.status(400).json({ error: "Missing required fields: 'title' and 'summary'" });
+    return;
+  }
+
+  // Set SSE response headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  let isClientConnected = true;
+  res.on("close", () => {
+    isClientConnected = false;
+  });
+
+  const sendSSE = (event: string, data: any) => {
+    if (!isClientConnected) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    if (typeof (res as any).flush === "function") {
+      (res as any).flush();
+    }
+  };
+
+  const ideaInput: IdeaInput = {
+    title,
+    summary,
+    targetAudience: targetAudience || "General Founders / Businesses",
+    monetization: monetization || "$49/month SaaS"
+  };
+
+  try {
+    sendSSE("init", { service: "dossier-stream", timestamp: new Date().toISOString() });
+
+    const dossier = await orchestrator.evaluateIdea(ideaInput, {
+      pricingMonthlyUsd: pricingMonthlyUsd ? parseFloat(pricingMonthlyUsd) : undefined,
+      estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined,
+      useLiveLLM: useLiveLLM !== false,
+      onProgress: (stage, detail) => {
+        sendSSE("progress", { stage, detail, timestamp: new Date().toISOString() });
+      },
+      onEvent: (event) => {
+        sendSSE(event.type, event);
+      }
+    });
+
+    sendSSE("done", { success: true, dossierId: dossier.id });
+    res.end();
+  } catch (error: any) {
+    console.error("evaluateIdea stream error:", error);
+    sendSSE("error", { error: error.message || "Evaluation stream failed" });
+    res.end();
+  }
+});
+
 // Approval action gate endpoint (Persistent Human-in-the-loop)
 app.post("/api/approval/:actionId", async (req: Request, res: Response) => {
   const actionId = String(req.params.actionId);

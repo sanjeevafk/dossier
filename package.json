@@ -23,7 +23,7 @@
     "server": "tsx src/server.ts",
     "benchmark": "tsx src/benchmark.ts",
     "test:stress": "tsx src/stress-test.ts",
-    "test": "node --test test/*.test.mjs"
+    "test": "NODE_ENV=test node --test test/*.test.mjs"
   },
   "keywords": [
     "ai-agent",

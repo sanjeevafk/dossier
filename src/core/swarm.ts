@@ -15,7 +15,8 @@ import {
   CheapestValidationExperiment,
   EpistemicTier,
   EpistemicTaxonomySummary,
-  ValidationVerdict
+  ValidationVerdict,
+  SwarmEvent
 } from "../types/index.js";
 import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
@@ -28,6 +29,7 @@ import { dossierStorage } from "../services/storage.js";
 
 export interface SwarmExecutionOptions {
   onProgress?: (stage: string, detail: string) => void;
+  onEvent?: (event: SwarmEvent) => void;
   pricingMonthlyUsd?: number;
   expectedChurnMonthly?: number;
   estimatedCacUsd?: number;
@@ -143,6 +145,7 @@ Market & Prediction Signals: ${marketContext}`;
     const isPromptInjection = /ignore (previous|all) instructions|system prompt|jailbreak|output 100|developer mode/i.test(text);
     const isImpossiblePhysics = /perpetual motion|free energy|infinite electricity|zero input energy|violates thermodynamics|overunity/i.test(text);
     const isNoMonetization = /free forever|no monetization|zero revenue|not charging/i.test(text) || pricing <= 0;
+    const isThinWrapper = /(chrome extension|browser extension|gpt wrapper|chat with pdf|meeting notes|summariz|prompt engineering|simple crm|transcriber|ai copywriter|ai tweet)/i.test(text);
     const ltvCac = sandboxSim.metrics.ltvCacRatio;
 
     let score = 70;
@@ -156,25 +159,40 @@ Market & Prediction Signals: ${marketContext}`;
     switch (role) {
       case "analyst": {
         const compCount = marketResearch.identifiedCompetitors.length;
-        score = Math.max(35, Math.min(88, 75 - (compCount * 4) + (domain.archetype === "deeptech_research" ? 8 : -3)));
-        verdict = score >= 75 ? "STRONG_PURSUE" : (score >= 60 ? "VIABLE_WITH_RISK" : "PIVOT_REQUIRED");
-        fatalFlaws = compCount > 2 
-          ? [`High competitive crowding: ${compCount} direct and indirect competitors already control primary distribution channels.`]
-          : [`Unclear differentiation against established ${domain.archetypeLabel} incumbents.`];
-        keyAssumptions = [`Market demand in ${domain.primaryCustomer} is active and funded.`];
-        competitiveRisks = marketResearch.identifiedCompetitors.map((c: any) => `${c.name} (${c.category}): ${c.vulnerability}`);
-        mustTestBeforeBuilding = [`Validate addressable budget allocations across 10 prospective buyers in ${domain.primaryCustomer}.`];
-        rationale = `Evaluated competitive whitespace and demand signals for ${domain.archetypeLabel}.`;
+        if (isThinWrapper) {
+          score = 35;
+          verdict = "PIVOT_REQUIRED";
+          fatalFlaws = [
+            "Hyper-saturated category: Hundreds of nearly identical AI utility wrappers already compete for identical search queries.",
+            "Non-existent switching barriers: Users quickly jump to whichever tool offers the cheapest token pricing or native foundation integration."
+          ];
+          keyAssumptions = ["Organic viral discovery can overcome negative paid search arbitrage."];
+          competitiveRisks = ["Browser extension store cloning by international copycats with zero development overhead."];
+          mustTestBeforeBuilding = ["Prove negative customer acquisition cost (CAC) via organic SEO or open-source community distribution."];
+          rationale = "Market Recon: Saturated commodity category with zero structural switching friction.";
+        } else {
+          score = Math.max(35, Math.min(88, 75 - (compCount * 4) + (domain.archetype === "deeptech_research" ? 8 : -3)));
+          verdict = score >= 75 ? "STRONG_PURSUE" : (score >= 60 ? "VIABLE_WITH_RISK" : "PIVOT_REQUIRED");
+          fatalFlaws = compCount > 2 
+            ? [`High competitive crowding: ${compCount} direct and indirect competitors already control primary distribution channels.`]
+            : [`Unclear differentiation against established ${domain.archetypeLabel} incumbents.`];
+          keyAssumptions = [`Market demand in ${domain.primaryCustomer} is active and funded.`];
+          competitiveRisks = marketResearch.identifiedCompetitors.map((c: any) => `${c.name} (${c.category}): ${c.vulnerability}`);
+          mustTestBeforeBuilding = [`Validate addressable budget allocations across 10 prospective buyers in ${domain.primaryCustomer}.`];
+          rationale = `Evaluated competitive whitespace and demand signals for ${domain.archetypeLabel}.`;
+        }
         break;
       }
 
       case "customer": {
-        score = domain.archetype === "b2g_govtech" ? 58 : (domain.archetype === "healthcare_clinical" ? 62 : 70);
+        score = domain.archetype === "b2g_govtech" ? 48 : (domain.archetype === "healthcare_clinical" ? 52 : (isThinWrapper ? 45 : 68));
         if (pricing > 150 && domain.archetype === "consumer_social") score -= 15;
-        verdict = score >= 70 ? "VIABLE_WITH_RISK" : "LEAN_KILL";
-        fatalFlaws = [`Adoption inertia: ${domain.primaryCustomer} have entrenched habits with high switching drag.`];
+        verdict = score >= 70 ? "VIABLE_WITH_RISK" : (score < 50 ? "STRONG_KILL" : "LEAN_KILL");
+        fatalFlaws = isThinWrapper
+          ? ["Novelty churn cliff: Users test the tool twice for curiosity, then abandon it once novelty fades.", "High price sensitivity: Unwillingness to pay recurring subscription for single-purpose utilities."]
+          : [`Adoption inertia: ${domain.primaryCustomer} have entrenched habits with high switching drag.`];
         keyAssumptions = [`End users will switch to a new workflow without extensive retraining.`];
-        competitiveRisks = ["Existing manual processes or entrenched legacy tools with zero marginal training cost."];
+        competitiveRisks = ["Existing manual processes, bookmarks, or entrenched legacy tools with zero marginal training cost."];
         mustTestBeforeBuilding = [`Observe 5 target operators completing the core task in their native workflow.`];
         rationale = `Users feel the pain point, but habit inertia and workflow disruption create high pilot abandonment risk.`;
         break;
@@ -191,6 +209,11 @@ Market & Prediction Signals: ${marketContext}`;
           verdict = "STRONG_KILL";
           fatalFlaws = ["System integrity risk: Input text contains prompt tampering or jailbreak syntax."];
           rationale = "Security architecture review: Flagged adversarial instruction injection.";
+        } else if (isThinWrapper) {
+          score = 72;
+          verdict = "VIABLE_WITH_RISK";
+          fatalFlaws = ["Fragile API dependency: Reliance on upstream LLM API rate limits, schema deprecation, and unexpected token price shifts."];
+          rationale = "Architecture review: Trivially simple integration, but heavy upstream platform dependency.";
         } else {
           score = sandboxSim.exitCode === 0 ? 84 : 55;
           verdict = score >= 75 ? "STRONG_PURSUE" : "VIABLE_WITH_RISK";
@@ -208,8 +231,15 @@ Market & Prediction Signals: ${marketContext}`;
           score = 20;
           verdict = "STRONG_KILL";
           fatalFlaws = ["Zero monetization capture: Free distribution without commercial capture creates immediate insolvency."];
+        } else if (isThinWrapper) {
+          score = 28;
+          verdict = "STRONG_KILL";
+          fatalFlaws = [
+            "Zero structural defensibility: Thin wrapper architecture offers no proprietary data moat or sustainable pricing power.",
+            "Platform Replication Risk: Hyperscalers or upstream model providers can commoditize this entire workflow with a native feature release."
+          ];
         } else if (ltvCac < 1.0) {
-          score = 25;
+          score = 22;
           verdict = "STRONG_KILL";
           fatalFlaws = [`Mathematically inverted unit economics: CAC ($${cac}) exceeds LTV ($${sandboxSim.metrics.ltvEstimateUsd}). Every user burns capital.`];
         } else if (ltvCac < 2.5) {
@@ -243,6 +273,14 @@ Market & Prediction Signals: ${marketContext}`;
             "Impossible physical or technical claim: Violates fundamental conservation of energy / thermodynamic laws."
           ];
           rationale = "Red Team Physics Audit: Claimed mechanism cannot function in the physical world.";
+        } else if (isThinWrapper) {
+          score = 24;
+          verdict = "STRONG_KILL";
+          fatalFlaws = [
+            "Commoditization Hazard: Low defensibility thin wrapper over base foundation models. Hyperscalers or open-source extensions can replicate this within 48 hours with zero infrastructure cost.",
+            "Zero Structural Moat: Without proprietary datasets or embedded workflow lock-in, monthly user churn exceeds 25% as free alternatives emerge."
+          ];
+          rationale = "Red Team Defensibility Audit: Extreme replication vulnerability to native foundation model updates.";
         } else if (ltvCac < 1.0) {
           score = 22;
           verdict = "STRONG_KILL";
@@ -251,13 +289,87 @@ Market & Prediction Signals: ${marketContext}`;
           ];
           rationale = "Red Team Capital Audit: Business model guarantees bankruptcy under modeled customer acquisition costs.";
         } else {
-          score = domain.archetype === "b2g_govtech" ? 34 : (domain.archetype === "healthcare_clinical" ? 36 : 42);
-          verdict = "LEAN_KILL";
-          fatalFlaws = [
-            `Unproven commitment: ${domain.primaryCustomer} praise the idea in discovery calls but stall during procurement.`,
-            `Regulatory compliance overhead in ${domain.regulatoryEnvironment} exceeds initial budget.`
-          ];
-          rationale = `High false-positive risk: founders routinely mistake polite feedback for actual purchasing intent.`;
+          // Domain-specific tailored adversarial failure patterns
+          switch (domain.archetype) {
+            case "b2b_saas":
+              score = ltvCac < 2.5 ? 36 : 46;
+              verdict = "LEAN_KILL";
+              fatalFlaws = [
+                `Enterprise Procurement Deadlock: ${domain.primaryCustomer} praise discovery demos, but security reviews and IT committees stall contracts for 4–9 months while incumbents bundle the capability for free.`,
+                `Integration Churn Trap: Without bi-directional synchronization into core CRM/ERP systems, weekly active usage degrades by >60% within 60 days.`
+              ];
+              rationale = `High pilot abandonment risk: Enterprise buyers express enthusiasm in discovery but face procurement bottlenecks.`;
+              break;
+
+            case "b2g_govtech":
+              score = 30;
+              verdict = "STRONG_KILL";
+              fatalFlaws = [
+                `Multi-Year Tender RFP Stagnation: Public sector procurement requires sovereign hosting certifications and bureaucratic approvals that outlast seed runway.`,
+                `Field Bureaucracy Friction: Civil servants and field operators avoid adopting unmandated third-party tools due to audit liability concerns.`
+              ];
+              rationale = `Government tender cycles and departmental inertia create high bankruptcy probability before revenue realization.`;
+              break;
+
+            case "healthcare_clinical":
+              score = 32;
+              verdict = "STRONG_KILL";
+              fatalFlaws = [
+                `EHR Gatekeeping & Malpractice Liability: Electronic Health Record vendors (Epic, Cerner) impose closed API walled gardens; diagnostic claims trigger intense medical liability.`,
+                `Clinician Cognitive Overload: Doctors already spend >2 hours daily on charting; any non-automated interface suffers immediate clinical rejection.`
+              ];
+              rationale = `Clinical liability and hospital IT procurement barriers severely constrain deployment timeline.`;
+              break;
+
+            case "hardware_robotics":
+              score = 34;
+              verdict = "LEAN_KILL";
+              fatalFlaws = [
+                `Bill-of-Materials (BoM) Margin Compression: Sensor payloads and battery thermal degradation compress hardware margins below 30% without recurring software attach rates.`,
+                `Field Servicing Overhead: Mean-time-between-failures (MTBF) under adverse weather requires costly physical repairs that destroy unit cash flow.`
+              ];
+              rationale = `Hardware production capital expenditure and field maintenance risk outstrip initial capitalization.`;
+              break;
+
+            case "consumer_social":
+              score = 28;
+              verdict = "STRONG_KILL";
+              fatalFlaws = [
+                `30-Day Cohort Retention Cliff: Consumer utilities face >85% month-1 dropoff without dense multi-player network effects or habit-forming loops.`,
+                `Paid Acquisition Arbitrage Collapse: Performance marketing ad costs (CAC $${cac}) outpace prosumer lifetime monetization within 90 days.`
+              ];
+              rationale = `Rapid consumer novelty decay and high acquisition costs lead to unsustainable churn dynamics.`;
+              break;
+
+            case "deeptech_research":
+              score = 44;
+              verdict = "PIVOT_REQUIRED";
+              fatalFlaws = [
+                `Inference Latency & VRAM Wall: Heavy transformer passes incur per-query compute costs that consume >40% of subscription revenue at production scale.`,
+                `Lab-to-Field Distribution Shift: Academic benchmark accuracy drops significantly when encountering messy, noisy real-world inputs.`
+              ];
+              rationale = `Technically ambitious but constrained by high token inference overhead and out-of-distribution edge failures.`;
+              break;
+
+            case "web3_defi":
+              score = 35;
+              verdict = "LEAN_KILL";
+              fatalFlaws = [
+                `Smart Contract Exploitation Vector: Unaudited cross-contract execution risks total liquidity drain via flash loans or oracle manipulation.`,
+                `Regulatory Compliance Chasm: Shifting international securities and AML/KYC mandates expose operators to protocol-level regulatory enforcement.`
+              ];
+              rationale = `High systemic risk from regulatory exposure and smart contract vulnerability surface area.`;
+              break;
+
+            default:
+              score = 40;
+              verdict = "LEAN_KILL";
+              fatalFlaws = [
+                `Distribution Desert: Lack of an asymmetric, proprietary top-of-funnel acquisition channel leads to zero-traction stagnation.`,
+                `Habit Inertia Trap: Defaulting to existing manual spreadsheets remains cheaper and lower friction than onboarding a new platform.`
+              ];
+              rationale = `Founder underestimates customer switching friction and lack of organic discovery channels.`;
+          }
         }
         keyAssumptions = [`Buyers have discretionary budget authority to deploy this within ${domain.procurementCycle}.`];
         competitiveRisks = ["Zero switching cost back to legacy manual methods."];
@@ -330,14 +442,20 @@ Market & Prediction Signals: ${marketContext}`;
     options: SwarmExecutionOptions = {}
   ): Promise<IdeaDossier> {
     const notify = options.onProgress || (() => {});
+    const emit = options.onEvent || (() => {});
 
     // 01 INGEST & CLASSIFY
     notify("01 INGEST", `Ingesting "${idea.title}" into TrueForge execution runtime...`);
+    emit({ type: "stage", stage: "01 INGEST", detail: `Ingesting "${idea.title}" into TrueForge execution runtime...`, timestamp: new Date().toISOString() });
+
     const domain = classifyIdeaDomain(idea);
     notify("01 CLASSIFY", `Classified concept as [${domain.archetypeLabel}] — Target: ${domain.primaryCustomer}`);
+    emit({ type: "domain", domain });
 
     // 02 DECOMPOSE & RECON
     notify("02 DECOMPOSE", `Decomposing variables under ${domain.procurementCycle} framework...`);
+    emit({ type: "stage", stage: "02 DECOMPOSE", detail: `Decomposing variables under ${domain.procurementCycle} framework...`, timestamp: new Date().toISOString() });
+
     const pricing = options.pricingMonthlyUsd ?? (domain.archetype === "hardware_robotics" ? 1500 : domain.archetype === "b2b_saas" ? 499 : (domain.archetype === "deeptech_research" ? 2500 : (domain.archetype === "consumer_social" ? 19 : 100)));
     const churn = options.expectedChurnMonthly ?? (domain.archetype === "consumer_social" ? 0.12 : 0.04);
     const cac = options.estimatedCacUsd ?? (domain.archetype === "hardware_robotics" ? 2500 : domain.archetype === "b2b_saas" ? 1200 : (domain.archetype === "deeptech_research" ? 5000 : 350));
@@ -352,10 +470,18 @@ Market & Prediction Signals: ${marketContext}`;
       runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30)
     ]);
 
+    emit({
+      type: "sandbox_metrics",
+      metrics: sandboxSim.metrics,
+      runtime: sandboxSim.runtime,
+      exitCode: sandboxSim.exitCode
+    });
+
     const marketContext = `Comps: ${marketResearch.identifiedCompetitors.map(c => c.name).join(", ")}. Signals: ${marketResearch.marketSignals.join("; ")}. Macro Odds: ${polymarketSignals.keyTakeaway}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}, LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x, Payback ${sandboxSim.metrics.estimatedPaybackMonths}mo.`;
 
     // 03 INVESTIGATE (Domain-Tailored Specialist Subagents)
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
+    emit({ type: "stage", stage: "03 INVESTIGATE", detail: `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`, timestamp: new Date().toISOString() });
 
     const shouldCallLive = options.useLiveLLM !== false;
     const [liveAnalyst, liveCustomer, liveArchitect, liveInvestor, liveRedTeam, liveExpert] = shouldCallLive
@@ -376,6 +502,18 @@ Market & Prediction Signals: ${marketContext}`;
     const investorOpinion: AgentOpinion = liveInvestor || this.generateHeuristicOpinion("investor", idea, domain, marketResearch, sandboxSim, pricing, cac);
     const redTeamOpinion: AgentOpinion = liveRedTeam || this.generateHeuristicOpinion("redteam", idea, domain, marketResearch, sandboxSim, pricing, cac);
     const expertOpinion: AgentOpinion = liveExpert || this.generateHeuristicOpinion("expert", idea, domain, marketResearch, sandboxSim, pricing, cac);
+
+    // Emit live opinions as they are collected
+    for (const op of [analystOpinion, customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion]) {
+      emit({
+        type: "agent_opinion",
+        role: op.role,
+        roleTitle: op.roleTitle,
+        verdict: op.verdict,
+        score: op.score,
+        fatalFlaw: op.fatalFlaws[0]
+      });
+    }
 
     // 04 ATTACK & CROSS-EXAMINE (Adversarial Round 1)
     notify("04 ATTACK", `Red Team deploying fatal assumption attacks across [${domain.archetypeLabel}]...`);
@@ -516,6 +654,11 @@ Market & Prediction Signals: ${marketContext}`;
 
     if (audit.testTimeSelfCorrections > 0) {
       notify("05 VERIFY [SELF-CORRECTION]", `Stanford CS329A Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`);
+      emit({
+        type: "audit_correction",
+        detail: `Stanford CS329A Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`,
+        hallucinationsBlocked: audit.hallucinationsBlocked
+      });
     }
 
     // 06 CONVERGE (Multi-Round Convergence Loop)
@@ -545,17 +688,39 @@ Market & Prediction Signals: ${marketContext}`;
       });
     }
 
+    for (const d of debateTrail) {
+      emit({
+        type: "crossfire_clash",
+        challenger: d.challenger,
+        target: d.target,
+        challengePoint: d.challengePoint,
+        rebuttal: d.rebuttal || "",
+        status: d.status
+      });
+    }
+
     // 07 TRANSPARENT DIMENSIONAL RESILIENCE SCORING WITH TRACEABLE FACTOR ATTRIBUTION
     notify("07 VERDICT", "Synthesizing transparent 5-dimensional resilience breakdown & factor attribution...");
 
-    const technicalFeasibility = Math.round((verifiedOpinions.architect.score * 0.7) + (sandboxSim.exitCode === 0 ? 30 : 0));
-    const demandAndAdoption = Math.round((verifiedOpinions.customer.score * 0.6) + (verifiedOpinions.analyst.score * 0.4));
-    const economicsAndCapitalEfficiency = Math.round(
-      (verifiedOpinions.investor.score * 0.6) + 
-      Math.min(Math.round(sandboxSim.metrics.ltvCacRatio * 7), 40)
-    );
-    const defensibilityAndMoat = Math.round((verifiedOpinions.expert.score * 0.6) + (verifiedOpinions.analyst.score * 0.4));
-    const adversarialResilience = Math.round(100 - (verifiedOpinions.redteam.score < 50 ? (50 - verifiedOpinions.redteam.score) * 1.5 : 10));
+    const technicalFeasibility = Math.max(10, Math.min(100, Math.round(
+      (verifiedOpinions.architect.score * (sandboxSim.exitCode === 0 ? 0.85 : 0.4)) +
+      (sandboxSim.exitCode === 0 ? 15 : 0)
+    )));
+    const demandAndAdoption = Math.max(10, Math.min(100, Math.round(
+      (verifiedOpinions.customer.score * 0.6) + (verifiedOpinions.analyst.score * 0.4)
+    )));
+    const economicsAndCapitalEfficiency = Math.max(10, Math.min(100, Math.round(
+      (verifiedOpinions.investor.score * 0.7) + 
+      Math.min(Math.round(sandboxSim.metrics.ltvCacRatio * 6), 30)
+    )));
+    const defensibilityAndMoat = Math.max(10, Math.min(100, Math.round(
+      (verifiedOpinions.expert.score * 0.6) + (verifiedOpinions.analyst.score * 0.4)
+    )));
+    const adversarialResilience = Math.max(10, Math.min(100,
+      verifiedOpinions.redteam.score <= 35
+        ? verifiedOpinions.redteam.score
+        : Math.round(verifiedOpinions.redteam.score * 0.9 + 5)
+    ));
 
     // Weighted Composite Resilience Score (100 Scale)
     // Feasibility: 20%, Demand: 25%, Economics: 20%, Moat: 15%, Adversarial: 20%
@@ -879,6 +1044,8 @@ Market & Prediction Signals: ${marketContext}`;
     } catch (err: any) {
       // Non-blocking storage save
     }
+
+    emit({ type: "dossier_complete", dossier });
 
     return dossier;
   }
