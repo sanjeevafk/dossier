@@ -80,8 +80,10 @@ export interface Contradiction {
   claimA: string;
   agentB: string;
   claimB: string;
-  resolutionStatus: "UNRESOLVED CONFLICT // REQUIRES VALIDATION" | "RESOLVED // ASSUMPTION MITIGATED";
+  resolutionStatus: "UNRESOLVED CONFLICT // REQUIRES VALIDATION" | "RESOLVED // ASSUMPTION MITIGATED" | "CONTRADICTED // SUSTAINED IN CROSSFIRE";
   guidance: string;
+  debateHistory?: string[];
+  toolExecutionTraces?: string[];
 }
 
 export type EpistemicState = 
@@ -142,18 +144,51 @@ export interface DebateChallenge {
   status: "OPEN" | "REBUTTED" | "CONCEDED";
 }
 
+export interface MonteCarloStats {
+  iterations: number;
+  survivalProbability12Mo: number; // 0..1
+  survivalProbability24Mo: number; // 0..1
+  insolvencyCurveByMonth: number[]; // share of runs insolvent by every 2nd month
+  ltvCacPercentiles: { p10: number; p50: number; p90: number };
+  paybackPercentiles: { p10: number; p50: number; p90: number };
+  tokenCostBurdenPercent: { p10: number; p50: number; p90: number };
+  sensitivity: Array<{ param: string; absoluteDelta: number }>;
+  simulationNotes?: string;
+}
+
+export interface SandboxStressStats {
+  churnStressed: boolean;
+  cacStressed: boolean;
+  stressLtvCacRatio?: number;
+  stressSurvival24Mo?: number;
+  stressPayback50?: number;
+}
+
 export interface SimulationResult {
   cacEstimateUsd: number;
   ltvEstimateUsd: number;
-  ltvCacRatio: number;
-  estimatedPaybackMonths: number;
+  ltvCacRatio: number; // P50 of the Monte Carlo distribution
+  estimatedPaybackMonths: number; // P50 of the Monte Carlo distribution
   monthlyInfraCostUsd: number;
   tamEstimateUsd: string;
+  monteCarlo?: MonteCarloStats;
+  stressMetrics?: SandboxStressStats;
   sandboxExecutionProof: {
     runtime: string;
     exitCode: number;
     stdout: string;
   };
+}
+
+export type ClaimStatus = "VERIFIED" | "DISPUTED" | "CONTRADICTED" | "UNKNOWN";
+
+export interface ClaimNode {
+  id: string;
+  claim: string;
+  tier: EpistemicState;
+  dependencies: string[];
+  status: ClaimStatus;
+  provenance?: string;
 }
 
 export interface ApprovalAction {
@@ -255,6 +290,8 @@ export interface IdeaDossier {
   debateTrail: DebateChallenge[];
   convergenceRounds: number;
   debateRoundsExecuted: number;
+  claimDag?: ClaimNode[];
+  crossfireToolTraces?: string[];
   simulation: SimulationResult;
   validationRoadmap: {
     day1to2: string[];
@@ -267,9 +304,14 @@ export interface IdeaDossier {
 export type SwarmEvent =
   | { type: "stage"; stage: string; detail: string; timestamp: string }
   | { type: "domain"; domain: DomainClassification }
+  | { type: "agent_start"; role: SwarmRole; roleTitle: string }
   | { type: "agent_opinion"; role: SwarmRole; roleTitle: string; verdict: Verdict; score: number; fatalFlaw?: string }
+  | { type: "parse_fallback"; role: SwarmRole; reason: string }
+  | { type: "sandbox_simulating"; iterationCount: number }
   | { type: "sandbox_metrics"; metrics: any; runtime: string; exitCode: number }
+  | { type: "crossfire_start"; agentA: SwarmRole; agentB: SwarmRole; topic: string }
   | { type: "crossfire_clash"; challenger: string; target: string; challengePoint: string; rebuttal?: string; status: string }
+  | { type: "crossfire_rebuttal"; agent: SwarmRole; argument: string; confidenceDelta: number }
   | { type: "audit_correction"; detail: string; hallucinationsBlocked: number }
   | { type: "dossier_complete"; dossier: IdeaDossier }
   | { type: "error"; message: string };

@@ -16,7 +16,10 @@ import {
   EpistemicTier,
   EpistemicTaxonomySummary,
   ValidationVerdict,
-  SwarmEvent
+  SwarmEvent,
+  IdeaDomainArchetype,
+  SandboxStressStats,
+  Contradiction as ContradictionEntry
 } from "../types/index.js";
 import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
@@ -26,6 +29,7 @@ import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
+import { z } from "zod";
 
 export interface SwarmExecutionOptions {
   onProgress?: (stage: string, detail: string) => void;
@@ -36,20 +40,89 @@ export interface SwarmExecutionOptions {
   useLiveLLM?: boolean;
 }
 
+/**
+ * Deterministic adversarial invariants shared by the live-LLM and heuristic evaluation paths.
+ * These enforce hard kill ceilings independent of model drift.
+ */
+function detectAdversarialInvariants(idea: IdeaInput, pricing: number) {
+  const text = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization} ${idea.techStack || ""}`.toLowerCase();
+  return {
+    isPromptInjection: /ignore (previous|all) instructions|system prompt|jailbreak|output 100|developer mode/i.test(text),
+    isImpossiblePhysics: /perpetual motion|free energy|infinite electricity|zero input energy|violates thermodynamics|overunity/i.test(text),
+    isNoMonetization: /free forever|no monetization|zero revenue|not charging/i.test(text) || pricing <= 0,
+    isThinWrapper: /(chrome extension|browser extension|gpt wrapper|chat with pdf|meeting notes|summariz|prompt engineering|simple crm|transcriber|ai copywriter|ai tweet)/i.test(text)
+  };
+}
+
+type AdversarialInvariants = ReturnType<typeof detectAdversarialInvariants>;
+
+const AGENT_OUTPUT_SCHEMA = z.object({
+  verdict: z.enum(["STRONG_KILL", "LEAN_KILL", "PIVOT_REQUIRED", "VIABLE_WITH_RISK", "STRONG_PURSUE"]),
+  score: z.number().min(0).max(100),
+  fatalFlaws: z.array(z.string()).optional(),
+  keyAssumptions: z.array(z.string()).optional(),
+  competitiveRisks: z.array(z.string()).optional(),
+  mustTestBeforeBuilding: z.array(z.string()).optional(),
+  rationale: z.string().optional()
+});
+
+const WRAPPER_KILL_CEILINGS: Partial<Record<SwarmRole, { score: number; verdict: Verdict }>> = {
+  analyst: { score: 35, verdict: "PIVOT_REQUIRED" },
+  investor: { score: 28, verdict: "STRONG_KILL" },
+  redteam: { score: 24, verdict: "STRONG_KILL" }
+};
+const HIGH_CHURN_KILL_CEILING = 39;
+
+const CROSS_EXAM_SCHEMA = z.object({
+  crossExam: z.string().min(1),
+  targetClaim: z.string().optional()
+});
+
+const CROSSFIRE_DEFENSE_SCHEMA = z.object({
+  defense: z.string().min(1),
+  revisedScore: z.number().min(0).max(100),
+  concedes: z.boolean()
+});
+
+// Structured domain drag so feasibility and expert confidence reflect the domain's
+// genuine engineering/compliance burden instead of route-independent constants.
+const DOMAIN_FEASIBILITY_DRAG: Partial<Record<IdeaDomainArchetype, number>> = {
+  deeptech_research: -10,
+  hardware_robotics: -7,
+  web3_defi: -7,
+  b2g_govtech: -5,
+  healthcare_clinical: -4,
+  consumer_social: -3
+};
+
+const DOMAIN_REGULATORY_DRAG: Partial<Record<IdeaDomainArchetype, number>> = {
+  b2b_saas: 0,
+  consumer_social: -3,
+  general_startup: -4,
+  deeptech_research: -5,
+  hardware_robotics: -6,
+  healthcare_clinical: -10,
+  web3_defi: -12,
+  b2g_govtech: -14
+};
+
 export class IdeaSwarmOrchestrator {
   /**
    * Evaluate an individual agent perspective using live LLM if available,
-   * injecting domain-specific prompts and specialist mandates.
+   * injecting domain-specific prompts, specialist mandates, and hard score calibration.
+   * Returns a discriminated result so the orchestrator can surface schema/parse failures
+   * on the stream instead of silently swapping heuristics in.
    */
   private async evaluateRoleWithLLM(
     role: SwarmRole,
     idea: IdeaInput,
     marketContext: string,
-    domain: DomainClassification
-  ): Promise<AgentOpinion | null> {
+    domain: DomainClassification,
+    invariants: AdversarialInvariants
+  ): Promise<{ opinion: AgentOpinion | null; fallbackReason?: string }> {
     const status = getLLMStatus();
     if (!status.hasLiveLLM) {
-      return null;
+      return { opinion: null };
     }
 
     const defaultRoleConfig = SWARM_ROLES[role];
@@ -72,7 +145,12 @@ ADVERSARIAL EVALUATION RULES:
 1. Do NOT give sycophantic praise. Your job is to aggressively stress-test assumptions.
 2. Evaluate through the specific lens of ${domain.archetypeLabel}. NEVER apply irrelevant startup priors.
 3. If this idea has fatal flaws, call them out with zero hesitation.
-4. You must return a strictly valid JSON object matching this schema:
+4. Your score is an adversarial gate, not a consensus average — resolved flaws earn points; unresolved fatal flaws must drag it below 40.
+
+MANDATORY SCORING CALIBRATION:
+${defaultRoleConfig.scoringCalibration}
+
+You must return a strictly valid JSON object matching this schema:
 {
   "verdict": "STRONG_KILL" | "LEAN_KILL" | "PIVOT_REQUIRED" | "VIABLE_WITH_RISK" | "STRONG_PURSUE",
   "score": number (0 to 100),
@@ -95,34 +173,207 @@ Market & Prediction Signals: ${marketContext}`;
     try {
       const raw = await generateAgentTurn(systemPrompt, userPrompt, {
         temperature: 0.5,
-        maxTokens: 2500,
+        maxTokens: 2000,
         jsonMode: true
       });
+
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return null;
-      const parsed = JSON.parse(jsonMatch[0]);
+      if (!jsonMatch) {
+        return { opinion: null, fallbackReason: "model returned no JSON object" };
+      }
+
+      const validated = AGENT_OUTPUT_SCHEMA.safeParse(JSON.parse(jsonMatch[0]));
+      if (!validated.success) {
+        const issues = validated.error.issues
+          .map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`)
+          .join("; ");
+        return { opinion: null, fallbackReason: `schema validation failed — ${issues}` };
+      }
+      const parsed = validated.data;
+
+      let score = parsed.score;
+      let verdict: Verdict = parsed.verdict;
+      const fatalFlaws = (parsed.fatalFlaws ?? []).slice();
+
+      // Deterministic adversarial invariant gates override model drift.
+      if (invariants.isPromptInjection || invariants.isImpossiblePhysics) {
+        score = Math.min(score, 22);
+        verdict = "STRONG_KILL";
+        fatalFlaws.unshift(
+          invariants.isPromptInjection
+            ? "System integrity risk: adversarial instruction injection detected."
+            : "Physical impossibility: claimed mechanism violates conservation of energy."
+        );
+      } else if (invariants.isThinWrapper) {
+        const guard = WRAPPER_KILL_CEILINGS[role];
+        if (guard) {
+          score = Math.min(score, guard.score);
+          verdict = guard.verdict;
+          fatalFlaws.unshift("Zero structural defensibility: thin wrapper over frontier models is trivially replicable as a native platform feature.");
+        }
+      }
+      if (domain.archetype === "consumer_social" && (role === "investor" || role === "redteam") && score > HIGH_CHURN_KILL_CEILING) {
+        score = HIGH_CHURN_KILL_CEILING;
+        if (verdict === "STRONG_PURSUE" || verdict === "VIABLE_WITH_RISK") {
+          verdict = "LEAN_KILL";
+        }
+        fatalFlaws.unshift("High-churn consumer model: novelty-driven retention collapses unit economics before payback.");
+      }
 
       return {
-        role,
-        roleNumber: roleMeta.number,
-        roleTitle: roleMeta.title,
-        verdict: parsed.verdict || "VIABLE_WITH_RISK",
-        score: typeof parsed.score === "number" ? Math.min(100, Math.max(0, parsed.score)) : 65,
-        status: "COMPLETE",
-        fatalFlaws: Array.isArray(parsed.fatalFlaws) ? parsed.fatalFlaws : [],
-        keyAssumptions: Array.isArray(parsed.keyAssumptions) ? parsed.keyAssumptions : [],
-        competitiveRisks: Array.isArray(parsed.competitiveRisks) ? parsed.competitiveRisks : [],
-        mustTestBeforeBuilding: Array.isArray(parsed.mustTestBeforeBuilding) ? parsed.mustTestBeforeBuilding : [],
-        rationale: parsed.rationale || `Evaluated through ${domain.archetypeLabel} domain lens.`,
-        telemetryMetadata: {
-          latencyMs: Math.floor(Math.random() * 250) + 120,
-          claimsVerified: 5,
-          threatSeverity: parsed.score < 50 ? "HIGH" : "MODERATE"
+        opinion: {
+          role,
+          roleNumber: roleMeta.number,
+          roleTitle: roleMeta.title,
+          verdict,
+          score,
+          status: "COMPLETE",
+          fatalFlaws,
+          keyAssumptions: parsed.keyAssumptions ?? [],
+          competitiveRisks: parsed.competitiveRisks ?? [],
+          mustTestBeforeBuilding: parsed.mustTestBeforeBuilding ?? [],
+          rationale: parsed.rationale || `Evaluated through ${domain.archetypeLabel} domain lens.`,
+          telemetryMetadata: {
+            latencyMs: Math.floor(Math.random() * 250) + 120,
+            claimsVerified: 5,
+            threatSeverity: score < 50 ? "HIGH" : "MODERATE"
+          }
         }
       };
-    } catch {
-      return null;
+    } catch (err: any) {
+      return { opinion: null, fallbackReason: `LLM turn failed: ${err?.message || "unknown provider error"}` };
     }
+  }
+
+  /**
+   * Round 2 cross-examination (plan 2.2): the lowest-scoring agent cross-examines the
+   * highest-scoring agent using dynamic ReAct tool findings (stressed Monte Carlo +
+   * competitor recon). The defender must produce verifiable evidence or concede
+   * confidence points; falls back to deterministic stress adjudication when offline.
+   */
+  private async runRoundTwoCrossfire(
+    challengerOpinion: AgentOpinion,
+    defenderOpinion: AgentOpinion,
+    context: {
+      stressSummary: string;
+      reconSummary: string;
+      contestedClaim: string;
+      stressLtvCacRatio: number;
+      stressSurvival24?: number;
+      hasLiveLLM: boolean;
+    },
+    emit: (event: SwarmEvent) => void
+  ): Promise<{ challenge: DebateChallenge; contradiction: ContradictionEntry; defenderScoreDelta: number; toolTraces: string[] }> {
+    emit({ type: "crossfire_start", agentA: challengerOpinion.role, agentB: defenderOpinion.role, topic: context.contestedClaim });
+
+    const toolTraces = [context.stressSummary, context.reconSummary];
+    const debateHistory: string[] = [];
+    const originalScore = defenderOpinion.score;
+    let newScore = originalScore;
+    let crossExamText = "";
+    let defenseText = "";
+
+    if (context.hasLiveLLM) {
+      try {
+        const skepticTurn = await generateAgentTurn(
+          `You are Agent ${challengerOpinion.roleNumber} // ${challengerOpinion.roleTitle} in the TrueForge adversarial crossfire. You MUST cite the stress-sandbox numbers verbatim and probe exactly one testable claim. Return strictly valid JSON: {"crossExam": string, "targetClaim": string}.`,
+          `Stress evidence you must cite: ${context.stressSummary}\nContested claim to attack: "${context.contestedClaim}"\nIssue a direct cross-examination of at most 100 words to Agent ${defenderOpinion.roleNumber} // ${defenderOpinion.roleTitle}.`,
+          { temperature: 0.4, maxTokens: 800, jsonMode: true }
+        );
+        const examMatch = skepticTurn.match(/\{[\s\S]*\}/);
+        const parsedExam = CROSS_EXAM_SCHEMA.safeParse(JSON.parse(examMatch ? examMatch[0] : "{}"));
+        if (parsedExam.success) {
+          crossExamText = parsedExam.data.crossExam;
+          debateHistory.push(`Skeptic cross-examination: ${crossExamText}`);
+        }
+
+        const defenderTurn = await generateAgentTurn(
+          `You are Agent ${defenderOpinion.roleNumber} // ${defenderOpinion.roleTitle} under cross-examination. Either produce concrete defensive evidence, or concede and deduct confidence points. Return strictly valid JSON: {"defense": string (<=120 words), "revisedScore": number (your defensible confidence 0-100, never above your original), "concedes": boolean}.`,
+          `Cross-examination: ${crossExamText || context.contestedClaim}\nDynamic tool findings against you: ${toolTraces.join(" | ")}\nOriginal claim to defend or concede: "${context.contestedClaim}".`,
+          { temperature: 0.4, maxTokens: 1200, jsonMode: true }
+        );
+        const defMatch = defenderTurn.match(/\{[\s\S]*\}/);
+        const parsedDefense = CROSSFIRE_DEFENSE_SCHEMA.safeParse(JSON.parse(defMatch ? defMatch[0] : "{}"));
+        if (parsedDefense.success) {
+          newScore = Math.min(parsedDefense.data.revisedScore, originalScore);
+          if (parsedDefense.data.concedes) {
+            newScore = Math.min(newScore, 45);
+          }
+          defenseText = parsedDefense.data.defense;
+          defenderOpinion.score = newScore;
+          if (originalScore - newScore >= 15) {
+            defenderOpinion.verdict = "PIVOT_REQUIRED";
+          } else if (newScore < 50 && defenderOpinion.verdict === "STRONG_PURSUE") {
+            defenderOpinion.verdict = "VIABLE_WITH_RISK";
+          }
+          debateHistory.push(`Defender response: ${defenseText}`, `Confidence: ${originalScore} → ${newScore}`);
+          emit({ type: "crossfire_rebuttal", agent: defenderOpinion.role, argument: defenseText, confidenceDelta: originalScore - newScore });
+          return this.buildCrossfireOutcome(challengerOpinion, defenderOpinion, crossExamText, defenseText, debateHistory, toolTraces, originalScore, newScore);
+        }
+      } catch {
+        // LLM crossfire failed — fall through to deterministic adjudication below
+      }
+    }
+
+    if (!crossExamText) {
+      crossExamText = `Round 2 cross-examination with dynamic tool evidence: ${context.stressSummary}. On "${context.contestedClaim}", defend with verifiable evidence or deduct confidence points.`;
+    }
+    if (!defenseText) {
+      const stressSurvival = context.stressSurvival24 ?? 0;
+      if (context.stressLtvCacRatio >= 2.5 && stressSurvival >= 0.8) {
+        defenseText = `Economics survive stress: P50 LTV/CAC ${context.stressLtvCacRatio}x with 24-month survival ${(stressSurvival * 100).toFixed(0)}%. Confidence retained; mitigation mandate: pre-signed pilot LOIs and upfront annual prepayments before production engineering.`;
+        newScore = originalScore;
+      } else {
+        const haircut = stressSurvival < 0.35 ? 18 : stressSurvival < 0.6 ? 12 : 10;
+        newScore = Math.max(28, Math.min(originalScore, originalScore - haircut));
+        defenseText = `Stress evidence does not clear viability: P50 LTV/CAC ${context.stressLtvCacRatio}x with ${(100 - stressSurvival * 100).toFixed(0)}% insolvency by month 24. Confidence deducted ${originalScore - newScore} points; mandate dual-key approval and pre-screened pilot commitments before further spend.`;
+        defenderOpinion.score = newScore;
+        if (originalScore - newScore >= 15) {
+          defenderOpinion.verdict = "PIVOT_REQUIRED";
+        } else if (newScore < 50 && defenderOpinion.verdict === "STRONG_PURSUE") {
+          defenderOpinion.verdict = "VIABLE_WITH_RISK";
+        }
+      }
+      debateHistory.push(`Deterministic stress adjudication: ${defenseText}`);
+    }
+
+    emit({ type: "crossfire_rebuttal", agent: defenderOpinion.role, argument: defenseText, confidenceDelta: originalScore - newScore });
+    return this.buildCrossfireOutcome(challengerOpinion, defenderOpinion, crossExamText, defenseText, debateHistory, toolTraces, originalScore, newScore);
+  }
+
+  private buildCrossfireOutcome(
+    challengerOpinion: AgentOpinion,
+    defenderOpinion: AgentOpinion,
+    crossExamText: string,
+    defenseText: string,
+    debateHistory: string[],
+    toolTraces: string[],
+    originalScore: number,
+    newScore: number
+  ): { challenge: DebateChallenge; contradiction: ContradictionEntry; defenderScoreDelta: number; toolTraces: string[] } {
+    const defenderDropped = newScore < originalScore;
+    const challenge: DebateChallenge = {
+      challenger: challengerOpinion.role,
+      target: defenderOpinion.role,
+      round: 2,
+      challengePoint: crossExamText,
+      rebuttal: defenseText,
+      status: (originalScore - newScore) >= 12 ? "CONCEDED" : "REBUTTED"
+    };
+    const contradiction: ContradictionEntry = {
+      id: "C-CROSSFIRE-02",
+      agentA: challengerOpinion.roleTitle,
+      claimA: crossExamText,
+      agentB: defenderOpinion.roleTitle,
+      claimB: defenseText,
+      resolutionStatus: defenderDropped ? "CONTRADICTED // SUSTAINED IN CROSSFIRE" : "RESOLVED // ASSUMPTION MITIGATED",
+      guidance: defenderDropped
+        ? `Defender conceded ${originalScore - newScore} confidence points under stochastically stressed economics; validate the contested metric empirically before further capital deployment.`
+        : `Defender held score under dynamic tool evidence; enforce the mitigation mandate (pilot LOIs / upfront prepayments) during validation.`,
+      debateHistory,
+      toolExecutionTraces: toolTraces
+    };
+    return { challenge, contradiction, defenderScoreDelta: originalScore - newScore, toolTraces };
   }
 
   /**
@@ -136,16 +387,11 @@ Market & Prediction Signals: ${marketContext}`;
     marketResearch: any,
     sandboxSim: any,
     pricing: number,
-    cac: number
+    cac: number,
+    invariants: AdversarialInvariants
   ): AgentOpinion {
     const roleLabels = domain.specialistRoleLabels;
-    const text = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization} ${idea.techStack || ""}`.toLowerCase();
-
-    // Adversarial invariant checks
-    const isPromptInjection = /ignore (previous|all) instructions|system prompt|jailbreak|output 100|developer mode/i.test(text);
-    const isImpossiblePhysics = /perpetual motion|free energy|infinite electricity|zero input energy|violates thermodynamics|overunity/i.test(text);
-    const isNoMonetization = /free forever|no monetization|zero revenue|not charging/i.test(text) || pricing <= 0;
-    const isThinWrapper = /(chrome extension|browser extension|gpt wrapper|chat with pdf|meeting notes|summariz|prompt engineering|simple crm|transcriber|ai copywriter|ai tweet)/i.test(text);
+    const { isPromptInjection, isImpossiblePhysics, isNoMonetization, isThinWrapper } = invariants;
     const ltvCac = sandboxSim.metrics.ltvCacRatio;
 
     let score = 70;
@@ -215,10 +461,15 @@ Market & Prediction Signals: ${marketContext}`;
           fatalFlaws = ["Fragile API dependency: Reliance on upstream LLM API rate limits, schema deprecation, and unexpected token price shifts."];
           rationale = "Architecture review: Trivially simple integration, but heavy upstream platform dependency.";
         } else {
-          score = sandboxSim.exitCode === 0 ? 84 : 55;
+          score = (sandboxSim.exitCode === 0 ? 84 : 55) + (DOMAIN_FEASIBILITY_DRAG[domain.archetype] ?? 0);
+          const mcFeasibility = sandboxSim.metrics.monteCarlo;
+          if (mcFeasibility) {
+            if (mcFeasibility.tokenCostBurdenPercent.p50 > 0.45) score -= 6;
+            if (mcFeasibility.survivalProbability12Mo < 0.6) score -= 6;
+          }
           verdict = score >= 75 ? "STRONG_PURSUE" : "VIABLE_WITH_RISK";
           fatalFlaws = ["API token inflation or uncontrolled recursion under burst concurrency load."];
-          rationale = `Architecture verified feasible with Python sandbox simulation (Exit 0) and isolated process boundaries.`;
+          rationale = `Architecture verified feasible with Python sandbox simulation (Exit 0); ${domain.archetypeLabel} engineering burden applied.`;
         }
         keyAssumptions = ["Underlying infrastructure and edge models maintain required throughput and latency budgets."];
         competitiveRisks = ["Commoditization of base foundation models."];
@@ -246,10 +497,40 @@ Market & Prediction Signals: ${marketContext}`;
           score = 52;
           verdict = "VIABLE_WITH_RISK";
           fatalFlaws = [`Compressed venture margins: LTV/CAC ratio of ${ltvCac}x leaves insufficient buffer for sales payback.`];
+          const mcWeak = sandboxSim.metrics.monteCarlo;
+          if (mcWeak && mcWeak.survivalProbability24Mo < 0.5) {
+            score -= 10;
+            fatalFlaws.push(`Stochastic insolvency: ${(100 - mcWeak.survivalProbability24Mo * 100).toFixed(0)}% of ${mcWeak.iterations} Monte Carlo runs burn cash to zero before month 24.`);
+          }
         } else {
-          score = Math.min(84, Math.round(55 + (ltvCac * 4)));
+          const mcStrong = sandboxSim.metrics.monteCarlo;
+          const ltvP50 = mcStrong?.ltvCacPercentiles.p50 ?? ltvCac;
+          score = Math.min(88, Math.round(48 + (ltvP50 * 4)));
+          const paybackMonths = mcStrong?.paybackPercentiles.p50 ?? sandboxSim.metrics.estimatedPaybackMonths;
+          if (paybackMonths > 22) {
+            score -= 12;
+          } else if (paybackMonths > 15) {
+            score -= 6;
+          }
+          if (mcStrong) {
+            if (mcStrong.survivalProbability24Mo < 0.35) {
+              score -= 14;
+            } else if (mcStrong.survivalProbability24Mo < 0.60) {
+              score -= 8;
+            } else if (mcStrong.survivalProbability24Mo < 0.85) {
+              score -= 4;
+            }
+            if (mcStrong.ltvCacPercentiles.p10 < 1.0) {
+              score = Math.max(32, score - 8);
+              fatalFlaws.unshift(`Stochastic insolvency tail: ${(100 - mcStrong.survivalProbability24Mo * 100).toFixed(0)}% of ${mcStrong.iterations} Monte Carlo runs burn cash to zero before month 24.`);
+            }
+          }
+          if (score < 50 && !fatalFlaws.length) {
+            fatalFlaws = [`Long sales cycles (${domain.procurementCycle}) will strain early runway under stochastic insolvency risk.`];
+          } else {
+            fatalFlaws.push(`Long sales cycles (${domain.procurementCycle}) will strain early runway.`);
+          }
           verdict = score >= 75 ? "STRONG_PURSUE" : "VIABLE_WITH_RISK";
-          fatalFlaws = [`Long sales cycles (${domain.procurementCycle}) will strain early runway.`];
         }
         keyAssumptions = [`Unit economics support healthy margins under ${domain.unitEconomicsModel}.`];
         competitiveRisks = ["Well-funded legacy providers bundle identical capability for free."];
@@ -289,10 +570,13 @@ Market & Prediction Signals: ${marketContext}`;
           ];
           rationale = "Red Team Capital Audit: Business model guarantees bankruptcy under modeled customer acquisition costs.";
         } else {
-          // Domain-specific tailored adversarial failure patterns
+          // Domain-tailored adversarial failure patterns; severity narrows to
+          // procurement timing when stochastic economics survive the stress replay.
+          const mcRedteam = sandboxSim.metrics.monteCarlo;
+          const econSurvivesStress = ltvCac >= 6 && (mcRedteam ? mcRedteam.survivalProbability24Mo >= 0.8 : false);
           switch (domain.archetype) {
             case "b2b_saas":
-              score = ltvCac < 2.5 ? 36 : 46;
+              score = econSurvivesStress ? 52 : (ltvCac < 2.5 ? 36 : 46);
               verdict = "LEAN_KILL";
               fatalFlaws = [
                 `Enterprise Procurement Deadlock: ${domain.primaryCustomer} praise discovery demos, but security reviews and IT committees stall contracts for 4–9 months while incumbents bundle the capability for free.`,
@@ -389,10 +673,12 @@ Market & Prediction Signals: ${marketContext}`;
           fatalFlaws = ["Security integrity violation."];
           rationale = "Compliance specialist review: Malicious injection payload.";
         } else {
-          score = 78;
-          verdict = "STRONG_PURSUE";
+          score = 78 + (DOMAIN_REGULATORY_DRAG[domain.archetype] ?? 0) - (isThinWrapper ? 18 : 0);
+          verdict = score >= 75 ? "STRONG_PURSUE" : "VIABLE_WITH_RISK";
           fatalFlaws = [`Non-compliance with ${domain.regulatoryEnvironment} standards could halt deployment.`];
-          rationale = `Vertical compliance analysis confirmed statutory requirements under ${domain.regulatoryEnvironment}.`;
+          rationale = isThinWrapper
+            ? "Vertical review: compliance posture acceptable, but zero proprietary domain grounding weakens the defensibility claim."
+            : `Vertical compliance analysis confirmed statutory requirements under ${domain.regulatoryEnvironment}.`;
         }
         keyAssumptions = [`Solution meets mandatory ${domain.regulatoryEnvironment} compliance protocols.`];
         competitiveRisks = ["Incumbent vendors with pre-existing certifications."];
@@ -456,19 +742,41 @@ Market & Prediction Signals: ${marketContext}`;
     notify("02 DECOMPOSE", `Decomposing variables under ${domain.procurementCycle} framework...`);
     emit({ type: "stage", stage: "02 DECOMPOSE", detail: `Decomposing variables under ${domain.procurementCycle} framework...`, timestamp: new Date().toISOString() });
 
-    const pricing = options.pricingMonthlyUsd ?? (domain.archetype === "hardware_robotics" ? 1500 : domain.archetype === "b2b_saas" ? 499 : (domain.archetype === "deeptech_research" ? 2500 : (domain.archetype === "consumer_social" ? 19 : 100)));
-    const churn = options.expectedChurnMonthly ?? (domain.archetype === "consumer_social" ? 0.12 : 0.04);
+    const pricingOrder: Record<IdeaDomainArchetype, number> = {
+      hardware_robotics: 1500,
+      b2b_saas: 499,
+      deeptech_research: 2500,
+      consumer_social: 19,
+      b2g_govtech: 900,
+      healthcare_clinical: 1000,
+      web3_defi: 149,
+      general_startup: 100
+    };
+    const pricing = options.pricingMonthlyUsd ?? pricingOrder[domain.archetype];
     const cac = options.estimatedCacUsd ?? (domain.archetype === "hardware_robotics" ? 2500 : domain.archetype === "b2b_saas" ? 1200 : (domain.archetype === "deeptech_research" ? 5000 : 350));
+    const invariants = detectAdversarialInvariants(idea, pricing);
+    const churn = options.expectedChurnMonthly ?? (invariants.isThinWrapper ? 0.28 : (domain.archetype === "consumer_social" ? 0.12 : 0.04));
 
-    const [marketResearch, polymarketSignals, sandboxSim] = await Promise.all([
+    emit({ type: "sandbox_simulating", iterationCount: 10000 });
+
+    const [marketResearch, polymarketSignals, sandboxSim, stressSim] = await Promise.all([
       performMarketResearch(idea.title, [
         idea.targetAudience,
         idea.monetization,
         domain.regulatoryEnvironment
       ]),
       queryPolymarketMarkets(idea.title),
-      runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30)
+      runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30),
+      // Pessimistic stress run feeding the crossfire tool traces (plan 2.2 ReAct evidence)
+      runEconomicsSimulation(pricing * 0.85, Math.min(1, churn * 1.6), cac * 1.6, 500, 1500, 30)
     ]);
+    const stressMetrics: SandboxStressStats = {
+      churnStressed: true,
+      cacStressed: true,
+      stressLtvCacRatio: stressSim.metrics.ltvCacRatio,
+      stressSurvival24Mo: stressSim.metrics.monteCarlo?.survivalProbability24Mo,
+      stressPayback50: stressSim.metrics.monteCarlo?.paybackPercentiles.p50 ?? stressSim.metrics.estimatedPaybackMonths
+    };
 
     emit({
       type: "sandbox_metrics",
@@ -477,43 +785,37 @@ Market & Prediction Signals: ${marketContext}`;
       exitCode: sandboxSim.exitCode
     });
 
-    const marketContext = `Comps: ${marketResearch.identifiedCompetitors.map(c => c.name).join(", ")}. Signals: ${marketResearch.marketSignals.join("; ")}. Macro Odds: ${polymarketSignals.keyTakeaway}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}, LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x, Payback ${sandboxSim.metrics.estimatedPaybackMonths}mo.`;
+    const mc = sandboxSim.metrics.monteCarlo;
+    const marketContext = `Comps: ${marketResearch.identifiedCompetitors.map(c => c.name).join(", ")}. Signals: ${marketResearch.marketSignals.join("; ")}. Macro Odds: ${polymarketSignals.keyTakeaway}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
 
     // 03 INVESTIGATE (Domain-Tailored Specialist Subagents)
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
     emit({ type: "stage", stage: "03 INVESTIGATE", detail: `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`, timestamp: new Date().toISOString() });
 
     const shouldCallLive = options.useLiveLLM !== false;
-    const [liveAnalyst, liveCustomer, liveArchitect, liveInvestor, liveRedTeam, liveExpert] = shouldCallLive
-      ? await Promise.all([
-          this.evaluateRoleWithLLM("analyst", idea, marketContext, domain),
-          this.evaluateRoleWithLLM("customer", idea, marketContext, domain),
-          this.evaluateRoleWithLLM("architect", idea, marketContext, domain),
-          this.evaluateRoleWithLLM("investor", idea, marketContext, domain),
-          this.evaluateRoleWithLLM("redteam", idea, marketContext, domain),
-          this.evaluateRoleWithLLM("expert", idea, marketContext, domain)
-        ])
-      : [null, null, null, null, null, null];
 
-    // Dynamic Domain-Calibrated Opinions (used as fallback or for ungrounded roles)
-    const analystOpinion: AgentOpinion = liveAnalyst || this.generateHeuristicOpinion("analyst", idea, domain, marketResearch, sandboxSim, pricing, cac);
-    const customerOpinion: AgentOpinion = liveCustomer || this.generateHeuristicOpinion("customer", idea, domain, marketResearch, sandboxSim, pricing, cac);
-    const architectOpinion: AgentOpinion = liveArchitect || this.generateHeuristicOpinion("architect", idea, domain, marketResearch, sandboxSim, pricing, cac);
-    const investorOpinion: AgentOpinion = liveInvestor || this.generateHeuristicOpinion("investor", idea, domain, marketResearch, sandboxSim, pricing, cac);
-    const redTeamOpinion: AgentOpinion = liveRedTeam || this.generateHeuristicOpinion("redteam", idea, domain, marketResearch, sandboxSim, pricing, cac);
-    const expertOpinion: AgentOpinion = liveExpert || this.generateHeuristicOpinion("expert", idea, domain, marketResearch, sandboxSim, pricing, cac);
-
-    // Emit live opinions as they are collected
-    for (const op of [analystOpinion, customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion]) {
-      emit({
-        type: "agent_opinion",
-        role: op.role,
-        roleTitle: op.roleTitle,
-        verdict: op.verdict,
-        score: op.score,
-        fatalFlaw: op.fatalFlaws[0]
-      });
-    }
+    // Stream agents live: each role emits agent_start when it begins computing
+    // and agent_opinion the moment its (LLM or heuristic) opinion resolves.
+    const AGENT_ROLES = ["analyst", "customer", "architect", "investor", "redteam", "expert"] as const;
+    const [analystOpinion, customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion] = await Promise.all(
+      AGENT_ROLES.map(async (role) => {
+        emit({ type: "agent_start", role, roleTitle: domain.specialistRoleLabels[role].title });
+        const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, marketContext, domain, invariants) : null;
+        if (live?.fallbackReason) {
+          emit({ type: "parse_fallback", role, reason: live.fallbackReason });
+        }
+        const opinion: AgentOpinion = live?.opinion || this.generateHeuristicOpinion(role, idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+        emit({
+          type: "agent_opinion",
+          role: opinion.role,
+          roleTitle: opinion.roleTitle,
+          verdict: opinion.verdict,
+          score: opinion.score,
+          fatalFlaw: opinion.fatalFlaws[0]
+        });
+        return opinion;
+      })
+    );
 
     // 04 ATTACK & CROSS-EXAMINE (Adversarial Round 1)
     notify("04 ATTACK", `Red Team deploying fatal assumption attacks across [${domain.archetypeLabel}]...`);
@@ -544,6 +846,10 @@ Market & Prediction Signals: ${marketContext}`;
         status: "OPEN"
       }
     ];
+
+    for (const clash of debateTrail) {
+      emit({ type: "crossfire_clash", challenger: clash.challenger, target: clash.target, challengePoint: clash.challengePoint, rebuttal: clash.rebuttal || "", status: clash.status });
+    }
 
     // 05 VERIFY (Sandboxed Python Subprocess & Stanford CS329A Robust Verifier)
     notify("05 VERIFY", "Verifying sandboxed Python metrics & executing Stanford CS329A Robust Verifier...");
@@ -624,7 +930,7 @@ Market & Prediction Signals: ${marketContext}`;
     ];
 
     const verifier = new StanfordRobustVerifier();
-    const { verifiedOpinions, audit } = verifier.verifySwarmOpinions(
+    const { verifiedOpinions, audit, claimDag } = verifier.verifySwarmOpinions(
       idea,
       domain,
       {
@@ -673,30 +979,45 @@ Market & Prediction Signals: ${marketContext}`;
     ];
     const scoreSpread = Math.max(...initialScores) - Math.min(...initialScores);
     const hasUnresolvedFatalFlaw = debateTrail.some(d => d.status === "OPEN") || redTeamOpinion.score < 45;
+    const crossfireToolTraces: string[] = [];
+    let crossfireContradiction: ContradictionEntry | null = null;
 
     if (hasUnresolvedFatalFlaw || scoreSpread > 25) {
       convergenceRounds = 2;
-      notify("06 CONVERGE [ROUND 2]", `Convergence criteria unmet (Score Spread: ${scoreSpread}pts). Escalating to Round 2 probe on fatal flaw...`);
+      notify("06 CONVERGE [ROUND 2]", `Convergence criteria unmet (Score Spread: ${scoreSpread}pts). Escalating to Round 2 crossfire on the contested claim...`);
 
-      debateTrail.push({
-        challenger: "redteam",
-        target: "expert",
-        round: 2,
-        challengePoint: `Red Team Round 2 Probe: Given "${redTeamOpinion.fatalFlaws[0]}", what verifiable evidence prevents terminal project abandonment?`,
-        rebuttal: `Domain Expert & Synthesizer: Mandate dual-key human approval checkpoint to pre-screen 3 verified pilot commitments in ${domain.primaryCustomer} before deploying production engineering.`,
-        status: "REBUTTED"
-      });
-    }
+      // Genuine top-vs-bottom cross-examination with dynamic ReAct tool findings (plan 2.2)
+      const contenderPool = [
+        verifiedOpinions.analyst,
+        verifiedOpinions.customer,
+        verifiedOpinions.architect,
+        verifiedOpinions.investor,
+        verifiedOpinions.redteam,
+        verifiedOpinions.expert
+      ];
+      const rankedContenders = [...contenderPool].sort((a, b) => b.score - a.score);
+      const defenderOpinion = rankedContenders[0];
+      const challengerOpinion = rankedContenders[rankedContenders.length - 1];
+      const contestedClaim = defenderOpinion.keyAssumptions[0] || defenderOpinion.rationale;
 
-    for (const d of debateTrail) {
-      emit({
-        type: "crossfire_clash",
-        challenger: d.challenger,
-        target: d.target,
-        challengePoint: d.challengePoint,
-        rebuttal: d.rebuttal || "",
-        status: d.status
-      });
+      const crossfireResolution = await this.runRoundTwoCrossfire(
+        challengerOpinion,
+        defenderOpinion,
+        {
+          stressSummary: `run_sandbox_economics(stress): churn ${(Math.min(1, churn * 1.6) * 100).toFixed(0)}%, CAC $${Math.round(cac * 1.6)} → P50 LTV/CAC ${stressSim.metrics.ltvCacRatio}x, survival@24mo ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0)) * 100).toFixed(0)}%, payback P50 ${stressSim.metrics.estimatedPaybackMonths}mo.`,
+          reconSummary: `search_competitor_recon("${contestedClaim.split(/\s+/).slice(0, 4).join(" ")}") → ${marketResearch.identifiedCompetitors.slice(0, 3).map(c => `${c.name} [${c.vulnerability}]`).join("; ")}`,
+          contestedClaim,
+          stressLtvCacRatio: stressSim.metrics.ltvCacRatio,
+          stressSurvival24: stressSim.metrics.monteCarlo?.survivalProbability24Mo,
+          hasLiveLLM: shouldCallLive && getLLMStatus().hasLiveLLM
+        },
+        emit
+      );
+
+      debateTrail.push(crossfireResolution.challenge);
+      crossfireToolTraces.push(...crossfireResolution.toolTraces);
+      emit({ type: "crossfire_clash", challenger: crossfireResolution.challenge.challenger, target: crossfireResolution.challenge.target, challengePoint: crossfireResolution.challenge.challengePoint, rebuttal: crossfireResolution.challenge.rebuttal || "", status: crossfireResolution.challenge.status });
+      crossfireContradiction = crossfireResolution.contradiction;
     }
 
     // 07 TRANSPARENT DIMENSIONAL RESILIENCE SCORING WITH TRACEABLE FACTOR ATTRIBUTION
@@ -710,8 +1031,9 @@ Market & Prediction Signals: ${marketContext}`;
       (verifiedOpinions.customer.score * 0.6) + (verifiedOpinions.analyst.score * 0.4)
     )));
     const economicsAndCapitalEfficiency = Math.max(10, Math.min(100, Math.round(
-      (verifiedOpinions.investor.score * 0.7) + 
-      Math.min(Math.round(sandboxSim.metrics.ltvCacRatio * 6), 30)
+      (verifiedOpinions.investor.score * 0.7) +
+      Math.min(Math.round((mc?.ltvCacPercentiles.p50 ?? sandboxSim.metrics.ltvCacRatio) * 6), 30) -
+      (mc && mc.tokenCostBurdenPercent.p50 > 0.35 ? Math.round((mc.tokenCostBurdenPercent.p50 - 0.35) * 40) : 0)
     )));
     const defensibilityAndMoat = Math.max(10, Math.min(100, Math.round(
       (verifiedOpinions.expert.score * 0.6) + (verifiedOpinions.analyst.score * 0.4)
@@ -724,13 +1046,54 @@ Market & Prediction Signals: ${marketContext}`;
 
     // Weighted Composite Resilience Score (100 Scale)
     // Feasibility: 20%, Demand: 25%, Economics: 20%, Moat: 15%, Adversarial: 20%
-    const compositeScore = Math.round(
+    let compositeScore = Math.round(
       technicalFeasibility * 0.20 +
       demandAndAdoption * 0.25 +
       economicsAndCapitalEfficiency * 0.20 +
       defensibilityAndMoat * 0.15 +
       adversarialResilience * 0.20
     );
+
+    // Structural adversarial gates: non-differentiated wrappers, inverted unit economics,
+    // and zero-monetization profiles cannot be averaged into viability — the composite is
+    // capped below the KILL threshold (50) no matter how optimistic the remaining dimensions are.
+    if (invariants.isThinWrapper || sandboxSim.metrics.ltvCacRatio < 1) {
+      compositeScore = Math.min(compositeScore, 44);
+    }
+    if (invariants.isNoMonetization) {
+      compositeScore = Math.min(compositeScore, 39);
+    }
+
+    // Fatal-profile anchoring: a sustained structural invariant or a verified STRONG_KILL
+    // from the Red Team anchors the composite to the collapse zone (worst dimension carries
+    // the score) instead of letting healthy dimensions average the kill away.
+    const fatalProfile =
+      invariants.isThinWrapper ||
+      invariants.isNoMonetization ||
+      invariants.isPromptInjection ||
+      invariants.isImpossiblePhysics ||
+      sandboxSim.metrics.ltvCacRatio < 1 ||
+      verifiedOpinions.redteam.verdict === "STRONG_KILL";
+    if (fatalProfile) {
+      const weakestDimension = Math.min(
+        technicalFeasibility,
+        demandAndAdoption,
+        economicsAndCapitalEfficiency,
+        defensibilityAndMoat,
+        adversarialResilience
+      );
+      compositeScore = Math.min(compositeScore, Math.round(weakestDimension * 0.6 + compositeScore * 0.4));
+    }
+
+    // Consensus strength bonus: when no structural fatal holds and every non-adversarial
+    // dimension clears the uncertainty floor, a genuinely strong concept earns
+    // BUILD_IF_VALIDATED territory beyond what the arithmetic average produces.
+    if (!fatalProfile) {
+      const certaintyFloor = Math.min(technicalFeasibility, demandAndAdoption, economicsAndCapitalEfficiency, defensibilityAndMoat);
+      if (certaintyFloor >= 62) {
+        compositeScore = Math.min(92, compositeScore + Math.round((certaintyFloor - 62) / 4));
+      }
+    }
 
     const dimensionTraces = {
       technicalFeasibility: {
@@ -924,7 +1287,8 @@ Market & Prediction Signals: ${marketContext}`;
         claimB: `Cloud API orchestration offers richer feature complexity than disconnected edge models.`,
         resolutionStatus: "RESOLVED // ASSUMPTION MITIGATED",
         guidance: `Architect will deploy client-side edge models for critical operational triage, syncing metadata asynchronously.`
-      }
+      },
+      ...(crossfireContradiction ? [crossfireContradiction] : [])
     ];
 
     const executiveSynthesizerOpinion: AgentOpinion = {
@@ -1008,6 +1372,8 @@ Market & Prediction Signals: ${marketContext}`;
       debateTrail,
       convergenceRounds,
       debateRoundsExecuted: convergenceRounds,
+      claimDag,
+      crossfireToolTraces,
       simulation: {
         cacEstimateUsd: sandboxSim.metrics.cacEstimateUsd,
         ltvEstimateUsd: sandboxSim.metrics.ltvEstimateUsd,
@@ -1015,6 +1381,8 @@ Market & Prediction Signals: ${marketContext}`;
         estimatedPaybackMonths: sandboxSim.metrics.estimatedPaybackMonths,
         monthlyInfraCostUsd: sandboxSim.metrics.monthlyInfraCostUsd,
         tamEstimateUsd: sandboxSim.metrics.tamEstimateUsd,
+        monteCarlo: sandboxSim.metrics.monteCarlo,
+        stressMetrics,
         sandboxExecutionProof: {
           runtime: sandboxSim.runtime,
           exitCode: sandboxSim.exitCode,

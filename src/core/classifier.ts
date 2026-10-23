@@ -18,7 +18,7 @@ export function classifyIdeaDomain(idea: IdeaInput): DomainClassification {
     text.includes("consumer")
   ) {
     archetype = "consumer_social";
-  } else if (idea.projectType === "Research" || (text.includes("research") && !text.includes("saas") && !text.includes("cybersecurity")) || text.includes("paper") || text.includes("formal verification") || text.includes("deeptech") || text.includes("algorithm")) {
+  } else if (idea.projectType === "Research" || (text.includes("research") && !text.includes("saas") && !text.includes("cybersecurity")) || text.includes("research paper") || text.includes("formal verification") || text.includes("deeptech") || text.includes("algorithm")) {
     archetype = "deeptech_research";
   } else if (
     text.includes("cybersecurity") ||

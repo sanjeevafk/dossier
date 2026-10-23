@@ -145,80 +145,148 @@ const BENCHMARK_SUITE: BenchmarkCase[] = [
   }
 ];
 
+function stdDev(values: number[]): number {
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  return Math.sqrt(values.reduce((acc, s) => acc + Math.pow(s - mean, 2), 0) / values.length);
+}
+
+function modalVerdict(values: string[]): string {
+  const counts = new Map<string, number>();
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+  let best = values[0];
+  let bestCount = 0;
+  for (const [v, c] of counts) {
+    if (c > bestCount) {
+      best = v;
+      bestCount = c;
+    }
+  }
+  return best;
+}
+
+const SCORE_DISPERSION_GATE = 18;
+
 export async function runDossierBenchmark(): Promise<void> {
+  const RUNS = Math.max(1, Math.min(5, Number.parseInt(process.env.BENCHMARK_RUNS || "3", 10) || 3));
+
   console.log("\n=======================================================");
   console.log("  ⚡ DOSSIER DOMAIN-AWARE BENCHMARK SUITE");
-  console.log("  Evaluating 10 Diverse Concepts Across TrueForge Harness");
+  console.log(`  10 Diverse Concepts × ${RUNS} Runs (de-noised dispersion)`);
   console.log("=======================================================\n");
 
   const orchestrator = new IdeaSwarmOrchestrator();
-  const results: Array<{
-    id: string;
-    title: string;
-    domainArchetype: string;
-    category: string;
-    verdict: string;
-    score: number;
-    feasiScore: number;
-    demandScore: number;
-    econScore: number;
-    advScore: number;
-    convergenceRounds: number;
-    weakestAssumption: string;
-    latencyMs: number;
-    sandboxExit: number;
-  }> = [];
-
   const startTimeTotal = Date.now();
 
-  for (let i = 0; i < BENCHMARK_SUITE.length; i++) {
-    const item = BENCHMARK_SUITE[i];
-    const indexStr = `[${(i + 1).toString().padStart(2, "0")}/10]`;
-    console.log(`${indexStr} Evaluating ${item.id}: "${item.idea.title}" (${item.category})...`);
+  // Aggregation bookkeeping keyed by benchmark case id.
+  const scoresById = new Map<string, number[]>();
+  const verdictsById = new Map<string, string[]>();
+  const latenciesById = new Map<string, number[]>();
+  const dimsById = new Map<string, { feasi: number[]; demand: number[]; econ: number[]; adv: number[]; rounds: number[] }>();
+  const metaById = new Map<string, { title: string; domainArchetype: string; category: string; weakestAssumption: string; sandboxExit: number }>();
+  const perRunStdDevs: number[] = [];
 
-    const t0 = Date.now();
-    const dossier = await orchestrator.evaluateIdea(item.idea, {
-      pricingMonthlyUsd: item.pricing,
-      estimatedCacUsd: item.cac,
-      useLiveLLM: true
-    });
-    const elapsed = Date.now() - t0;
+  for (let run = 1; run <= RUNS; run++) {
+    console.log(`\n──────── Run ${run}/${RUNS} ────────`);
+    const runScores: number[] = [];
 
-    const sandboxExit = dossier.simulation.sandboxExecutionProof.exitCode;
-    const rb = dossier.resilienceBreakdown;
+    for (const item of BENCHMARK_SUITE) {
+      console.log(`[run ${run}] Evaluating ${item.id}: "${item.idea.title}" (${item.category})...`);
 
-    results.push({
-      id: item.id,
-      title: item.idea.title,
-      domainArchetype: dossier.domainClassification.archetypeLabel,
-      category: item.category,
-      verdict: dossier.overallVerdict,
-      score: dossier.killScore,
-      feasiScore: rb.technicalFeasibility,
-      demandScore: rb.demandAndAdoption,
-      econScore: rb.economicsAndCapitalEfficiency,
-      advScore: rb.adversarialResilience,
-      convergenceRounds: dossier.convergenceRounds || 1,
-      weakestAssumption: dossier.weakestAssumption.fatalRisk,
-      latencyMs: elapsed,
-      sandboxExit
-    });
+      try {
+        const t0 = Date.now();
+        const dossier = await orchestrator.evaluateIdea(item.idea, {
+          pricingMonthlyUsd: item.pricing,
+          estimatedCacUsd: item.cac,
+          useLiveLLM: true
+        });
+        const elapsed = Date.now() - t0;
+        const rb = dossier.resilienceBreakdown;
 
-    console.log(`       ➔ Domain: [${dossier.domainClassification.archetypeLabel}] | Verdict: ${dossier.overallVerdict} (${dossier.killScore}/100) | Rounds: ${dossier.convergenceRounds || 1} | Latency: ${elapsed}ms\n`);
+        if (!scoresById.has(item.id)) scoresById.set(item.id, []);
+        if (!verdictsById.has(item.id)) verdictsById.set(item.id, []);
+        if (!latenciesById.has(item.id)) latenciesById.set(item.id, []);
+        if (!dimsById.has(item.id)) dimsById.set(item.id, { feasi: [], demand: [], econ: [], adv: [], rounds: [] });
+        scoresById.get(item.id)!.push(dossier.killScore);
+        verdictsById.get(item.id)!.push(dossier.overallVerdict);
+        latenciesById.get(item.id)!.push(elapsed);
+        const dims = dimsById.get(item.id)!;
+        dims.feasi.push(rb.technicalFeasibility);
+        dims.demand.push(rb.demandAndAdoption);
+        dims.econ.push(rb.economicsAndCapitalEfficiency);
+        dims.adv.push(rb.adversarialResilience);
+        dims.rounds.push(dossier.convergenceRounds || 1);
+        metaById.set(item.id, {
+          title: item.idea.title,
+          domainArchetype: dossier.domainClassification.archetypeLabel,
+          category: item.category,
+          weakestAssumption: dossier.weakestAssumption.fatalRisk,
+          sandboxExit: dossier.simulation.sandboxExecutionProof.exitCode
+        });
+
+        runScores.push(dossier.killScore);
+        console.log(`       ➔ Domain: [${dossier.domainClassification.archetypeLabel}] | Verdict: ${dossier.overallVerdict} (${dossier.killScore}/100) | Rounds: ${dossier.convergenceRounds || 1} | Latency: ${elapsed}ms`);
+      } catch (err: any) {
+        console.log(`       ✗ FAILED: ${err?.message || "evaluation error"} — excluded from aggregation`);
+      }
+    }
+
+    if (runScores.length > 0) {
+      perRunStdDevs.push(stdDev(runScores));
+    }
   }
 
-  const totalTimeSec = ((Date.now() - startTimeTotal) / 1000).toFixed(2);
+  // De-noised aggregation: per-concept means across runs define gate and table.
+  const results = BENCHMARK_SUITE
+    .filter((item) => (scoresById.get(item.id)?.length ?? 0) > 0)
+    .map((item) => {
+      const scores = scoresById.get(item.id)!;
+      const dims = dimsById.get(item.id)!;
+      const meta = metaById.get(item.id)!;
+      const verdict = modalVerdict(verdictsById.get(item.id)!);
+      const mean = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+      return {
+        id: item.id,
+        title: meta.title,
+        domainArchetype: meta.domainArchetype,
+        category: meta.category,
+        verdict,
+        score: Math.round(mean(scores)),
+        feasiScore: Math.round(mean(dims.feasi)),
+        demandScore: Math.round(mean(dims.demand)),
+        econScore: Math.round(mean(dims.econ)),
+        advScore: Math.round(mean(dims.adv)),
+        convergenceRounds: Math.max(...dims.rounds),
+        weakestAssumption: meta.weakestAssumption,
+        latencyMs: Math.round(mean(latenciesById.get(item.id)!)),
+        sandboxExit: meta.sandboxExit,
+        expectedRangeMatch: item.expectedVerdictRange.includes(verdict as "BUILD" | "REFINE" | "KILL")
+      };
+    });
+
+  if (results.length === 0) {
+    console.error("\n✗ BENCHMARK FAILED: no concept produced a usable dossier in any run.\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  const scores = results.map((r) => r.score);
+  const meanScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const scoreStdDev = stdDev(scores);
+  const minScore = Math.min(...scores);
+  const maxScore = Math.max(...scores);
   const avgLatency = Math.round(results.reduce((a, b) => a + b.latencyMs, 0) / results.length);
   const sandboxPassRate = Math.round((results.filter(r => r.sandboxExit === 0).length / results.length) * 100);
   const killOrRefineRate = Math.round((results.filter(r => r.verdict !== "BUILD").length / results.length) * 100);
+  const expectationMatchRate = Math.round((results.filter(r => r.expectedRangeMatch).length / results.length) * 100);
+  const totalTimeSec = ((Date.now() - startTimeTotal) / 1000).toFixed(2);
+  const dispersionGatePassed = scoreStdDev >= SCORE_DISPERSION_GATE;
 
-  // Print Summary Table
-  console.log("==========================================================================================================");
-  console.log("  📊 DOSSIER DOMAIN-AWARE BENCHMARK EXECUTION SUMMARY");
+  console.log("\n==========================================================================================================");
+  console.log(`  📊 DE-NOISED BENCHMARK SUMMARY (mean of ${RUNS} runs per concept)`);
   console.log("==========================================================================================================");
   console.log(`ID     | DOMAIN ARCHETYPE         | SCORE | VERDICT            | FEAS | DMND | ECON | ADV  | ROUNDS | LATENCY`);
   console.log(`-------+--------------------------+-------+--------------------+------+------+------+------+--------+---------`);
-  
+
   for (const r of results) {
     const id = r.id.padEnd(6);
     const dom = r.domainArchetype.slice(0, 24).padEnd(24);
@@ -234,22 +302,37 @@ export async function runDossierBenchmark(): Promise<void> {
   }
 
   console.log("==========================================================================================================");
-  console.log(`📈 OVERALL DOMAIN-AWARE BENCHMARK METRICS:`);
-  console.log(`  • Total Tests Executed    : 10 / 10 (100% Success)`);
+  console.log(`📈 OVERALL DOMAIN-AWARE BENCHMARK METRICS (de-noised over ${RUNS} runs):`);
+  console.log(`  • Concepts Aggregated     : ${results.length}/${BENCHMARK_SUITE.length}`);
   console.log(`  • Average Latency per Idea: ${avgLatency} ms`);
   console.log(`  • Total Benchmark Runtime : ${totalTimeSec} seconds`);
   console.log(`  • Sandboxed Subprocess    : ${sandboxPassRate}% Isolated Exit Code 0`);
   console.log(`  • Adversarial Filter Rate : ${killOrRefineRate}% (Killed or Refined under stress)`);
-  console.log("==========================================================================================================\n");
+  console.log(`  • Verdict Expectation Fit : ${expectationMatchRate}% of concepts inside the plan's expected verdict range`);
+  console.log(`  • Score Range             : ${minScore}–${maxScore} (mean ${meanScore.toFixed(1)})`);
+  console.log(`  • Per-Run Dispersion σ    : ${perRunStdDevs.map((s) => s.toFixed(1)).join(" / ")}`);
+  console.log(`  • De-Noised Dispersion σ  : ${scoreStdDev.toFixed(1)} — Gate ≥ ${SCORE_DISPERSION_GATE} → ${dispersionGatePassed ? "PASSED" : "FAILED"}`);
+  console.log("==========================================================================================================");
+
+  if (dispersionGatePassed) {
+    console.log(`\n✓ QUALITY GATE 3 PASSED: de-noised score dispersion σ=${scoreStdDev.toFixed(1)} ≥ ${SCORE_DISPERSION_GATE}.\n`);
+  } else {
+    console.error(`\n✗ QUALITY GATE 3 FAILED: de-noised score dispersion σ=${scoreStdDev.toFixed(1)} < ${SCORE_DISPERSION_GATE}. Break the mid-band separation further or enrich the benchmark suite's merit diversity.\n`);
+    process.exitCode = 1;
+  }
 
   // Export to Markdown Report
   const mdReport = `# Dossier Domain-Aware Adversarial Benchmark Report
 
 **Execution Date:** ${new Date().toISOString()}  
 **Agent Harness:** TrueForge Multi-Agent Runtime (File TF-007)  
-**Total Concepts Evaluated:** 10  
+**De-Noising:** ${RUNS} full runs per concept; Quality Gate 3 evaluates σ of per-concept mean scores  
 **Overall Benchmark Runtime:** ${totalTimeSec} seconds  
 **Average Latency:** ${avgLatency} ms per full 6-agent adversarial evaluation  
+**Verdict Expectation Fit:** ${expectationMatchRate}% inside the plan's expected verdict range  
+**Score Range:** ${minScore}–${maxScore} (mean ${meanScore.toFixed(1)})  
+**Per-Run Dispersion σ:** ${perRunStdDevs.map((s) => s.toFixed(1)).join(" / ")}  
+**De-Noised Dispersion (σ):** ${scoreStdDev.toFixed(1)} ${dispersionGatePassed ? `— QUALITY GATE 3 PASSED (≥ ${SCORE_DISPERSION_GATE})` : `— ⚠ QUALITY GATE 3 FAILED (< ${SCORE_DISPERSION_GATE})`}  
 
 ---
 
@@ -267,8 +350,9 @@ ${results.map(r => `| **${r.id}** | ${r.title} | ${r.domainArchetype} | **${r.sc
    * **B2G & Healthcare concepts** were evaluated against **public tender timelines, WHO guidelines, and field worker cognitive load**, rather than irrelevant consumer freemium metrics.
    * **Hardware & Drone concepts** were audited on **on-device YOLOv8 latency, GPS-denied SLAM, and battery cycle economics**.
 
-2. **Subprocess Isolation:**
-   * **100% of unit economics simulations executed cleanly** inside isolated Python3 subprocess environments with zero runtime errors.
+2. **Stochastic Sandbox & Crossfire:**
+   * **Monte Carlo percentiles (survival, P10 insolvency tail, payback spread) differentiate concept economics beyond point estimates.**
+   * **Round 2 crossfire cites stressed sandbox replays and competitor recon as tool evidence; defeated defenders concede confidence points.**
 
 3. **Multi-Round Convergence:**
    * Escalated to **Round 2 adversarial cross-examination** whenever score disparities exceeded 25 points or fatal flaws remained unmitigated.

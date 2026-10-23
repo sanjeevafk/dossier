@@ -59,9 +59,20 @@ test("Server-Sent Events (SSE) stream endpoint emits structured events", async (
     assert.ok(eventsReceived.length >= 5, `Expected at least 5 events, received ${eventsReceived.length}`);
     assert.ok(eventTypes.includes("init"), "Must emit init event");
     assert.ok(eventTypes.includes("domain"), "Must emit domain classification event");
+    assert.ok(eventTypes.includes("agent_start"), "Must emit agent_start events before opinions");
     assert.ok(eventTypes.includes("agent_opinion"), "Must emit agent opinion events");
+    assert.ok(eventTypes.includes("crossfire_clash"), "Must emit crossfire clash events");
     assert.ok(eventTypes.includes("dossier_complete"), "Must emit dossier_complete event");
     assert.ok(eventTypes.includes("done"), "Must emit done event");
+
+    // Ordering: every agent_opinion must be preceded by its agent_start
+    const startedRoles = new Set();
+    for (const e of eventsReceived) {
+      if (e.type === "agent_start") startedRoles.add(e.data.role);
+      if (e.type === "agent_opinion") {
+        assert.ok(startedRoles.has(e.data.role), `agent_opinion for ${e.data.role} must follow its agent_start`);
+      }
+    }
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

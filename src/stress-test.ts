@@ -113,9 +113,10 @@ export async function runStressTestSuite() {
   const fuzzSim = await runEconomicsSimulation(0.01, -0.5, 50000, 100, 500, 12);
   const t7 = Date.now() - t6;
 
-  const passedFuzz = 
+  const passedFuzz =
     fuzzSim.exitCode === 0 &&
-    fuzzSim.metrics.cacEstimateUsd === 50000;
+    // Monte Carlo CAC is a sampled percentile; assert boundary fidelity within 2% (+$2 rounding slack)
+    Math.abs(fuzzSim.metrics.cacEstimateUsd - 50000) <= 50000 * 0.02 + 2;
 
   testResults.push({
     id: "ST-04",

@@ -171,14 +171,14 @@ Every phase must pass rigorous automated testing:
 
 ## 4. Work Tracking & Task Dependencies
 
-- [ ] **Phase 1: Quick Wins & Streaming Engine**
-  - [ ] 1.1 Remove formulaic string templates & add 8 domain failure patterns
-  - [ ] 1.2 Implement `/api/evaluate/stream` SSE endpoint in `src/server.ts`
-  - [ ] 1.3 Calibrate prompt scoring rubrics to penalize unviable models
-- [ ] **Phase 2: Stochastic Rigor & Adversarial Crossfire**
-  - [ ] 2.1 Develop vectorized Python Monte Carlo simulation in `src/tools/sandbox.ts`
-  - [ ] 2.2 Implement 2-round crossfire rebuttal logic in `src/core/swarm.ts`
-  - [ ] 2.3 Construct epistemic DAG claim hierarchy in `src/core/verifier.ts`
+- [x] **Phase 1: Quick Wins & Streaming Engine**
+  - [x] 1.1 Remove formulaic string templates & add 8 domain failure patterns
+  - [x] 1.2 Implement `/api/evaluate/stream` SSE endpoint in `src/server.ts`
+  - [x] 1.3 Calibrate prompt scoring rubrics to penalize unviable models
+- [x] **Phase 2: Stochastic Rigor & Adversarial Crossfire**
+  - [x] 2.1 Develop vectorized Python Monte Carlo simulation in `src/tools/sandbox.ts`
+  - [x] 2.2 Implement 2-round crossfire rebuttal logic in `src/core/swarm.ts`
+  - [x] 2.3 Construct epistemic DAG claim hierarchy in `src/core/verifier.ts`
 - [ ] **Phase 3: The Wow Factor & Visual Command Center**
   - [ ] 3.1 Build animated live swarm canvas with debate links in `public/index.html`
   - [ ] 3.2 Add HTML5 canvas survival probability & payback distribution graphs
