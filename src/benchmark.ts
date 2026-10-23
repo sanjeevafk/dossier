@@ -142,6 +142,58 @@ const BENCHMARK_SUITE: BenchmarkCase[] = [
     pricing: 49,
     cac: 110,
     expectedVerdictRange: ["BUILD"]
+  },
+  {
+    id: "BM-11",
+    category: "Free Platform / No Monetization",
+    idea: {
+      title: "CommuniAid: City-Wide Volunteer Relief Coordination",
+      summary: "Free coordination hub matching volunteers with shelters and community kitchens: shift scheduling, supply lists, and SMS alerts, funded entirely by donors.",
+      targetAudience: "Community volunteers, shelters, and mutual-aid organizers",
+      monetization: "Free forever — no monetization model, donor-funded only"
+    },
+    pricing: 0,
+    cac: 60,
+    expectedVerdictRange: ["KILL"]
+  },
+  {
+    id: "BM-12",
+    category: "AI Wrapper / Zero Moat",
+    idea: {
+      title: "ViralThreads: AI Tweet Composer Chrome Extension",
+      summary: "A Chrome extension that drafts viral tweet threads from any article URL using GPT to rewrite headlines into punchy copy for creators.",
+      targetAudience: "Indie creators and ghostwriters on Twitter/X",
+      monetization: "Freemium with $9/mo Pro plan"
+    },
+    pricing: 9,
+    cac: 30,
+    expectedVerdictRange: ["KILL"]
+  },
+  {
+    id: "BM-13",
+    category: "Developer Tools",
+    idea: {
+      title: "LedgerIQ: Revenue Leak Anomaly Copilot",
+      summary: "Continuously reconciles billing, usage, and invoicing data to surface silent revenue leaks (unbilled overages, discount drift, dunning gaps) with one-click credit memos.",
+      targetAudience: "RevOps and Finance leaders at Series B-D companies",
+      monetization: "$499/mo per organization priced on ARR coverage"
+    },
+    pricing: 499,
+    cac: 420,
+    expectedVerdictRange: ["BUILD", "REFINE"]
+  },
+  {
+    id: "BM-14",
+    category: "Insurance Vertical SaaS",
+    idea: {
+      title: "ClaimPilot: AI Claim Pre-Fill for P&C Adjusters",
+      summary: "Ingests photos, weather data, and policy PDFs to pre-fill property damage claim estimates with carrier-compliant line items, cutting desk handling from 40 to 6 minutes.",
+      targetAudience: "Property & Casualty claims desks at regional insurers",
+      monetization: "$850/mo per claims desk with accuracy-backed SLA"
+    },
+    pricing: 850,
+    cac: 520,
+    expectedVerdictRange: ["BUILD", "REFINE"]
   }
 ];
 
@@ -171,7 +223,7 @@ export async function runDossierBenchmark(): Promise<void> {
 
   console.log("\n=======================================================");
   console.log("  ⚡ DOSSIER DOMAIN-AWARE BENCHMARK SUITE");
-  console.log(`  10 Diverse Concepts × ${RUNS} Runs (de-noised dispersion)`);
+  console.log(`  ${BENCHMARK_SUITE.length} Diverse-Merit Concepts × ${RUNS} Runs (de-noised dispersion)`);
   console.log("=======================================================\n");
 
   const orchestrator = new IdeaSwarmOrchestrator();
@@ -243,6 +295,7 @@ export async function runDossierBenchmark(): Promise<void> {
       const dims = dimsById.get(item.id)!;
       const meta = metaById.get(item.id)!;
       const verdict = modalVerdict(verdictsById.get(item.id)!);
+      const normalizedVerdict = verdict === "BUILD_IF_VALIDATED" ? "BUILD" : verdict;
       const mean = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
       return {
         id: item.id,
@@ -259,7 +312,7 @@ export async function runDossierBenchmark(): Promise<void> {
         weakestAssumption: meta.weakestAssumption,
         latencyMs: Math.round(mean(latenciesById.get(item.id)!)),
         sandboxExit: meta.sandboxExit,
-        expectedRangeMatch: item.expectedVerdictRange.includes(verdict as "BUILD" | "REFINE" | "KILL")
+        expectedRangeMatch: item.expectedVerdictRange.includes(normalizedVerdict as "BUILD" | "REFINE" | "KILL")
       };
     });
 

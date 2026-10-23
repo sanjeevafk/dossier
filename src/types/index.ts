@@ -182,6 +182,19 @@ export interface SimulationResult {
 
 export type ClaimStatus = "VERIFIED" | "DISPUTED" | "CONTRADICTED" | "UNKNOWN";
 
+export interface MutationProposal {
+  id: string;
+  strategy: "WEDGE_PIVOT" | "MODEL_INVERSION" | "TROJAN_DISTRIBUTION";
+  label: string;
+  rationale: string;
+  mutatedIdea: {
+    title: string;
+    summary: string;
+    targetAudience: string;
+    monetization: string;
+  };
+}
+
 export interface ClaimNode {
   id: string;
   claim: string;
@@ -292,6 +305,7 @@ export interface IdeaDossier {
   debateRoundsExecuted: number;
   claimDag?: ClaimNode[];
   crossfireToolTraces?: string[];
+  mutationProposals?: MutationProposal[];
   simulation: SimulationResult;
   validationRoadmap: {
     day1to2: string[];
@@ -312,6 +326,7 @@ export type SwarmEvent =
   | { type: "crossfire_start"; agentA: SwarmRole; agentB: SwarmRole; topic: string }
   | { type: "crossfire_clash"; challenger: string; target: string; challengePoint: string; rebuttal?: string; status: string }
   | { type: "crossfire_rebuttal"; agent: SwarmRole; argument: string; confidenceDelta: number }
+  | { type: "mutation_proposals"; proposals: MutationProposal[] }
   | { type: "audit_correction"; detail: string; hallucinationsBlocked: number }
   | { type: "dossier_complete"; dossier: IdeaDossier }
   | { type: "error"; message: string };

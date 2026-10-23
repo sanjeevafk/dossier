@@ -2,6 +2,38 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runEconomicsSimulation } from "../dist/tools/sandbox.js";
 import { IdeaSwarmOrchestrator } from "../dist/core/swarm.js";
+import { buildMutationProposals } from "../dist/core/mutator.js";
+import { classifyIdeaDomain } from "../dist/core/classifier.js";
+
+test("Mutation Engine generates three distinct strategic pivots on a collapsed score", () => {
+  const idea = {
+    title: "ChatNotes: AI Chrome Extension for Meeting Summaries",
+    summary: "A Chrome extension that records Google Meet audio and sends transcripts to OpenAI to output bulleted notes.",
+    targetAudience: "General remote workers",
+    monetization: "Freemium with $10/mo Pro subscription"
+  };
+  const domain = classifyIdeaDomain(idea);
+  const proposals = buildMutationProposals(idea, domain, {
+    killScore: 30,
+    fatalFlaw: "Zero structural defensibility: thin wrapper architecture.",
+    pricing: 10,
+    churn: 0.28,
+    cac: 45,
+    survival24Mo: 0.26,
+    ltvCacRatio: 0.65
+  });
+
+  assert.equal(proposals.length, 3, "Exactly three pivots must be generated");
+  const strategies = new Set(proposals.map((p) => p.strategy));
+  assert.ok(strategies.has("WEDGE_PIVOT"), "Wedge Pivot must be present");
+  assert.ok(strategies.has("MODEL_INVERSION"), "Business Model Inversion must be present");
+  assert.ok(strategies.has("TROJAN_DISTRIBUTION"), "Trojan Distribution must be present");
+  proposals.forEach((p) => {
+    assert.ok(p.mutatedIdea.title, `Pivot ${p.id} must carry a mutated title`);
+    assert.ok(p.mutatedIdea.summary.length > 40, `Pivot ${p.id} must carry a substantive summary`);
+    assert.ok(p.mutatedIdea.monetization.match(/\$/), `Pivot ${p.id} monetization must be concrete`);
+  });
+});
 
 test("Sandbox Economics Simulation runs successfully", async () => {
   const sim = await runEconomicsSimulation(49.0, 0.05, 150.0, 500, 1500, 30);

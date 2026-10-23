@@ -72,6 +72,27 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
 
+    /* Phase 3.1 — live swarm canvas: computational pulses & crossfire energy arcs */
+    .node-pulsing circle {
+      animation: nodePulse 1.1s ease-in-out infinite;
+    }
+    @keyframes nodePulse {
+      0%, 100% { stroke-width: 1.6; filter: none; }
+      50% { stroke-width: 4.5; filter: drop-shadow(0 0 9px rgba(161, 98, 7, 0.85)); }
+    }
+    .crossfire-arc {
+      animation: arcFlow 0.5s linear infinite;
+      opacity: 0.85;
+    }
+    @keyframes arcFlow {
+      to { stroke-dashoffset: -28; }
+    }
+    .swarm-dial {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
     /* Modal Backdrop */
     .modal-backdrop {
       background-color: rgba(0, 0, 0, 0.5);
@@ -158,7 +179,7 @@
         <!-- Right Column: Swarm Orbit Diagram -->
         <div class="lg:col-span-6 flex items-center justify-center">
           <div class="w-full max-w-[520px] h-[400px] flex items-center justify-center select-none">
-            <svg class="w-full h-full" viewBox="0 0 520 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg id="swarmOrbitSvg" class="w-full h-full" viewBox="0 0 520 400" fill="none" xmlns="http://www.w3.org/2000/svg">
               
               <!-- Dashed Circular Orbit (Clean, completely empty center) -->
               <circle cx="260" cy="195" r="125" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="4 4" fill="none" />
@@ -183,6 +204,8 @@
                 <text x="30" y="13" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10.5" fill="#71717a">Competition Trends</text>
                 <!-- Node Circle -->
                 <circle id="svgCircleAnalyst" cx="0" cy="0" r="21" fill="#facc15" stroke="#000000" stroke-width="1.5" />
+                <!-- Live confidence dial (Phase 3.1) -->
+                <text id="svgScoreAnalyst" x="0" y="38" font-family="'IBM Plex Mono', monospace" font-weight="800" font-size="11" fill="#a1a1aa" text-anchor="middle" class="swarm-dial"></text>
                 <!-- Bar Chart Icon -->
                 <path d="M -6 5 L -6 0 M 0 5 L 0 -5 M 6 5 L 6 -2" stroke="#000000" stroke-width="1.8" stroke-linecap="round" />
               </g>
@@ -196,6 +219,8 @@
                 <text x="30" y="22" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10" fill="#71717a">Stress Test</text>
                 <!-- Node Circle -->
                 <circle id="svgCircleInvestor" cx="0" cy="0" r="21" fill="#facc15" stroke="#000000" stroke-width="1.5" />
+                <!-- Live confidence dial (Phase 3.1) -->
+                <text id="svgScoreInvestor" x="0" y="38" font-family="'IBM Plex Mono', monospace" font-weight="800" font-size="11" fill="#a1a1aa" text-anchor="middle" class="swarm-dial"></text>
                 <!-- Dollar Icon -->
                 <text x="0" y="5.5" font-family="'Plus Jakarta Sans', sans-serif" font-weight="800" font-size="16" fill="#000000" text-anchor="middle">$</text>
               </g>
@@ -208,6 +233,8 @@
                 <text x="0" y="53" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10.5" fill="#71717a" text-anchor="middle">Empathy Reality Check</text>
                 <!-- Node Circle -->
                 <circle id="svgCircleCustomer" cx="0" cy="0" r="21" fill="#facc15" stroke="#000000" stroke-width="1.5" />
+                <!-- Live confidence dial (Phase 3.1) -->
+                <text id="svgScoreCustomer" x="0" y="-30" font-family="'IBM Plex Mono', monospace" font-weight="800" font-size="11" fill="#a1a1aa" text-anchor="middle" class="swarm-dial"></text>
                 <!-- 2-People Icon -->
                 <path d="M -3.5 -5 A 2.8 2.8 0 1 1 -3.51 -5 Z M -7.5 6 C -7.5 3 0 3 0 6 Z M 3.5 -5 A 2.8 2.8 0 1 1 3.49 -5 Z M 0.5 6 C 0.5 3 6.5 3 6.5 6 Z" fill="none" stroke="#000000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
               </g>
@@ -221,6 +248,8 @@
                 <text x="-22" y="22" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10" fill="#71717a" text-anchor="end">Architecture</text>
                 <!-- Node Circle -->
                 <circle id="svgCircleArchitect" cx="0" cy="0" r="21" fill="#facc15" stroke="#000000" stroke-width="1.5" />
+                <!-- Live confidence dial (Phase 3.1) -->
+                <text id="svgScoreArchitect" x="0" y="38" font-family="'IBM Plex Mono', monospace" font-weight="800" font-size="11" fill="#a1a1aa" text-anchor="middle" class="swarm-dial"></text>
                 <!-- Code brackets </> -->
                 <text x="0" y="4.5" font-family="'IBM Plex Mono', monospace" font-weight="800" font-size="12" fill="#000000" text-anchor="middle" letter-spacing="-1">&lt;/&gt;</text>
               </g>
@@ -234,6 +263,8 @@
                 <text x="-22" y="22" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10" fill="#71717a" text-anchor="end">Contrarian</text>
                 <!-- Node Circle -->
                 <circle id="svgCircleRedteam" cx="0" cy="0" r="21" fill="#facc15" stroke="#000000" stroke-width="1.5" />
+                <!-- Live confidence dial (Phase 3.1) -->
+                <text id="svgScoreRedteam" x="0" y="38" font-family="'IBM Plex Mono', monospace" font-weight="800" font-size="11" fill="#a1a1aa" text-anchor="middle" class="swarm-dial"></text>
                 <!-- Shield Icon -->
                 <path d="M 0 -6.5 L 5.5 -4 C 5.5 1.5 2.5 5.5 0 7.5 C -2.5 5.5 -5.5 1.5 -5.5 -4 Z M -2 0.5 L -0.5 2 L 2.5 -1.5" fill="none" stroke="#000000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
               </g>
@@ -608,6 +639,38 @@
               Unresolved Contradictions &amp; Agent Rebuttals
             </h3>
             <div id="contradictionsList" class="space-y-3 font-mono text-xs"></div>
+          </div>
+
+          <!-- Phase 3.2 — Visual Monte Carlo & Survival Graph -->
+          <div id="monteCarloSection" class="space-y-2">
+            <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+              Stochastic Monte Carlo <span class="text-zinc-400">// 10,000 vectorized runs</span>
+            </h3>
+            <div id="monteCarloContent" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div class="p-4 bg-white rounded-xl border border-zinc-200">
+                <div class="text-[10px] text-zinc-500 uppercase font-bold mb-2">Survival Probability <span class="text-zinc-400">// cash &gt; 0 by month</span></div>
+                <canvas id="survivalChart" class="w-full" height="200"></canvas>
+                <div id="survivalSummary" class="text-[10px] text-zinc-500 mt-2 font-mono"></div>
+              </div>
+              <div class="p-4 bg-white rounded-xl border border-zinc-200">
+                <div class="text-[10px] text-zinc-500 uppercase font-bold mb-2">Payback Distribution <span class="text-zinc-400">// P10 / P50 / P90</span></div>
+                <canvas id="paybackChart" class="w-full" height="200"></canvas>
+                <div id="paybackSummary" class="text-[10px] text-zinc-500 mt-2 font-mono"></div>
+              </div>
+            </div>
+            <div class="p-4 bg-white rounded-xl border border-zinc-200">
+              <div class="text-[10px] text-zinc-500 uppercase font-bold mb-2">Sensitivity — Tornado <span class="text-zinc-400">// which variable moves P50 LTV/CAC most</span></div>
+              <div id="tornadoList" class="space-y-2"></div>
+            </div>
+          </div>
+
+          <!-- Phase 3.3 — Idea Autopsy & Mutation Engine -->
+          <div id="mutationSection" class="hidden space-y-2">
+            <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+              💀 Idea Autopsy → <span class="text-red-600">Mutation Engine Activated</span> <span class="text-zinc-400">// resilience &lt; 55</span>
+            </h3>
+            <p class="text-[10px] text-zinc-500 font-sans">Fatal flaws inverted into three algorithmic strategic pivots. Pick one and re-run the full swarm against the mutant — the pivot inherits nothing; it earns its own dossier.</p>
+            <div id="mutationCards" class="grid grid-cols-1 lg:grid-cols-3 gap-4"></div>
           </div>
 
           <!-- Sandbox Simulation Output -->
@@ -1098,6 +1161,15 @@
       document.getElementById('streamCurrentDetail').textContent = 'Ingesting concept into TrueForge execution runtime...';
       document.getElementById('streamCrossfireBox').classList.add('hidden');
 
+      // Phase 3.1/3.2/3.3 reset — clear pulses, arcs, dials, charts, and mutation cards
+      clearAllNodePulses();
+      clearCrossfireArcs();
+      clearAllSwarmDials();
+      const mutationSection = document.getElementById('mutationSection');
+      if (mutationSection) mutationSection.classList.add('hidden');
+      const mutationCards = document.getElementById('mutationCards');
+      if (mutationCards) mutationCards.innerHTML = '';
+
       const roles = ['analyst', 'customer', 'architect', 'investor', 'redteam', 'expert'];
       roles.forEach(r => {
         const scoreEl = document.getElementById(`tile-${r}-score`);
@@ -1144,14 +1216,102 @@
       }
     }
 
+    // ======================= Phase 3.1 — Live Swarm Canvas =======================
+    const SWARM_NODE_CENTERS = {
+      analyst: [368, 133],
+      customer: [260, 320],
+      architect: [152, 257],
+      investor: [368, 257],
+      redteam: [152, 133],
+      founder: [260, 70],
+      expert: [260, 195]
+    };
+    let crossfireArcEls = [];
+
+    function svgRoleCapitalized(role) {
+      return role ? role.charAt(0).toUpperCase() + role.slice(1) : '';
+    }
+
+    function startNodePulse(role) {
+      const node = document.getElementById(`svgNode${svgRoleCapitalized(role)}`);
+      if (node) node.classList.add('node-pulsing');
+      const dial = document.getElementById(`svgScore${svgRoleCapitalized(role)}`);
+      if (dial) {
+        dial.textContent = '···';
+        dial.setAttribute('fill', '#a1a1aa');
+      }
+    }
+
+    function stopNodePulse(role) {
+      const node = document.getElementById(`svgNode${svgRoleCapitalized(role)}`);
+      if (node) node.classList.remove('node-pulsing');
+      const corner = document.getElementById(`svgNode${svgRoleCapitalized(role)}`);
+      if (!corner && role !== 'expert') return;
+    }
+
+    function clearAllNodePulses() {
+      ['analyst', 'customer', 'architect', 'investor', 'redteam', 'founder'].forEach(stopNodePulse);
+    }
+
+    function updateNodeDial(role, score) {
+      const dial = document.getElementById(`svgScore${svgRoleCapitalized(role)}`);
+      if (!dial) return;
+      dial.textContent = `${score}/100`;
+      dial.setAttribute('fill', score < 45 ? '#ef4444' : (score >= 70 ? '#10b981' : '#f59e0b'));
+    }
+
+    function clearAllSwarmDials() {
+      ['analyst', 'customer', 'architect', 'investor', 'redteam'].forEach((r) => {
+        const dial = document.getElementById(`svgScore${svgRoleCapitalized(r)}`);
+        if (dial) {
+          dial.textContent = '';
+          dial.setAttribute('fill', '#a1a1aa');
+        }
+      });
+    }
+
+    function drawCrossfireArc(challenger, target) {
+      const svg = document.getElementById('swarmOrbitSvg');
+      const from = SWARM_NODE_CENTERS[challenger];
+      const to = SWARM_NODE_CENTERS[target];
+      if (!svg || !from || !to) return;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', from[0]);
+      line.setAttribute('y1', from[1]);
+      line.setAttribute('x2', to[0]);
+      line.setAttribute('y2', to[1]);
+      line.setAttribute('stroke', '#ef4444');
+      line.setAttribute('stroke-width', '2.5');
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('stroke-dasharray', '6 8');
+      line.classList.add('crossfire-arc');
+      svg.appendChild(line);
+      crossfireArcEls.push(line);
+      setTimeout(() => {
+        line.remove();
+        crossfireArcEls = crossfireArcEls.filter((el) => el !== line);
+      }, 6500);
+    }
+
+    function clearCrossfireArcs() {
+      crossfireArcEls.forEach((el) => el.remove());
+      crossfireArcEls = [];
+    }
+
     function handleStreamEvent(event, data) {
       if (event === 'stage' || (data && data.stage)) {
         document.getElementById('streamCurrentStage').textContent = data.stage || 'STAGE // ACTIVE';
         document.getElementById('streamCurrentDetail').textContent = data.detail || '';
       }
 
+      if (event === 'agent_start') {
+        startNodePulse(data.role);
+      }
+
       if (event === 'agent_opinion') {
         const role = data.role;
+        stopNodePulse(role);
+        updateNodeDial(role, data.score);
         const scoreEl = document.getElementById(`tile-${role}-score`);
         const tile = document.getElementById(`tile-${role}`);
         if (scoreEl && tile) {
@@ -1170,7 +1330,12 @@
         highlightSvgNode(role, data.score);
       }
 
+      if (event === 'crossfire_start') {
+        drawCrossfireArc(data.agentA, data.agentB);
+      }
+
       if (event === 'crossfire_clash') {
+        drawCrossfireArc(data.challenger, data.target);
         const box = document.getElementById('streamCrossfireBox');
         const textEl = document.getElementById('streamCrossfireText');
         box.classList.remove('hidden');
@@ -1179,6 +1344,8 @@
 
       if (event === 'dossier_complete' && data.dossier) {
         document.getElementById('streamStatusBadge').textContent = 'CONSENSUS REACHED // DOSSIER COMPILED';
+        clearAllNodePulses();
+        clearCrossfireArcs();
         renderDossier(data.dossier);
         setTimeout(() => {
           document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
@@ -1276,6 +1443,243 @@
         spinner.classList.add('hidden');
       }
     });
+
+    // ======================= Phase 3.2 — Monte Carlo Charts =======================
+    function setupChartCanvas(canvas, logicalWidth, logicalHeight) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(220, Math.round(rect.width || logicalWidth));
+      canvas.width = w * dpr;
+      canvas.height = logicalHeight * dpr;
+      canvas.style.height = logicalHeight + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      return { ctx, w, h: logicalHeight };
+    }
+
+    function renderSurvivalChart(mc) {
+      const canvas = document.getElementById('survivalChart');
+      if (!canvas) return;
+      const { ctx, w, h } = setupChartCanvas(canvas, 420, 200);
+      const pad = { l: 40, r: 12, t: 14, b: 26 };
+      const months = 24;
+      const insol = Array.isArray(mc.insolvencyCurveByMonth) ? mc.insolvencyCurveByMonth : [];
+      const points = [{ month: 0, solvent: 100 }].concat(
+        insol.map((v, i) => ({ month: (i + 1) * 2, solvent: Math.max(0, (1 - v) * 100) }))
+      );
+
+      const xFor = (m) => pad.l + (m / months) * (w - pad.l - pad.r);
+      const yFor = (pct) => pad.t + (1 - pct / 100) * (h - pad.t - pad.b);
+
+      ctx.strokeStyle = '#e4e4e7';
+      ctx.lineWidth = 1;
+      [0, 25, 50, 75, 100].forEach((p) => {
+        ctx.beginPath();
+        ctx.moveTo(xFor(0), yFor(p));
+        ctx.lineTo(xFor(months), yFor(p));
+        ctx.stroke();
+        ctx.fillStyle = '#a1a1aa';
+        ctx.font = '9px "IBM Plex Mono", monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${p}%`, pad.l - 6, yFor(p) + 3);
+      });
+
+      ctx.beginPath();
+      points.forEach((p, i) => {
+        const x = xFor(p.month);
+        const y = yFor(p.solvent);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      ctx.lineTo(xFor(points[points.length - 1].month), yFor(0));
+      ctx.lineTo(xFor(0), yFor(0));
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(16,185,129,0.12)';
+      ctx.fill();
+
+      ctx.strokeStyle = '#d4d4d8';
+      ctx.setLineDash([3, 3]);
+      [12, 24].forEach((m) => {
+        ctx.beginPath();
+        ctx.moveTo(xFor(m), yFor(100));
+        ctx.lineTo(xFor(m), yFor(0));
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#71717a';
+      ctx.font = '9px "IBM Plex Mono", monospace';
+      ctx.textAlign = 'center';
+      [0, 6, 12, 18, 24].forEach((m) => ctx.fillText(`${m}`, xFor(m), h - 8));
+
+      ctx.fillStyle = '#10b981';
+      ctx.font = 'bold 10px "IBM Plex Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`12mo: ${Math.round((mc.survivalProbability12Mo || 0) * 100)}% survive`, pad.l + 8, pad.t + 2);
+      ctx.fillText(`24mo: ${Math.round((mc.survivalProbability24Mo || 0) * 100)}% survive`, pad.l + 8, pad.t + 15);
+    }
+
+    function renderPaybackChart(mc) {
+      const canvas = document.getElementById('paybackChart');
+      if (!canvas) return;
+      const { ctx, w, h } = setupChartCanvas(canvas, 420, 200);
+      const pad = { l: 14, r: 14, t: 40, b: 26 };
+      const p10 = mc.paybackPercentiles ? mc.paybackPercentiles.p10 : mc.estimatedPaybackMonths;
+      const p50 = mc.paybackPercentiles ? mc.paybackPercentiles.p50 : mc.estimatedPaybackMonths;
+      const p90 = mc.paybackPercentiles ? mc.paybackPercentiles.p90 : mc.estimatedPaybackMonths;
+
+      const mean = (p10 + 2 * p50 + p90) / 4;
+      const sd = Math.max(0.12, (p90 - p10) / 2.563);
+      const xMin = Math.max(0, p10 - (p90 - p10) * 0.6 - 0.4);
+      const xMax = p90 + (p90 - p10) * 0.6 + 0.8;
+      const xFor = (v) => pad.l + ((v - xMin) / (xMax - xMin)) * (w - pad.l - pad.r);
+
+      const pdf = (v) => Math.exp(-Math.pow(v - mean, 2) / (2 * sd * sd)) / (sd * Math.sqrt(2 * Math.PI));
+      let peak = 0;
+      for (let i = 0; i <= 90; i++) {
+        const v = xMin + (i / 90) * (xMax - xMin);
+        peak = Math.max(peak, pdf(v));
+      }
+      const yBase = h - pad.b;
+      const yFor = (d) => yBase - (d / peak) * (yBase - pad.t);
+
+      ctx.beginPath();
+      for (let i = 0; i <= 90; i++) {
+        const v = xMin + (i / 90) * (xMax - xMin);
+        const x = xFor(v);
+        const y = yFor(pdf(v));
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      ctx.lineTo(xFor(xMax), yBase);
+      ctx.lineTo(xFor(xMin), yBase);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(250,204,21,0.18)';
+      ctx.fill();
+
+      ctx.font = '9px "IBM Plex Mono", monospace';
+      [[p10, '#f59e0b', 'P10'], [p50, '#09090b', 'P50'], [p90, '#f59e0b', 'P90']].forEach(([v, color, label]) => {
+        ctx.strokeStyle = color;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(xFor(v), yBase);
+        ctx.lineTo(xFor(v), pad.t - 12);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${label} ${v.toFixed(1)}`, xFor(v), pad.t - 16);
+      });
+
+      ctx.fillStyle = '#a1a1aa';
+      ctx.textAlign = 'center';
+      ctx.fillText('months to payback', (w / 2), h - 8);
+    }
+
+    function renderTornado(mc) {
+      const list = document.getElementById('tornadoList');
+      if (!list) return;
+      list.innerHTML = '';
+      if (!mc || !Array.isArray(mc.sensitivity) || mc.sensitivity.length === 0) {
+        list.innerHTML = '<div class="text-xs text-zinc-400 font-sans">Tornado data unavailable — embedded fallback sandbox ran without distribution.</div>';
+        return;
+      }
+      const maxDelta = Math.max(...mc.sensitivity.map((s) => s.absoluteDelta), 0.0001);
+      mc.sensitivity.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-3';
+        const pct = Math.round((item.absoluteDelta / maxDelta) * 100);
+        row.innerHTML = `
+          <div class="w-36 font-mono text-[10px] text-zinc-600 uppercase shrink-0">${(item.param || '').replace(/_/g, ' ')}</div>
+          <div class="flex-1 bg-zinc-100 rounded h-3.5 overflow-hidden">
+            <div class="h-3.5 rounded bg-amber-500/80" style="width: ${pct}%"></div>
+          </div>
+          <div class="w-16 text-right font-mono text-[10px] text-zinc-500 shrink-0">±${item.absoluteDelta.toFixed(2)}×</div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    function renderMonteCarloPanel(dossier) {
+      const section = document.getElementById('monteCarloSection');
+      const summarySurv = document.getElementById('survivalSummary');
+      const summaryPay = document.getElementById('paybackSummary');
+      if (!section) return;
+      const mc = dossier.simulation && dossier.simulation.monteCarlo;
+      if (!mc) {
+        section.classList.add('hidden');
+        return;
+      }
+      section.classList.remove('hidden');
+      renderSurvivalChart(mc);
+      renderPaybackChart(mc);
+      renderTornado(mc);
+      if (summarySurv) {
+        summarySurv.textContent = `${mc.iterations.toLocaleString()} runs · churn N(${(mc.simulationNotes || '')[0] ? 'μ sample' : 'μ sample'}, σ) · steady-state replacement model`;
+      }
+      if (summaryPay) {
+        const lc = mc.ltvCacPercentiles || { p10: dossier.simulation.ltvCacRatio, p50: dossier.simulation.ltvCacRatio, p90: dossier.simulation.ltvCacRatio };
+        summaryPay.textContent = `LTV/CAC P10–P90: ${lc.p10}x – ${lc.p90}x (P50 ${lc.p50}x) · token burden P50 ${Math.round(((mc.tokenCostBurdenPercent && mc.tokenCostBurdenPercent.p50) || 0) * 100)}% of gross`;
+      }
+    }
+
+    // ======================= Phase 3.3 — Mutation Engine =======================
+    const STRATEGY_META = {
+      WEDGE_PIVOT: { icon: '🎯', color: 'text-cyan-700', border: 'border-cyan-200' },
+      MODEL_INVERSION: { icon: '💼', color: 'text-amber-700', border: 'border-amber-200' },
+      TROJAN_DISTRIBUTION: { icon: '🐴', color: 'text-violet-700', border: 'border-violet-200' }
+    };
+
+    function renderMutationPanel(dossier) {
+      const section = document.getElementById('mutationSection');
+      const cards = document.getElementById('mutationCards');
+      if (!section || !cards) return;
+      const proposals = dossier.mutationProposals || [];
+      window.lastMutationProposals = proposals;
+      if (!proposals.length) {
+        section.classList.add('hidden');
+        return;
+      }
+      section.classList.remove('hidden');
+      cards.innerHTML = '';
+      proposals.forEach((p) => {
+        const meta = STRATEGY_META[p.strategy] || {};
+        const card = document.createElement('div');
+        card.className = `p-4 bg-white rounded-xl border ${meta.border || 'border-zinc-200'} space-y-2 flex flex-col`;
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[10px] font-mono font-bold uppercase ${meta.color || 'text-zinc-500'}">${meta.icon || '🔁'} ${p.label}</span>
+            <span class="text-[9px] font-mono text-zinc-400">${p.id}</span>
+          </div>
+          <div class="text-xs font-bold text-zinc-900 font-sans leading-snug">${escapeHtml(p.mutatedIdea.title)}</div>
+          <p class="text-[11px] text-zinc-600 font-sans leading-relaxed">${escapeHtml(p.mutatedIdea.summary)}</p>
+          <div class="text-[10px] font-mono text-zinc-500 uppercase">🎯 ${escapeHtml(p.mutatedIdea.targetAudience)}</div>
+          <div class="text-[10px] font-mono text-emerald-700 uppercase font-bold">💰 ${escapeHtml(p.mutatedIdea.monetization)}</div>
+          <p class="text-[10px] text-zinc-500 font-sans italic border-t border-zinc-100 pt-2">${escapeHtml(p.rationale)}</p>
+          <button onclick="reevaluateMutationProposal('${p.id}')" class="mt-auto px-3 py-2 bg-zinc-900 hover:bg-zinc-700 text-white font-mono text-[11px] font-bold rounded-lg transition cursor-pointer">RE-EVALUATE PIVOT →</button>
+        `;
+        cards.appendChild(card);
+      });
+    }
+
+    window.reevaluateMutationProposal = function(proposalId) {
+      const proposals = window.lastMutationProposals || [];
+      const proposal = proposals.find((x) => x.id === proposalId);
+      if (!proposal) return;
+      document.getElementById('modalTitle').value = proposal.mutatedIdea.title;
+      document.getElementById('modalSummary').value = proposal.mutatedIdea.summary;
+      document.getElementById('modalTarget').value = proposal.mutatedIdea.targetAudience;
+      const priceMatch = /\$([0-9,]+)/.exec(proposal.mutatedIdea.monetization);
+      document.getElementById('modalPrice').value = priceMatch ? priceMatch[1].replace(/,/g, '') : '49';
+      openIntakeModal();
+      document.getElementById('modalEvalForm').dispatchEvent(new Event('submit'));
+    };
 
     function renderDossier(dossier) {
       document.getElementById('resultsSection').classList.remove('hidden');
@@ -1396,6 +1800,10 @@
 
       // Render Sandbox
       document.getElementById('sandboxStdout').textContent = dossier.simulation.sandboxExecutionProof.stdout;
+
+      // Phase 3.2 / 3.3 renderers — stochastic charts & mutation engine
+      renderMonteCarloPanel(dossier);
+      renderMutationPanel(dossier);
 
       // Store active dossier ID for exports
       window.currentRenderedDossierId = dossier.id;

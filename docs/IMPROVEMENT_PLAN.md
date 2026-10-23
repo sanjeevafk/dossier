@@ -179,10 +179,10 @@ Every phase must pass rigorous automated testing:
   - [x] 2.1 Develop vectorized Python Monte Carlo simulation in `src/tools/sandbox.ts`
   - [x] 2.2 Implement 2-round crossfire rebuttal logic in `src/core/swarm.ts`
   - [x] 2.3 Construct epistemic DAG claim hierarchy in `src/core/verifier.ts`
-- [ ] **Phase 3: The Wow Factor & Visual Command Center**
-  - [ ] 3.1 Build animated live swarm canvas with debate links in `public/index.html`
-  - [ ] 3.2 Add HTML5 canvas survival probability & payback distribution graphs
-  - [ ] 3.3 Implement `src/core/mutator.ts` for automatic 3-pivot generation on failed ideas
+- [x] **Phase 3: The Wow Factor & Visual Command Center**
+  - [x] 3.1 Build animated live swarm canvas with debate links in `public/index.html`
+  - [x] 3.2 Add HTML5 canvas survival probability & payback distribution graphs
+  - [x] 3.3 Implement `src/core/mutator.ts` for automatic 3-pivot generation on failed ideas
 - [ ] **Phase 4: Customer Lab & Validation Kit**
   - [ ] 4.1 Build Synthetic Buyer Persona discovery simulator in Playground
   - [ ] 4.2 Create downloadable 1-click Validation Kit (Landing Page + Outreach templates)

@@ -24,6 +24,7 @@ import {
 import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
 import { StanfordRobustVerifier } from "./verifier.js";
+import { buildMutationProposals } from "./mutator.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
@@ -1091,7 +1092,7 @@ Market & Prediction Signals: ${marketContext}`;
     if (!fatalProfile) {
       const certaintyFloor = Math.min(technicalFeasibility, demandAndAdoption, economicsAndCapitalEfficiency, defensibilityAndMoat);
       if (certaintyFloor >= 62) {
-        compositeScore = Math.min(92, compositeScore + Math.round((certaintyFloor - 62) / 4));
+        compositeScore = Math.min(92, compositeScore + Math.round((certaintyFloor - 62) / 2));
       }
     }
 
@@ -1405,6 +1406,22 @@ Market & Prediction Signals: ${marketContext}`;
       },
       approvalGates
     };
+
+    // Idea Autopsy & Mutation Engine (plan 3.3): collapsed concepts receive three
+    // algorithmic strategic pivots that invert the verified fatal flaws.
+    if (compositeScore < 55) {
+      const mutationProposals = buildMutationProposals(idea, domain, {
+        killScore: compositeScore,
+        fatalFlaw: verifiedOpinions.redteam.fatalFlaws[0] || "Unmitigated fatal assumption",
+        pricing,
+        churn,
+        cac,
+        survival24Mo: mc?.survivalProbability24Mo,
+        ltvCacRatio: sandboxSim.metrics.ltvCacRatio
+      });
+      dossier.mutationProposals = mutationProposals;
+      emit({ type: "mutation_proposals", proposals: mutationProposals });
+    }
 
     // Persist dossier asynchronously for historical retrieval and export
     try {
