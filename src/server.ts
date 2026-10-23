@@ -11,9 +11,37 @@ import { IdeaInput, SwarmRole } from "./types/index.js";
 const app: Application = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
+  : ["http://localhost:3000", "http://127.0.0.1:3000"];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== "production") {
+        callback(null, true);
+      } else {
+        callback(new Error("Blocked by CORS policy"));
+      }
+    },
+    credentials: true
+  })
+);
 app.use(express.json());
 app.use(express.static(path.join(process.cwd(), "public")));
+
+function requireAuth(req: Request, res: Response, next: () => void) {
+  const secret = process.env.DOSSIER_API_KEY;
+  const isLoopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.hostname === "localhost";
+  if (!secret && process.env.NODE_ENV !== "production" && isLoopback) {
+    return next();
+  }
+  const authHeader = req.headers.authorization;
+  if (secret && authHeader === `Bearer ${secret}`) {
+    return next();
+  }
+  return res.status(401).json({ error: "Unauthorized: valid Bearer token required for action gates" });
+}
 
 const orchestrator = new IdeaSwarmOrchestrator();
 
@@ -171,7 +199,7 @@ app.post("/api/evaluate/stream", async (req: Request, res: Response) => {
 });
 
 // Approval action gate endpoint (Persistent Human-in-the-loop)
-app.post("/api/approval/:actionId", async (req: Request, res: Response) => {
+app.post("/api/approval/:actionId", requireAuth, async (req: Request, res: Response) => {
   const actionId = String(req.params.actionId);
   const { decision } = req.body; // 'APPROVE' | 'REJECT'
 
