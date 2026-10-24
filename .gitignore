@@ -1,0 +1,78 @@
+# Environment & API keys
+.env
+.env.*
+*.env
+*.local
+!.env.example
+scripts/temp_video/
+dossier_demo.mp4
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Node / JS
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+.next/
+out/
+
+# Models & large checkpoints
+models/
+*.safetensors
+*.onnx
+
+# Local evaluation runs & generated dossiers
+reports/
+scripts/evaluate_*.ts
+docs/local/
+local/
+local
+
+# Runtime Local State
+*.db
+*.sqlite
+*.sqlite3
+/data/
+!src/data/
+storage/
+logs/
+*.log
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+BLOG_POST_LOCAL.md
+node_modules
+reports/forecast_ledger.jsonl
+package-lock.json

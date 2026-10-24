@@ -1,0 +1,13 @@
+node_modules
+.git
+.env
+.env.*
+!.env.example
+data/
+reports/
+dist/
+temp_video/
+scripts/temp_video/
+*.log
+.freebuff
+command-code-session-*.html

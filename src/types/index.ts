@@ -1,0 +1,500 @@
+export type SwarmRole =
+  | "analyst"
+  | "customer"
+  | "architect"
+  | "investor"
+  | "redteam"
+  | "expert"
+  | "synthesizer";
+
+export type IdeaDomainArchetype =
+  | "b2b_saas"
+  | "b2g_govtech"
+  | "healthcare_clinical"
+  | "hardware_robotics"
+  | "consumer_social"
+  | "deeptech_research"
+  | "web3_defi"
+  | "general_startup";
+
+export interface DomainClassification {
+  archetype: IdeaDomainArchetype;
+  archetypeLabel: string;
+  primaryCustomer: string;
+  procurementCycle: string;
+  regulatoryEnvironment: string;
+  unitEconomicsModel: string;
+  specialistRoleLabels: {
+    analyst: { number: string; title: string; mandate: string };
+    customer: { number: string; title: string; mandate: string };
+    architect: { number: string; title: string; mandate: string };
+    investor: { number: string; title: string; mandate: string };
+    redteam: { number: string; title: string; mandate: string };
+    expert: { number: string; title: string; mandate: string };
+  };
+}
+
+export interface IdeaInput {
+  title: string;
+  summary: string;
+  targetAudience: string;
+  monetization: string;
+  projectType?: "Startup" | "Hackathon" | "Product" | "Research" | "Other";
+  techStack?: string;
+  unclearAssumptions?: string[];
+}
+
+export type Verdict = "BUILD" | "BUILD_IF_VALIDATED" | "REFINE" | "KILL" | "STRONG_KILL" | "LEAN_KILL" | "PIVOT_REQUIRED" | "VIABLE_WITH_RISK" | "STRONG_PURSUE";
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export interface AgentOpinion {
+  role: SwarmRole;
+  roleNumber: string;
+  roleTitle: string;
+  verdict: Verdict;
+  score: number; // 0 to 100
+  status: "IDLE" | "INITIALIZING" | "RESEARCHING" | "DEBATING" | "VERIFYING" | "COMPLETE" | "BLOCKED";
+  fatalFlaws: string[];
+  keyAssumptions: string[];
+  competitiveRisks: string[];
+  mustTestBeforeBuilding: string[];
+  rationale: string;
+  telemetryMetadata?: {
+    latencyMs?: number;
+    claimsVerified?: number;
+    threatSeverity?: string;
+    /** Exact model/backend that produced this opinion (e.g. "gemini-3.8-flash-medium", "deterministic-heuristics"). */
+    modelId?: string;
+  };
+}
+
+export interface KeyAssumption {
+  id: string; // e.g. "A01"
+  statement: string;
+  evidenceStatus: "VERIFIED" | "UNVERIFIED" | "HIGH_RISK" | "REJECTED";
+  riskLevel: RiskLevel;
+  disproofCondition: string;
+}
+
+export interface Contradiction {
+  id: string;
+  agentA: string;
+  claimA: string;
+  agentB: string;
+  claimB: string;
+  resolutionStatus: "UNRESOLVED CONFLICT // REQUIRES VALIDATION" | "RESOLVED // ASSUMPTION MITIGATED" | "CONTRADICTED // SUSTAINED IN CROSSFIRE";
+  guidance: string;
+  debateHistory?: string[];
+  toolExecutionTraces?: string[];
+}
+
+export type EpistemicState = 
+  | "VERIFIED_FACT"        // Independently verified empirical ground truth (official regulations, confirmed competitor data)
+  | "VERIFIED_COMPUTATION" // Deterministic computation executed in isolated environment (Python3 subprocess exit 0) — input assumptions remain separately labelled
+  | "EXTERNAL_EVIDENCE"    // Sourced external data that has not been independently verified (Polymarket Gamma odds, community recon)
+  | "MODELLED_ASSUMPTION"  // Explicit hypotheses & projections not yet tested with empirical field trials
+  | "INFERENCE"            // Deductions drawn by an agent based on models or domain analogies
+  | "UNKNOWN"              // Unquantified black-box risk or missing parameter
+  | "CONTRADICTED";        // Disproved or conflicting claims with direct counter-evidence
+
+export type EpistemicTier = EpistemicState; // Backward-compatible alias
+
+export interface EvidenceItem {
+  id: string;
+  claim: string;
+  tier: EpistemicState;
+  claimType: EpistemicState; // Backwards compatible alias
+  provenance: string; // e.g. "Polymarket Gamma API", "Agent Reach", "Python3 Sandbox", "Official DGCA Standard"
+  indicator: "SUPPORTING" | "CONTRADICTING" | "NEUTRAL";
+  confidencePercent: number; // 0 to 100
+  falsificationCriteria?: string;
+  fatal?: boolean; // true when this assumption blocks BUILD until tested via ledger outcome
+  tested?: boolean; // true once a ledger outcome or LOI evidence resolves it
+}
+
+export interface ScoreFactor {
+  impact: number; // e.g. +30 or -15
+  description: string;
+  groundingTier: EpistemicState;
+  riskMitigationVerdict?: "MITIGATES_RISK" | "PARTIAL_MITIGATION" | "DOES_NOT_MITIGATE";
+}
+
+export interface DimensionScoreTrace {
+  score: number;
+  factors: ScoreFactor[];
+  rationale: string;
+}
+
+export interface EpistemicTaxonomySummary {
+  verifiedFactsCount: number;
+  verifiedComputationsCount: number;
+  externalEvidenceCount: number;
+  modelledAssumptionsCount: number;
+  inferencesCount: number;
+  unknownsCount: number;
+  contradictionsCount: number;
+  hasUnvalidatedFatalAssumptions: boolean;
+  hasUnresolvedUnknownsOrContradictions: boolean;
+}
+
+export type ValidationVerdict = "BUILD" | "BUILD_IF_VALIDATED" | "REFINE" | "KILL";
+
+export interface DebateChallenge {
+  challenger: SwarmRole;
+  target: SwarmRole;
+  round: number; // 1 or 2
+  challengePoint: string;
+  rebuttal?: string;
+  status: "OPEN" | "REBUTTED" | "CONCEDED";
+}
+
+export interface MonteCarloStats {
+  iterations: number;
+  survivalProbability12Mo: number; // 0..1
+  survivalProbability24Mo: number; // 0..1
+  insolvencyCurveByMonth: number[]; // share of runs insolvent by every 2nd month
+  ltvCacPercentiles: { p10: number; p50: number; p90: number };
+  paybackPercentiles: { p10: number; p50: number; p90: number };
+  tokenCostBurdenPercent: { p10: number; p50: number; p90: number };
+  sensitivity: Array<{ param: string; absoluteDelta: number }>;
+  simulationNotes?: string;
+}
+
+export interface SandboxStressStats {
+  churnStressed: boolean;
+  cacStressed: boolean;
+  stressLtvCacRatio?: number;
+  stressSurvival24Mo?: number;
+  stressPayback50?: number;
+}
+
+export interface SobolSensitivityStats {
+  method: string;
+  baseSamples: number;
+  modelEvaluations: number;
+  params: string[];
+  outputs: Record<
+    string,
+    { variance: number; firstOrder: Record<string, number>; totalOrder: Record<string, number> }
+  >;
+  ltvCacSensitivityRanking: Array<{ param: string; totalOrderIndex: number }>;
+  simulationNotes?: string;
+}
+
+export interface ValueOfInformationStats {
+  decisionModel: string;
+  expectedPayoffIfProceeding: number;
+  expectedPayoffWithPerfectInfo: number;
+  evpiPerCustomer: number;
+  partialEvpi: Array<{ param: string; evpiPerCustomer: number; shareOfEvpi: number }>;
+}
+
+export interface ValidationPriorityItem {
+  param: string;
+  evpiPerCustomer: number;
+  shareOfEvpi: number;
+  experimentTitle: string;
+  experimentDescription: string;
+}
+
+export interface SimulationResult {
+  cacEstimateUsd: number;
+  ltvEstimateUsd: number;
+  ltvCacRatio: number; // P50 of the Monte Carlo distribution
+  estimatedPaybackMonths: number; // P50 of the Monte Carlo distribution
+  monthlyInfraCostUsd: number;
+  tamEstimateUsd: string;
+  monteCarlo?: MonteCarloStats;
+  sobol?: SobolSensitivityStats;
+  voi?: ValueOfInformationStats;
+  stressMetrics?: SandboxStressStats;
+  sandboxExecutionProof: {
+    runtime: string;
+    exitCode: number;
+    stdout: string;
+  };
+}
+
+export type ClaimStatus = "VERIFIED" | "DISPUTED" | "CONTRADICTED" | "UNKNOWN";
+
+export interface MutationProposal {
+  id: string;
+  strategy: "WEDGE_PIVOT" | "MODEL_INVERSION" | "TROJAN_DISTRIBUTION";
+  label: string;
+  rationale: string;
+  mutatedIdea: {
+    title: string;
+    summary: string;
+    targetAudience: string;
+    monetization: string;
+  };
+}
+
+export interface ClaimNode {
+  id: string;
+  claim: string;
+  tier: EpistemicState;
+  dependencies: string[];
+  status: ClaimStatus;
+  provenance?: string;
+}
+
+export interface ApprovalAction {
+  id: string;
+  actionType: "COLD_OUTREACH_EMAIL" | "SMOKE_TEST_LANDING_PAGE" | "COMMUNITY_POST" | "SURVEY_DISTRIBUTION" | "PILOT_LOI_DRAFT";
+  summary: string;
+  payload: Record<string, any>;
+  requiresApproval: true;
+  status: "PENDING_HUMAN_APPROVAL" | "APPROVED" | "REJECTED";
+}
+
+export interface ResilienceScoreBreakdown {
+  technicalFeasibility: number; // 20%
+  demandAndAdoption: number; // 25%
+  economicsAndCapitalEfficiency: number; // 20%
+  defensibilityAndMoat: number; // 15%
+  adversarialResilience: number; // 20%
+  compositeScore: number; // 0 to 100
+  dimensionRationales: {
+    technicalFeasibility: string;
+    demandAndAdoption: string;
+    economicsAndCapitalEfficiency: string;
+    defensibilityAndMoat: string;
+    adversarialResilience: string;
+  };
+  dimensionTraces?: {
+    technicalFeasibility: DimensionScoreTrace;
+    demandAndAdoption: DimensionScoreTrace;
+    economicsAndCapitalEfficiency: DimensionScoreTrace;
+    defensibilityAndMoat: DimensionScoreTrace;
+    adversarialResilience: DimensionScoreTrace;
+  };
+}
+
+export interface CheapestValidationExperiment {
+  title: string;
+  description: string;
+  estimatedCostUsd: number;
+  timeToExecuteDays: number;
+  successMetric: string;
+  failureKillSignal: string;
+}
+
+export interface VerificationAuditItem {
+  id: string;
+  claimOrOpinion: string;
+  verdict: "VERIFIED_PASS" | "CORRECTED" | "REJECTED_UNGROUNDED";
+  rationale: string;
+  confidencePercent: number;
+}
+
+export interface VerificationAudit {
+  verifierProtocol: "EPISTEMIC_ROBUST_VERIFIER" | "STANFORD_CS329A_ROBUST_VERIFIER";
+  totalClaimsAudited: number;
+  hallucinationsBlocked: number;
+  testTimeSelfCorrections: number;
+  verificationConfidencePercent: number;
+  auditItems: VerificationAuditItem[];
+}
+
+export interface ExternalEvidenceSource {
+  title: string;
+  url: string;
+  provider: string; // "exa" | "tavily" | "polymarket" | "duckduckgo" | "hackernews"
+}
+
+export interface MarketCompetitor {
+  name: string;
+  url?: string;
+  category: "direct" | "indirect" | "incumbent";
+  strengths: string;
+  vulnerability: string;
+  pricingEstimate?: string;
+}
+
+export interface DecisionChoice {
+  choice: string;
+  probabilities: Record<string, number>;
+  threshold: number;
+  flagged: boolean;
+}
+
+export interface DecisionModelOutput {
+  engine?: string;
+  answers: {
+    moat: DecisionChoice;
+    regulatory_risk: DecisionChoice;
+    sales_cycle: DecisionChoice;
+    monetization: DecisionChoice;
+  };
+  fatal_flags: string[];
+  refine_flags: string[];
+  verdict: "BUILD" | "REFINE" | "KILL";
+  loss_ratio: number;
+  runtimeMs?: number;
+}
+
+/** Honest inter-agent disagreement signal — replaces cosmetic confidence scores. */
+export interface SwarmDissent {
+  /** max - min of the six verified agent scores. */
+  scoreSpread: number;
+  /** Agents issuing kill-grade scores (< 40). */
+  killGradeAgents: number;
+  avgAgentScore: number;
+  /** True when agents issue kill-grade scores but the composite still clears 50 — the verdict is contested and needs human judgment. */
+  verdictContested: boolean;
+}
+
+export interface IdeaDossier {
+  id: string;
+  dossierCode: string; // e.g. "TF-007"
+  timestamp: string;
+  /** Which engine produced this dossier: live LLM swarm or the deterministic heuristic engine. */
+  evaluationMode?: "LIVE_LLM" | "HEURISTIC_ENGINE";
+  /** P(build-worthy) — killScore mapped to a probability for calibration tracking. */
+  pSuccess?: number;
+  /** Archetype reference-class base rate shown alongside the score. */
+  baseRate?: number;
+  /** True once a ledger outcome resolves every fatal assumption (gates BUILD). */
+  fatalsResolved?: boolean;
+  /** Estimated marginal run cost in USD (recon queries + LLM tokens). */
+  costUsd?: number;
+  /** Actually-retrieved external sources backing this dossier (empty when no recon provider ran). */
+  externalEvidenceSources?: ExternalEvidenceSource[];
+  /** Competitors discovered through Market Analyst live web recon. */
+  identifiedCompetitors?: MarketCompetitor[];
+  idea: IdeaInput;
+  domainClassification: DomainClassification;
+  epistemicSummary?: EpistemicTaxonomySummary;
+  verificationAudit?: VerificationAudit;
+  killScore: number; // 0 to 100 (composite resilience score)
+  confidenceScore: number; // swarm-agreement strength (0-100), NOT idea quality
+  swarmDissent?: SwarmDissent;
+  /** IDs of the dated falsifiable forecasts this dossier registered in the calibration ledger. */
+  forecastIds?: string[];
+  /** Outside view: reference-class base rates vs the swarm verdict (optimism premium). */
+  outsideView?: import("../core/outside-view.js").OutsideViewPanel;
+  /** Fast decision model gate evaluation (Hamel Husain Oct 2026 pattern). */
+  decisionEvaluation?: DecisionModelOutput;
+  overallVerdict: ValidationVerdict;
+  riskLevel: RiskLevel;
+  executiveSummary: string;
+  roleAssessments: Record<SwarmRole, AgentOpinion>;
+  keyAssumptions: KeyAssumption[];
+  contradictions: Contradiction[];
+  evidenceFeed: EvidenceItem[];
+  strongestEvidence: EvidenceItem;
+  weakestAssumption: {
+    id: string;
+    statement: string;
+    fatalRisk: string;
+    disproofThreshold: string;
+  };
+  killConditions: string[];
+  cheapestValidationExperiment: CheapestValidationExperiment;
+  resilienceBreakdown: ResilienceScoreBreakdown;
+  predictionMarkets?: {
+    source: string;
+    macroSentiment: string;
+    keyTakeaway: string;
+    marketsFound: Array<{
+      title: string;
+      probabilityYesPercent: number;
+      volumeUsd: number;
+      marketUrl: string;
+    }>;
+  };
+  debateTrail: DebateChallenge[];
+  convergenceRounds: number;
+  debateRoundsExecuted: number;
+  claimDag?: ClaimNode[];
+  crossfireToolTraces?: string[];
+  mutationProposals?: MutationProposal[];
+  /** Validation experiments ranked by expected value of information (EVPI share). */
+  validationPriority?: ValidationPriorityItem[];
+  simulation: SimulationResult;
+  validationRoadmap: {
+    day1to2: string[];
+    day3to5: string[];
+    day6to7: string[];
+  };
+  approvalGates: ApprovalAction[];
+}
+
+// ======================= B1 — Calibration Ledger =======================
+
+export type ForecastSourceField =
+  | "VERDICT"
+  | "KILL_CONDITION"
+  | "WEAKEST_ASSUMPTION"
+  | "VALIDATION_EXPERIMENT";
+
+export interface ForecastRecord {
+  id: string; // e.g. "FC-DOSSIER-123456-VERDICT"
+  dossierId: string;
+  archetype: string;
+  sourceField: ForecastSourceField;
+  refId: string; // "VERDICT" | "KC-1" | "WA-01" | "EXP-01"
+  /** The falsifiable claim being made. */
+  statement: string;
+  /** What an outcome=true resolution means. */
+  resolvesTrueWhen: string;
+  /** Days from record creation until the forecast is due for resolution. */
+  deadlineDays: number;
+  /**
+   * The swarm's implied probability (0..1) that outcome=true, derived from the
+   * resilience score by the documented v1 mapping (see core/ledger.ts). Omitted
+   * for outcome-tracking-only records (e.g. kill-condition triggers), which are
+   * excluded from Brier aggregation.
+   */
+  probabilityEstimate?: number;
+  createdAt: string;
+  resolved?: {
+    outcome: boolean;
+    notes?: string;
+    resolvedAt: string;
+    resolvedBy?: string;
+  };
+}
+
+export interface CalibrationBucket {
+  /** Predicted-probability bucket, e.g. [0.6, 0.8). */
+  bucket: [number, number];
+  count: number;
+  predicted: number; // mean predicted probability in bucket
+  observed: number; // mean resolved outcome (0..1) in bucket
+}
+
+export interface CalibrationSummary {
+  totals: { recorded: number; resolved: number; pending: number };
+  /** Mean Brier score across resolved forecasts with a probability estimate (lower is better; 0.25 = chance). */
+  brierOverall: number | null;
+  byDomain: Array<{
+    archetype: string;
+    recorded: number;
+    resolved: number;
+    brier: number | null;
+    observedOutcomeRate: number | null;
+  }>;
+  reliability: CalibrationBucket[];
+  mappingNote: string;
+}
+
+export type SwarmEvent =
+  | { type: "stage"; stage: string; detail: string; timestamp: string }
+  | { type: "domain"; domain: DomainClassification }
+  | { type: "decision_gate"; evaluation: DecisionModelOutput }
+  | { type: "agent_start"; role: SwarmRole; roleTitle: string }
+  | { type: "agent_opinion"; role: SwarmRole; roleTitle: string; verdict: Verdict; score: number; fatalFlaw?: string }
+  | { type: "parse_fallback"; role: SwarmRole; reason: string }
+  | { type: "sandbox_simulating"; iterationCount: number }
+  | { type: "sandbox_metrics"; metrics: any; runtime: string; exitCode: number }
+  | { type: "crossfire_start"; agentA: SwarmRole; agentB: SwarmRole; topic: string }
+  | { type: "crossfire_clash"; challenger: string; target: string; challengePoint: string; rebuttal?: string; status: string }
+  | { type: "crossfire_rebuttal"; agent: SwarmRole; argument: string; confidenceDelta: number }
+  | { type: "mutation_proposals"; proposals: MutationProposal[] }
+  | { type: "audit_correction"; detail: string; hallucinationsBlocked: number }
+  | { type: "forecasts_recorded"; dossierId: string; count: number }
+  | { type: "dossier_complete"; dossier: IdeaDossier }
+  | { type: "error"; message: string };
+

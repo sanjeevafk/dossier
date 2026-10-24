@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: dossier-ai
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    # NOTE: canonical live deploy is Azure App Service (B1, Central India)
+    # per README. This Render spec is the fallback; free tier has no disk —
+    # set DOSSIER_DATA_DIR to a persistent volume before relying on the
+    # SQLite ledger in production.
+    healthCheckPath: /health
+    disk:
+      name: dossier-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+      - key: DOSSIER_DATA_DIR
+        value: /app/data
+      - key: ORCAROUTER_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: EXA_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: LOCAL_LLM_URL
+        sync: false
+      - key: DOSSIER_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
