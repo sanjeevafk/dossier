@@ -33,6 +33,7 @@ import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
+import { forecastLedger } from "../services/forecastLedger.js";
 import { z } from "zod";
 
 export interface SwarmExecutionOptions {
@@ -1581,6 +1582,18 @@ Market & Prediction Signals: ${marketContext}`;
       await dossierStorage.saveDossier(dossier);
     } catch (err: any) {
       // Non-blocking storage save
+    }
+
+    // B1 — Calibration ledger: record the dossier's dated falsifiable forecasts
+    // (verdict, kill conditions, weakest assumption, validation experiment).
+    // Idempotent per dossier; non-blocking on failure.
+    try {
+      const forecastCount = forecastLedger.recordDossierForecasts(dossier);
+      if (forecastCount > 0) {
+        emit({ type: "forecasts_recorded", dossierId: dossier.id, count: forecastCount });
+      }
+    } catch {
+      // Ledger recording must never break evaluation.
     }
 
     emit({ type: "dossier_complete", dossier });

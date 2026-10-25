@@ -358,6 +358,65 @@ export interface IdeaDossier {
   approvalGates: ApprovalAction[];
 }
 
+// ======================= B1 — Calibration Ledger =======================
+
+export type ForecastSourceField =
+  | "VERDICT"
+  | "KILL_CONDITION"
+  | "WEAKEST_ASSUMPTION"
+  | "VALIDATION_EXPERIMENT";
+
+export interface ForecastRecord {
+  id: string; // e.g. "FC-DOSSIER-123456-VERDICT"
+  dossierId: string;
+  archetype: string;
+  sourceField: ForecastSourceField;
+  refId: string; // "VERDICT" | "KC-1" | "WA-01" | "EXP-01"
+  /** The falsifiable claim being made. */
+  statement: string;
+  /** What an outcome=true resolution means. */
+  resolvesTrueWhen: string;
+  /** Days from record creation until the forecast is due for resolution. */
+  deadlineDays: number;
+  /**
+   * The swarm's implied probability (0..1) that outcome=true, derived from the
+   * resilience score by the documented v1 mapping (see core/ledger.ts). Omitted
+   * for outcome-tracking-only records (e.g. kill-condition triggers), which are
+   * excluded from Brier aggregation.
+   */
+  probabilityEstimate?: number;
+  createdAt: string;
+  resolved?: {
+    outcome: boolean;
+    notes?: string;
+    resolvedAt: string;
+    resolvedBy?: string;
+  };
+}
+
+export interface CalibrationBucket {
+  /** Predicted-probability bucket, e.g. [0.6, 0.8). */
+  bucket: [number, number];
+  count: number;
+  predicted: number; // mean predicted probability in bucket
+  observed: number; // mean resolved outcome (0..1) in bucket
+}
+
+export interface CalibrationSummary {
+  totals: { recorded: number; resolved: number; pending: number };
+  /** Mean Brier score across resolved forecasts with a probability estimate (lower is better; 0.25 = chance). */
+  brierOverall: number | null;
+  byDomain: Array<{
+    archetype: string;
+    recorded: number;
+    resolved: number;
+    brier: number | null;
+    observedOutcomeRate: number | null;
+  }>;
+  reliability: CalibrationBucket[];
+  mappingNote: string;
+}
+
 export type SwarmEvent =
   | { type: "stage"; stage: string; detail: string; timestamp: string }
   | { type: "domain"; domain: DomainClassification }
@@ -371,6 +430,7 @@ export type SwarmEvent =
   | { type: "crossfire_rebuttal"; agent: SwarmRole; argument: string; confidenceDelta: number }
   | { type: "mutation_proposals"; proposals: MutationProposal[] }
   | { type: "audit_correction"; detail: string; hallucinationsBlocked: number }
+  | { type: "forecasts_recorded"; dossierId: string; count: number }
   | { type: "dossier_complete"; dossier: IdeaDossier }
   | { type: "error"; message: string };
 

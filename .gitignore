@@ -68,3 +68,4 @@ logs/
 Thumbs.db
 BLOG_POST_LOCAL.md
 node_modules
+reports/forecast_ledger.jsonl

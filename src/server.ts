@@ -5,6 +5,7 @@ import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
 import { generateAgentTurn, getLLMStatus } from "./services/llm.js";
 import { dossierStorage } from "./services/storage.js";
+import { forecastLedger } from "./services/forecastLedger.js";
 import { SWARM_ROLES } from "./config/prompts.js";
 import { IdeaInput, SwarmRole } from "./types/index.js";
 
@@ -32,7 +33,10 @@ app.use(express.static(path.join(process.cwd(), "public")));
 
 function requireAuth(req: Request, res: Response, next: () => void) {
   const secret = process.env.DOSSIER_API_KEY;
-  const isLoopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.hostname === "localhost";
+  // Node reports IPv4 loopback as ::ffff:127.0.0.1 when the socket is IPv6 —
+  // normalize before the loopback check or dev-machine requests get 401s.
+  const ip = (req.ip || "").replace(/^::ffff:/, "");
+  const isLoopback = ip === "127.0.0.1" || ip === "::1" || req.hostname === "localhost";
   if (!secret && process.env.NODE_ENV !== "production" && isLoopback) {
     return next();
   }
@@ -221,6 +225,45 @@ app.post("/api/approval/:actionId", requireAuth, async (req: Request, res: Respo
     dossierId: result.dossierId,
     message: `Action ${actionId} has been successfully ${decision === "APPROVE" ? "approved" : "rejected"} by human operator.`
   });
+});
+
+// ======================= B1 — Calibration ledger endpoints =======================
+
+// List forecasts (optionally filter by resolution status and domain archetype).
+app.get("/api/forecasts", (req: Request, res: Response) => {
+  try {
+    const status = req.query.status === "pending" || req.query.status === "resolved" ? req.query.status : undefined;
+    const archetype = req.query.archetype ? String(req.query.archetype) : undefined;
+    const forecasts = forecastLedger.listForecasts({ status, archetype });
+    res.json({ success: true, count: forecasts.length, forecasts });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Resolve a forecast with the observed outcome — this is the act that turns the
+// ledger into a calibration track record. Resolutions are immutable.
+app.post("/api/forecasts/:id/resolve", requireAuth, (req: Request, res: Response) => {
+  try {
+    const { outcome, notes, resolvedBy } = req.body;
+    if (typeof outcome !== "boolean") {
+      res.status(400).json({ error: "Field 'outcome' must be a boolean (did the forecast hold?)" });
+      return;
+    }
+    const record = forecastLedger.resolveForecast(String(req.params.id), outcome, notes, resolvedBy);
+    res.json({ success: true, forecast: record });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Calibration summary: Brier scores (overall + per domain) and reliability buckets.
+app.get("/api/calibration", (req: Request, res: Response) => {
+  try {
+    res.json({ success: true, calibration: forecastLedger.calibrationSummary() });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Interactive Playground / Swarm Chat endpoint
