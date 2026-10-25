@@ -63,6 +63,8 @@ export interface AgentOpinion {
     latencyMs?: number;
     claimsVerified?: number;
     threatSeverity?: string;
+    /** Exact model/backend that produced this opinion (e.g. "gemini-3.8-flash-medium", "deterministic-heuristics"). */
+    modelId?: string;
   };
 }
 
@@ -268,6 +270,17 @@ export interface ExternalEvidenceSource {
   provider: string; // "exa" | "tavily" | "polymarket"
 }
 
+/** Honest inter-agent disagreement signal — replaces cosmetic confidence scores. */
+export interface SwarmDissent {
+  /** max - min of the six verified agent scores. */
+  scoreSpread: number;
+  /** Agents issuing kill-grade scores (< 40). */
+  killGradeAgents: number;
+  avgAgentScore: number;
+  /** True when agents issue kill-grade scores but the composite still clears 50 — the verdict is contested and needs human judgment. */
+  verdictContested: boolean;
+}
+
 export interface IdeaDossier {
   id: string;
   dossierCode: string; // e.g. "TF-007"
@@ -281,7 +294,8 @@ export interface IdeaDossier {
   epistemicSummary?: EpistemicTaxonomySummary;
   verificationAudit?: VerificationAudit;
   killScore: number; // 0 to 100 (composite resilience score)
-  confidenceScore: number; // e.g. 78%
+  confidenceScore: number; // swarm-agreement strength (0-100), NOT idea quality
+  swarmDissent?: SwarmDissent;
   overallVerdict: ValidationVerdict;
   riskLevel: RiskLevel;
   executiveSummary: string;

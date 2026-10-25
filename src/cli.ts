@@ -77,8 +77,16 @@ program
     console.log(pc.bold(pc.cyan("📊 SWARM VERDICT & RESILIENCE BREAKDOWN:")));
     const verdictColor = dossier.overallVerdict === "BUILD" ? pc.green : (dossier.overallVerdict === "BUILD_IF_VALIDATED" ? pc.green : (dossier.overallVerdict === "REFINE" ? pc.yellow : pc.red));
     console.log(`  Overall Verdict    : ${verdictColor(pc.bold(dossier.overallVerdict))}`);
-    console.log(`  Composite Resilience: ${verdictColor(pc.bold(`${dossier.killScore}/100`))} (Confidence: ${dossier.confidenceScore}%, Risk: ${dossier.riskLevel === "LOW" ? pc.green(dossier.riskLevel) : pc.yellow(dossier.riskLevel)})`);
-    
+    console.log(`  Composite Resilience: ${verdictColor(pc.bold(`${dossier.killScore}/100`))} (Swarm Agreement: ${dossier.confidenceScore}%, Risk: ${dossier.riskLevel === "LOW" ? pc.green(dossier.riskLevel) : pc.yellow(dossier.riskLevel)})`);
+
+    if (dossier.swarmDissent) {
+      const sd = dossier.swarmDissent;
+      console.log(`  Swarm Dissent      : spread ${sd.scoreSpread}pts | kill-grade agents ${sd.killGradeAgents}/6 | avg score ${sd.avgAgentScore}/100`);
+      if (sd.verdictContested) {
+        console.log(pc.yellow(`  ⚠️  Verdict Contested: ${sd.killGradeAgents} agents issue kill-grade scores while the composite clears 50 — human judgment required.`));
+      }
+    }
+
     if (dossier.epistemicSummary) {
       const es = dossier.epistemicSummary;
       console.log(`  Epistemic Balance  : ${pc.cyan(`${es.verifiedFactsCount} Facts`)} | ${pc.green(`${es.verifiedComputationsCount} Computations`)} | ${pc.magenta(`${es.externalEvidenceCount} External Evidence`)} | ${pc.yellow(`${es.modelledAssumptionsCount} Hypotheses`)} | ${pc.blue(`${es.inferencesCount} Inferences`)} | ${pc.red(`${es.unknownsCount} Unknowns`)} | ${pc.red(`${es.contradictionsCount} Contradictions`)}`);

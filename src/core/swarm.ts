@@ -16,6 +16,7 @@ import {
   CheapestValidationExperiment,
   EpistemicTier,
   EpistemicTaxonomySummary,
+  SwarmDissent,
   ValidationVerdict,
   SwarmEvent,
   IdeaDomainArchetype,
@@ -842,7 +843,8 @@ Market & Prediction Signals: ${marketContext}`;
         const opinion: AgentOpinion = live?.opinion || this.generateHeuristicOpinion(role, idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
         opinion.telemetryMetadata = {
           latencyMs: Date.now() - roleStart,
-          threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE"
+          threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE",
+          modelId: live?.opinion ? getLLMStatus().activeModel : "deterministic-heuristics"
         };
         emit({
           type: "agent_opinion",
@@ -1293,7 +1295,18 @@ Market & Prediction Signals: ${marketContext}`;
       }
     }
 
-    const confidenceScore = Math.min(Math.max(compositeScore + 10, 65), 95);
+    // Honest swarm-agreement signal (replaces the cosmetic composite+10 confidence):
+    // agreement strength, not idea quality — a split swarm means the verdict needs
+    // human judgment, and that signal must never be averaged away.
+    const killGradeAgents = initialScores.filter((s) => s < 40).length;
+    const avgAgentScore = Math.round(initialScores.reduce((a, b) => a + b, 0) / initialScores.length);
+    const swarmDissent: SwarmDissent = {
+      scoreSpread,
+      killGradeAgents,
+      avgAgentScore,
+      verdictContested: killGradeAgents >= 2 && compositeScore >= 50
+    };
+    const confidenceScore = Math.round(Math.max(25, Math.min(92, 90 - scoreSpread * 0.7 - killGradeAgents * 5)));
 
     // 08 STRUCTURED EVIDENCE WITH PROVENANCE
     const strongestEvidence = evidenceFeed[0];
@@ -1395,7 +1408,8 @@ Market & Prediction Signals: ${marketContext}`;
       telemetryMetadata: {
         latencyMs: Date.now() - synthesisStart,
         claimsVerified: evidenceFeed.length,
-        threatSeverity: riskLevel
+        threatSeverity: riskLevel,
+        modelId: evaluationMode === "LIVE_LLM" ? getLLMStatus().activeModel : "deterministic-heuristics"
       }
     };
 
@@ -1445,6 +1459,7 @@ Market & Prediction Signals: ${marketContext}`;
       verificationAudit: audit,
       killScore: compositeScore,
       confidenceScore,
+      swarmDissent,
       overallVerdict,
       riskLevel,
       executiveSummary: executiveSynthesizerOpinion.rationale,

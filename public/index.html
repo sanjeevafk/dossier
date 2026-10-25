@@ -552,6 +552,10 @@
               </div>
 
               <p id="resExecutiveSummary" class="text-sm text-zinc-700 mt-2 max-w-3xl leading-relaxed"></p>
+              <div id="resTrustBlock" class="hidden mt-3 font-mono text-[11px] space-y-1 bg-zinc-50 border border-zinc-200 rounded-lg p-2.5">
+                <div id="resSwarmDissent" class="text-zinc-700"></div>
+                <div id="resEvidenceSources" class="text-zinc-500 break-all"></div>
+              </div>
 
               <!-- Export Buttons -->
               <div class="flex flex-wrap items-center gap-2 pt-3">
@@ -572,7 +576,7 @@
               </div>
               <div class="bg-white border border-zinc-200 p-3.5 rounded-xl text-center md:text-right min-w-[170px] font-mono text-xs shadow-2xs space-y-1">
                 <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RESILIENCE:</span><span id="resScoreVal" class="text-zinc-900 font-bold">78/100</span></div>
-                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">CONFIDENCE:</span><span id="resConfidence" class="text-zinc-900 font-bold">84%</span></div>
+                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">SWARM AGREEMENT:</span><span id="resConfidence" class="text-zinc-900 font-bold">84%</span></div>
                 <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RISK:</span><span id="resRiskLevel" class="text-amber-600 font-bold">MEDIUM</span></div>
               </div>
             </div>
@@ -1687,6 +1691,24 @@
       document.getElementById('resExecutiveSummary').textContent = dossier.executiveSummary;
       document.getElementById('resConfidence').textContent = `${dossier.confidenceScore}%`;
       document.getElementById('resRiskLevel').textContent = dossier.riskLevel;
+      const evalMode = dossier.evaluationMode || 'UNKNOWN';
+      document.getElementById('resDossierStatus').textContent = `STATUS: COMPILED • ${evalMode === 'LIVE_LLM' ? 'LIVE LLM SWARM' : evalMode === 'HEURISTIC_ENGINE' ? 'HEURISTIC ENGINE' : evalMode}`;
+
+      // Honest trust block: swarm dissent + actually-retrieved evidence sources
+      const trustBlock = document.getElementById('resTrustBlock');
+      if (trustBlock) {
+        const sd = dossier.swarmDissent;
+        const sources = dossier.externalEvidenceSources || [];
+        const dissentLine = sd
+          ? `SWARM DISSENT: spread ${sd.scoreSpread}pts · kill-grade ${sd.killGradeAgents}/6 · avg ${sd.avgAgentScore}/100${sd.verdictContested ? ' · ⚠ VERDICT CONTESTED — human judgment required' : ''}`
+          : '';
+        const srcLine = sources.length > 0
+          ? `SOURCES (${sources.length}): ${sources.slice(0, 3).map(s => s.title.slice(0, 48)).join(' · ')}${sources.length > 3 ? ` · +${sources.length - 3} more` : ''}`
+          : `SOURCES: none retrieved — signals below are heuristic priors, not sourced evidence`;
+        trustBlock.classList.remove('hidden');
+        document.getElementById('resSwarmDissent').textContent = dissentLine;
+        document.getElementById('resEvidenceSources').textContent = srcLine;
+      }
       if (document.getElementById('resScoreVal')) {
         document.getElementById('resScoreVal').textContent = `${dossier.killScore}/100`;
       }
