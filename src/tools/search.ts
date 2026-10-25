@@ -37,16 +37,19 @@ export interface ResearchFindings {
  */
 export async function performMarketResearch(ideaTitle: string, domainKeywords: string[]): Promise<ResearchFindings> {
   const query = `${ideaTitle} ${domainKeywords.join(" ")}`.trim();
+  const cleanTitle = ideaTitle.trim().slice(0, 120);
 
   const [recon, community] = await Promise.all([
     performLiveWebRecon([
-      `${ideaTitle} competitors alternatives pricing`,
-      `${ideaTitle} ${domainKeywords.slice(0, 2).join(" ")} customer complaints churn reviews`
+      `${cleanTitle} competitors alternatives pricing`,
+      `${cleanTitle} ${domainKeywords.slice(0, 2).join(" ")} customer complaints churn reviews`
     ]),
-    queryCommunitySentiment(ideaTitle)
+    queryCommunitySentiment(cleanTitle)
   ]);
 
-  if (recon.provider === "none" || recon.results.length === 0) {
+  const liveRecon = recon.provider !== "none" && recon.results.length > 0;
+  const cacheHit = recon.provider === "exa:cache" || recon.provider === "tavily:cache";
+  if (!liveRecon) {
     return {
       query,
       dataSource: "none",
@@ -62,7 +65,7 @@ export async function performMarketResearch(ideaTitle: string, domainKeywords: s
   return {
     query,
     dataSource: "live-web-recon",
-    reconProvider: recon.provider,
+    reconProvider: cacheHit ? `${recon.provider} (cached, $0 marginal)` : recon.provider,
     identifiedCompetitors: [],
     marketSignals: recon.results.map((r) => `${r.title} — ${r.url}`),
     rawResults: recon.results,

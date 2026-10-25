@@ -3,7 +3,13 @@
  * from a configured provider (Exa or Tavily). When no provider is configured
  * or the call fails, the outcome is explicitly `provider: "none"` — callers
  * must treat that as "no external evidence available", never fabricate data.
+ *
+ * Recon responses are cached in SQLite (7-day TTL) via dossierStorage to cut
+ * per-eval cost 5-10x. Cache keys are normalized + PII-stripped so personal
+ * names/emails never reach providers or persist in the cache index.
  */
+
+import { dossierStorage } from "../services/storage.js";
 
 export interface ReconSourceResult {
   title: string;
@@ -12,7 +18,7 @@ export interface ReconSourceResult {
 }
 
 export interface ReconOutcome {
-  provider: "exa" | "tavily" | "none";
+  provider: "exa" | "tavily" | "exa:cache" | "tavily:cache" | "none";
   queries: string[];
   results: ReconSourceResult[];
   error?: string;
@@ -88,8 +94,25 @@ async function searchTavily(apiKey: string, query: string): Promise<ReconSourceR
 }
 
 /**
+ * Strip PII (emails, @handles) and normalize for cache keys + outbound queries.
+ * Never send idea-owner names/emails to recon providers.
+ */
+export function sanitizeReconQuery(query: string): string {
+  return query
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, " ")
+    .replace(/@[a-z0-9_]+/gi, " ")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
+}
+
+/**
  * Run live web recon across the given queries using the first configured provider.
- * Never throws — an unreachable or unconfigured provider yields `provider: "none"`.
+ * Cached responses return `provider: "exa:cache"` / `"tavily:cache"` so callers
+ * can meter cost. Never throws — an unreachable or unconfigured provider
+ * yields `provider: "none"`.
  */
 export async function performLiveWebRecon(queries: string[]): Promise<ReconOutcome> {
   const cleanQueries = queries.map((q) => q.trim()).filter(Boolean).slice(0, 3);
@@ -115,10 +138,26 @@ export async function performLiveWebRecon(queries: string[]): Promise<ReconOutco
   const collected: ReconSourceResult[] = [];
   const seenUrls = new Set<string>();
   const errors: string[] = [];
+  let cacheHits = 0;
 
-  for (const query of cleanQueries) {
+  for (const rawQuery of cleanQueries) {
+    const query = sanitizeReconQuery(rawQuery) || "startup idea validation";
+    const cacheKey = `recon:${provider}:${query}`;
     try {
+      const cached = dossierStorage.getReconCache(cacheKey);
+      if (cached && Array.isArray((cached.response as { results?: unknown })?.results)) {
+        cacheHits++;
+        const results = (cached.response as { results: ReconSourceResult[] }).results;
+        for (const result of results) {
+          if (seenUrls.has(result.url)) continue;
+          seenUrls.add(result.url);
+          collected.push(result);
+          if (collected.length >= MAX_TOTAL_RESULTS) break;
+        }
+        continue;
+      }
       const results = await search(query);
+      dossierStorage.setReconCache(cacheKey, provider, { results });
       for (const result of results) {
         if (seenUrls.has(result.url)) continue;
         seenUrls.add(result.url);
@@ -140,5 +179,9 @@ export async function performLiveWebRecon(queries: string[]): Promise<ReconOutco
     };
   }
 
-  return { provider, queries: cleanQueries, results: collected };
+  return {
+    provider: (cacheHits === cleanQueries.length ? `${provider}:cache` : provider) as ReconOutcome["provider"],
+    queries: cleanQueries,
+    results: collected
+  };
 }

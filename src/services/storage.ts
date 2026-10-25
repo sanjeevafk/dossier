@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { IdeaDossier, ApprovalAction } from "../types/index.js";
@@ -50,6 +51,7 @@ export class DossierStorageService {
 
   private getDb(): SqliteDb {
     if (this.db) return this.db;
+    fsSync.mkdirSync(DATA_DIR, { recursive: true });
     const Database = require("better-sqlite3");
     const db: SqliteDb = new Database(DB_PATH);
     db.exec(`
