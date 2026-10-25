@@ -43,23 +43,28 @@ program
       monetization: options.monetization
     };
 
-    console.log(pc.bold("Target Concept: "), pc.green(ideaInput.title));
-    console.log(pc.bold("Target Audience:"), ideaInput.targetAudience);
-    console.log(pc.bold("Monetization:   "), ideaInput.monetization);
-    console.log(pc.dim("\n-------------------------------------------------------"));
+    if (!options.json) {
+      console.log(pc.bold("Target Concept: "), pc.green(ideaInput.title));
+      console.log(pc.bold("Target Audience:"), ideaInput.targetAudience);
+      console.log(pc.bold("Monetization:   "), ideaInput.monetization);
+      console.log(pc.dim("\n-------------------------------------------------------"));
+    }
 
     const orchestrator = new IdeaSwarmOrchestrator();
 
     const dossier = await orchestrator.evaluateIdea(ideaInput, {
       pricingMonthlyUsd: parseFloat(options.pricing),
       estimatedCacUsd: parseFloat(options.cac),
-      onProgress: (stage, detail) => {
+      onProgress: options.json ? undefined : (stage, detail) => {
         console.log(`[${pc.magenta(stage)}] ${detail}`);
       }
     });
 
+    if (options.json) {
+      console.log(JSON.stringify({ success: true, dossier }, null, 2));
+    } else {
     console.log(pc.dim("-------------------------------------------------------\n"));
-    
+
     // Domain Classification
     const domain = dossier.domainClassification;
     console.log(pc.bold(pc.yellow(`🎯 DOMAIN CLASSIFICATION: [${domain.archetypeLabel}]`)));
@@ -192,6 +197,7 @@ program
     }
 
     console.log(pc.green("\n✔ Full evidence-first dossier compiled successfully.\n"));
+    }
 
     if (options.export) {
       const isJson = options.export.endsWith(".json");

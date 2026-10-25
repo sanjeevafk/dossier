@@ -50,9 +50,10 @@ test("Dossier Orchestrator evaluates idea and generates complete intelligence do
     summary: "Scans cloud infra for SOC2/HIPAA violations and creates remediation PRs.",
     targetAudience: "B2B SaaS CTOs",
     monetization: "$499/mo per company"
-  });
+  }, { useLiveLLM: false });
 
   assert.ok(dossier.id, "Dossier must have an ID");
+  assert.equal(dossier.evaluationMode, "HEURISTIC_ENGINE", "Offline evaluation must be labeled as heuristic engine");
   assert.ok(dossier.killScore >= 0 && dossier.killScore <= 100, "Kill score must be between 0 and 100");
   assert.ok(dossier.roleAssessments.redteam, "Red Team assessment must be present");
   assert.ok(dossier.roleAssessments.investor, "Investor assessment must be present");
@@ -66,6 +67,36 @@ test("Dossier Orchestrator evaluates idea and generates complete intelligence do
   assert.ok(dossier.debateTrail.length >= 3, "Round 1 debate trail must be populated");
   assert.ok(dossier.approvalGates.length > 0, "Human approval gates must be defined");
   assert.equal(dossier.approvalGates[0].status, "PENDING_HUMAN_APPROVAL");
+
+  // Honesty invariants: no fabricated external evidence, no synthetic telemetry.
+  const evidenceText = dossier.evidenceFeed.map((e) => `${e.provenance} ${e.claim}`).join(" ");
+  assert.ok(!evidenceText.includes("Agent Reach Community Reconnaissance"), "Fabricated community recon must not appear");
+  const communityItems = dossier.evidenceFeed.filter((e) => /^EV-04C/.test(e.id));
+  const noReconItem = dossier.evidenceFeed.find((e) => e.id.startsWith("EV-04") && !/^EV-04C/.test(e.id));
+  if (communityItems.length === 0) {
+    assert.ok(noReconItem, "With no community evidence, the EV-04 absence record must exist");
+    assert.equal(noReconItem.tier, "UNKNOWN", "Without external evidence, EV-04 must be UNKNOWN, not EXTERNAL_EVIDENCE");
+    assert.ok(noReconItem.claim.includes("No live external evidence"), "EV-04 must state the absence honestly");
+  } else {
+    for (const item of communityItems) {
+      assert.equal(item.tier, "EXTERNAL_EVIDENCE", "Community items must be labeled EXTERNAL_EVIDENCE");
+      assert.ok(item.provenance.startsWith("http"), "Community evidence must carry a real source URL");
+    }
+  }
+  assert.ok(Array.isArray(dossier.externalEvidenceSources), "externalEvidenceSources must be present");
+  for (const [, op] of Object.entries(dossier.roleAssessments)) {
+    const t = op.telemetryMetadata || {};
+    assert.equal(typeof t.latencyMs, "number", "Agent latency must be measured, not random");
+    assert.ok(t.latencyMs >= 0 && t.latencyMs < 120000, "Agent latency must be plausible");
+  }
+  // Debate trail must cite the red team's actual fatal flaw, not a fixed narrative.
+  const rtClash = dossier.debateTrail.find((c) => c.challenger === "redteam");
+  assert.ok(rtClash, "Red team must appear as challenger");
+  const rtFlaw = dossier.roleAssessments.redteam.fatalFlaws[0] || "";
+  assert.ok(
+    !rtFlaw || rtClash.challengePoint.includes(rtFlaw.split(" ").slice(0, 4).join(" ")),
+    "Round-1 challenge must cite the red team's actual fatal flaw"
+  );
 
   // Phase 2: stochastic Monte Carlo sandbox coverage
   assert.ok(dossier.simulation.monteCarlo, "Monte Carlo statistics must be present");

@@ -9,6 +9,7 @@ import {
   KeyAssumption,
   Contradiction,
   EvidenceItem,
+  ExternalEvidenceSource,
   RiskLevel,
   DomainClassification,
   ResilienceScoreBreakdown,
@@ -25,6 +26,7 @@ import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
 import { StanfordRobustVerifier } from "./verifier.js";
 import { buildMutationProposals } from "./mutator.js";
+import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
@@ -172,11 +174,13 @@ Domain: ${domain.archetypeLabel}
 Market & Prediction Signals: ${marketContext}`;
 
     try {
+      const turnStart = Date.now();
       const raw = await generateAgentTurn(systemPrompt, userPrompt, {
         temperature: 0.5,
         maxTokens: 2000,
         jsonMode: true
       });
+      const turnLatencyMs = Date.now() - turnStart;
 
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -235,8 +239,7 @@ Market & Prediction Signals: ${marketContext}`;
           mustTestBeforeBuilding: parsed.mustTestBeforeBuilding ?? [],
           rationale: parsed.rationale || `Evaluated through ${domain.archetypeLabel} domain lens.`,
           telemetryMetadata: {
-            latencyMs: Math.floor(Math.random() * 250) + 120,
-            claimsVerified: 5,
+            latencyMs: turnLatencyMs,
             threatSeverity: score < 50 ? "HIGH" : "MODERATE"
           }
         }
@@ -405,7 +408,6 @@ Market & Prediction Signals: ${marketContext}`;
 
     switch (role) {
       case "analyst": {
-        const compCount = marketResearch.identifiedCompetitors.length;
         if (isThinWrapper) {
           score = 35;
           verdict = "PIVOT_REQUIRED";
@@ -418,15 +420,20 @@ Market & Prediction Signals: ${marketContext}`;
           mustTestBeforeBuilding = ["Prove negative customer acquisition cost (CAC) via organic SEO or open-source community distribution."];
           rationale = "Market Recon: Saturated commodity category with zero structural switching friction.";
         } else {
-          score = Math.max(35, Math.min(88, 75 - (compCount * 4) + (domain.archetype === "deeptech_research" ? 8 : -3)));
+          const reconCount = marketResearch.rawResults.length;
+          score = Math.max(35, Math.min(88, 75 - (reconCount > 4 ? 8 : 0) + (domain.archetype === "deeptech_research" ? 8 : -3)));
           verdict = score >= 75 ? "STRONG_PURSUE" : (score >= 60 ? "VIABLE_WITH_RISK" : "PIVOT_REQUIRED");
-          fatalFlaws = compCount > 2 
-            ? [`High competitive crowding: ${compCount} direct and indirect competitors already control primary distribution channels.`]
-            : [`Unclear differentiation against established ${domain.archetypeLabel} incumbents.`];
+          fatalFlaws = [reconCount > 0
+            ? `Competitive crowding signal: live recon returned ${reconCount} closely-related results — differentiation must be verified against them.`
+            : `Unclear differentiation against established ${domain.archetypeLabel} incumbents — no live recon was available to map the field.`];
           keyAssumptions = [`Market demand in ${domain.primaryCustomer} is active and funded.`];
-          competitiveRisks = marketResearch.identifiedCompetitors.map((c: any) => `${c.name} (${c.category}): ${c.vulnerability}`);
+          competitiveRisks = reconCount > 0
+            ? marketResearch.rawResults.slice(0, 3).map((r: { title: string; url: string }) => `${r.title} (${r.url})`)
+            : ["Competitive landscape unverified — no live recon provider was available during this evaluation."];
           mustTestBeforeBuilding = [`Validate addressable budget allocations across 10 prospective buyers in ${domain.primaryCustomer}.`];
-          rationale = `Evaluated competitive whitespace and demand signals for ${domain.archetypeLabel}.`;
+          rationale = reconCount > 0
+            ? `Evaluated competitive whitespace for ${domain.archetypeLabel} against ${reconCount} live recon sources (${marketResearch.reconProvider}).`
+            : `Evaluated ${domain.archetypeLabel} whitespace from heuristic priors only — no live recon was available.`;
         }
         break;
       }
@@ -711,12 +718,7 @@ Market & Prediction Signals: ${marketContext}`;
       keyAssumptions,
       competitiveRisks,
       mustTestBeforeBuilding,
-      rationale,
-      telemetryMetadata: {
-        latencyMs: Math.floor(Math.random() * 80) + 40,
-        claimsVerified: 4,
-        threatSeverity: score < 50 ? "HIGH" : "MODERATE"
-      }
+      rationale
     };
   }
 
@@ -787,13 +789,44 @@ Market & Prediction Signals: ${marketContext}`;
     });
 
     const mc = sandboxSim.metrics.monteCarlo;
-    const marketContext = `Comps: ${marketResearch.identifiedCompetitors.map(c => c.name).join(", ")}. Signals: ${marketResearch.marketSignals.join("; ")}. Macro Odds: ${polymarketSignals.keyTakeaway}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
+
+    // Evidence provenance block: only REAL retrieved sources are described as
+    // sourced. When recon/markets/community are unavailable this is stated
+    // explicitly so agents never mistake heuristic priors for external evidence.
+    const reconSourceParts: string[] = [];
+    if (marketResearch.dataSource === "live-web-recon" && marketResearch.rawResults.length > 0) {
+      reconSourceParts.push(
+        `Live web recon (${marketResearch.reconProvider}): ${marketResearch.rawResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
+      );
+    } else {
+      reconSourceParts.push(
+        `No live web recon results were retrieved (${marketResearch.reconError || "provider unavailable"}) — treat competitive and demand statements as heuristic priors, not sourced evidence.`
+      );
+    }
+    if (marketResearch.community.discussions.length > 0) {
+      reconSourceParts.push(
+        `Community discussions (${marketResearch.community.provider}): ${marketResearch.community.discussions.slice(0, 3).map(d => `"${d.title}"${typeof d.score === "number" ? ` (${d.score} pts${typeof d.comments === "number" ? `, ${d.comments} comments` : ""})` : ""} [${d.url}]`).join("; ")}`
+      );
+    } else {
+      reconSourceParts.push("No community discussions (Reddit/HN/X) were retrievable for this concept.");
+    }
+    if (polymarketSignals.marketsFound.length > 0) {
+      reconSourceParts.push(
+        `Prediction markets: ${polymarketSignals.marketsFound.map(m => `"${m.title}" @ ${m.probabilityYesPercent}% [${m.marketUrl}]`).join("; ")}. ${polymarketSignals.keyTakeaway}`
+      );
+    } else {
+      reconSourceParts.push(polymarketSignals.keyTakeaway);
+    }
+
+    const marketContext = `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
 
     // 03 INVESTIGATE (Domain-Tailored Specialist Subagents)
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
     emit({ type: "stage", stage: "03 INVESTIGATE", detail: `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`, timestamp: new Date().toISOString() });
 
     const shouldCallLive = options.useLiveLLM !== false;
+    const evaluationMode: "LIVE_LLM" | "HEURISTIC_ENGINE" =
+      shouldCallLive && getLLMStatus().hasLiveLLM ? "LIVE_LLM" : "HEURISTIC_ENGINE";
 
     // Stream agents live: each role emits agent_start when it begins computing
     // and agent_opinion the moment its (LLM or heuristic) opinion resolves.
@@ -801,11 +834,16 @@ Market & Prediction Signals: ${marketContext}`;
     const [analystOpinion, customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion] = await Promise.all(
       AGENT_ROLES.map(async (role) => {
         emit({ type: "agent_start", role, roleTitle: domain.specialistRoleLabels[role].title });
+        const roleStart = Date.now();
         const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, marketContext, domain, invariants) : null;
         if (live?.fallbackReason) {
           emit({ type: "parse_fallback", role, reason: live.fallbackReason });
         }
         const opinion: AgentOpinion = live?.opinion || this.generateHeuristicOpinion(role, idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+        opinion.telemetryMetadata = {
+          latencyMs: Date.now() - roleStart,
+          threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE"
+        };
         emit({
           type: "agent_opinion",
           role: opinion.role,
@@ -818,42 +856,101 @@ Market & Prediction Signals: ${marketContext}`;
       })
     );
 
-    // 04 ATTACK & CROSS-EXAMINE (Adversarial Round 1)
+    // 04 ATTACK & CROSS-EXAMINE (Adversarial Round 1 — authored from actual agent outputs)
     notify("04 ATTACK", `Red Team deploying fatal assumption attacks across [${domain.archetypeLabel}]...`);
 
-    const debateTrail: DebateChallenge[] = [
-      {
-        challenger: "redteam",
-        target: "investor",
-        round: 1,
-        challengePoint: `Investor models healthy cash flows, but ${domain.procurementCycle} will create a 6–12 month revenue drought before first settlement.`,
-        rebuttal: `Mitigate by securing upfront milestone mobilization grants or paid proof-of-concept deposits rather than waiting for full RFP completion.`,
-        status: "REBUTTED"
+    const debateInput: DebateTrailInput = {
+      opinions: {
+        analyst: analystOpinion,
+        customer: customerOpinion,
+        architect: architectOpinion,
+        investor: investorOpinion,
+        redteam: redTeamOpinion,
+        expert: expertOpinion
       },
-      {
-        challenger: "customer",
-        target: "architect",
-        round: 1,
-        challengePoint: `Architect assumes operators will interact via dashboard, but ${domain.primaryCustomer} operate in high-friction field conditions with zero time for complex UIs.`,
-        rebuttal: `Enforce voice-native or automated edge triggers so field operators require zero manual data entry.`,
-        status: "CONCEDED"
-      },
-      {
-        challenger: "redteam",
-        target: "customer",
-        round: 1,
-        challengePoint: `Customer advocate assumes ${domain.primaryCustomer} have burning urgency, but legacy habits and lack of budget authority create high pilot churn.`,
-        rebuttal: `Must prove willingness to adopt via an unbranded pre-commitment or formal Letter of Intent (LOI) before full build.`,
-        status: "OPEN"
+      procurementCycle: domain.procurementCycle,
+      primaryCustomer: domain.primaryCustomer,
+      sandboxMetrics: {
+        ltvCacRatio: sandboxSim.metrics.ltvCacRatio,
+        estimatedPaybackMonths: sandboxSim.metrics.estimatedPaybackMonths
       }
-    ];
+    };
+    const { trail: roundOneTrail, source: debateSource } = await buildRoundOneDebateTrail(
+      debateInput,
+      shouldCallLive && getLLMStatus().hasLiveLLM
+    );
+    notify("04 ATTACK [ROUND 1]", `Crossfire authored via ${debateSource} — challenges cite actual agent claims.`);
 
+    const debateTrail: DebateChallenge[] = roundOneTrail;
     for (const clash of debateTrail) {
       emit({ type: "crossfire_clash", challenger: clash.challenger, target: clash.target, challengePoint: clash.challengePoint, rebuttal: clash.rebuttal || "", status: clash.status });
     }
 
     // 05 VERIFY (Sandboxed Python Subprocess & Stanford CS329A Robust Verifier)
     notify("05 VERIFY", "Verifying sandboxed Python metrics & executing Stanford CS329A Robust Verifier...");
+
+    // External evidence items are included ONLY when real sources were actually
+    // retrieved. When nothing was retrieved, an explicit UNKNOWN item records
+    // that absence — the feed never presents heuristic priors as sourced data.
+    const externalEvidenceItems: EvidenceItem[] = [];
+    let retrievedExternalCount = 0;
+    if (polymarketSignals.marketsFound.length > 0) {
+      const top = polymarketSignals.marketsFound[0];
+      externalEvidenceItems.push({
+        id: "EV-03",
+        claim: `Macro prediction market sentiment: ${polymarketSignals.keyTakeaway} Top correlated market: "${top.title}" at ${top.probabilityYesPercent}%.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: `Polymarket Gamma API [${top.marketUrl}]`,
+        indicator: polymarketSignals.macroSentiment === "BEARISH" ? "CONTRADICTING" : "SUPPORTING",
+        confidencePercent: 75
+      });
+      retrievedExternalCount++;
+    }
+    if (marketResearch.dataSource === "live-web-recon" && marketResearch.rawResults.length > 0) {
+      marketResearch.rawResults.slice(0, 2).forEach((r, i) => {
+        externalEvidenceItems.push({
+          id: i === 0 ? "EV-04" : `EV-04${String.fromCharCode(65 + i)}`,
+          claim: `Live web recon result (${marketResearch.reconProvider}): "${r.title}" — ${r.snippet}`,
+          tier: "EXTERNAL_EVIDENCE",
+          claimType: "EXTERNAL_EVIDENCE",
+          provenance: r.url,
+          indicator: "NEUTRAL",
+          confidencePercent: 70
+        });
+        retrievedExternalCount++;
+      });
+    }
+    marketResearch.community.discussions.slice(0, 2).forEach((d, i) => {
+      const stats = [typeof d.score === "number" ? `${d.score} pts` : null, typeof d.comments === "number" ? `${d.comments} comments` : null]
+        .filter(Boolean)
+        .join(", ");
+      externalEvidenceItems.push({
+        id: `EV-04${String.fromCharCode(67 + i)}`, // EV-04C, EV-04D … community items
+        claim: `Community discussion on ${d.platform}: "${d.title}"${stats ? ` (${stats})` : ""}`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: d.url,
+        indicator: "NEUTRAL",
+        confidencePercent: 70
+      });
+      retrievedExternalCount++;
+    });
+    if (retrievedExternalCount === 0) {
+      const reasons = [
+        marketResearch.dataSource !== "live-web-recon" ? marketResearch.reconError || "no web recon results" : null,
+        marketResearch.community.errors.length > 0 ? marketResearch.community.errors.join("; ") : "no community discussions retrievable"
+      ].filter(Boolean).join(" | ");
+      externalEvidenceItems.push({
+        id: "EV-04",
+        claim: `No live external evidence was retrieved (${reasons}) — competitive landscape, demand, and community signals in this dossier are heuristic priors, NOT sourced external evidence.`,
+        tier: "UNKNOWN",
+        claimType: "UNKNOWN",
+        provenance: "Dossier Runtime (recon unavailable)",
+        indicator: "NEUTRAL",
+        confidencePercent: 90
+      });
+    }
 
     const evidenceFeed: EvidenceItem[] = [
       {
@@ -874,24 +971,7 @@ Market & Prediction Signals: ${marketContext}`;
         indicator: "SUPPORTING",
         confidencePercent: 95
       },
-      {
-        id: "EV-03",
-        claim: `Macro prediction market sentiment: ${polymarketSignals.keyTakeaway}`,
-        tier: "EXTERNAL_EVIDENCE",
-        claimType: "EXTERNAL_EVIDENCE",
-        provenance: `Polymarket Gamma Live Oracle (${polymarketSignals.source})`,
-        indicator: polymarketSignals.macroSentiment === "BEARISH" ? "CONTRADICTING" : "SUPPORTING",
-        confidencePercent: 82
-      },
-      {
-        id: "EV-04",
-        claim: `Sourced community signal: Field operators in ${domain.primaryCustomer} exhibit high problem awareness but strong workflow inertia.`,
-        tier: "EXTERNAL_EVIDENCE",
-        claimType: "EXTERNAL_EVIDENCE",
-        provenance: "Agent Reach Community Reconnaissance (Reddit/HN/X)",
-        indicator: "CONTRADICTING",
-        confidencePercent: 78
-      },
+      ...externalEvidenceItems,
       {
         id: "EV-05",
         claim: `Founder hypothesis: Target buyers will switch to the new solution within 30 days without extensive organizational change management.`,
@@ -921,10 +1001,10 @@ Market & Prediction Signals: ${marketContext}`;
       },
       {
         id: "EV-08",
-        claim: `Unresolved contradiction: High reported willingness-to-pay vs absence of signed Letters of Intent (LOIs) in ${domain.primaryCustomer}.`,
+        claim: `Unresolved contradiction: Customer Advocate assumes buyer urgency ("${customerOpinion.keyAssumptions[0] || customerOpinion.rationale}") while Red Team flags "${redTeamOpinion.fatalFlaws[0] || "unproven willingness to pay"}" — and no purchase commitment has been secured.`,
         tier: "CONTRADICTED",
         claimType: "CONTRADICTED",
-        provenance: "Customer Advocate vs Red Team Debate Clash",
+        provenance: `Customer Advocate vs Red Team Debate Clash (${debateSource})`,
         indicator: "CONTRADICTING",
         confidencePercent: 60
       }
@@ -1006,7 +1086,9 @@ Market & Prediction Signals: ${marketContext}`;
         defenderOpinion,
         {
           stressSummary: `run_sandbox_economics(stress): churn ${(Math.min(1, churn * 1.6) * 100).toFixed(0)}%, CAC $${Math.round(cac * 1.6)} → P50 LTV/CAC ${stressSim.metrics.ltvCacRatio}x, survival@24mo ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0)) * 100).toFixed(0)}%, payback P50 ${stressSim.metrics.estimatedPaybackMonths}mo.`,
-          reconSummary: `search_competitor_recon("${contestedClaim.split(/\s+/).slice(0, 4).join(" ")}") → ${marketResearch.identifiedCompetitors.slice(0, 3).map(c => `${c.name} [${c.vulnerability}]`).join("; ")}`,
+          reconSummary: marketResearch.dataSource === "live-web-recon"
+            ? `search_competitor_recon("${contestedClaim.split(/\s+/).slice(0, 4).join(" ")}") → ${marketResearch.rawResults.slice(0, 3).map(r => `${r.title} [${r.url}]`).join("; ")}`
+            : `search_competitor_recon("${contestedClaim.split(/\s+/).slice(0, 4).join(" ")}") → no live recon results (${marketResearch.reconError || "provider unavailable"}); defense must rely on modeled priors`,
           contestedClaim,
           stressLtvCacRatio: stressSim.metrics.ltvCacRatio,
           stressSurvival24: stressSim.metrics.monteCarlo?.survivalProbability24Mo,
@@ -1022,6 +1104,7 @@ Market & Prediction Signals: ${marketContext}`;
     }
 
     // 07 TRANSPARENT DIMENSIONAL RESILIENCE SCORING WITH TRACEABLE FACTOR ATTRIBUTION
+    const synthesisStart = Date.now();
     notify("07 VERDICT", "Synthesizing transparent 5-dimensional resilience breakdown & factor attribution...");
 
     const technicalFeasibility = Math.max(10, Math.min(100, Math.round(
@@ -1283,11 +1366,16 @@ Market & Prediction Signals: ${marketContext}`;
       {
         id: "C02",
         agentA: roleLabels.customer.title,
-        claimA: `Field operators require zero-friction voice/edge inputs to adopt in high-stress operational environments.`,
+        claimA: `Customer Advocate at ${customerOpinion.score}/100 flags: "${customerOpinion.fatalFlaws[0] || "adoption friction unresolved"}"`,
         agentB: roleLabels.architect.title,
-        claimB: `Cloud API orchestration offers richer feature complexity than disconnected edge models.`,
-        resolutionStatus: "RESOLVED // ASSUMPTION MITIGATED",
-        guidance: `Architect will deploy client-side edge models for critical operational triage, syncing metadata asynchronously.`
+        claimB: `Architect at ${architectOpinion.score}/100 holds: "${architectOpinion.keyAssumptions[0] || architectOpinion.rationale}"`,
+        resolutionStatus:
+          architectOpinion.score - customerOpinion.score > 15
+            ? "UNRESOLVED CONFLICT // REQUIRES VALIDATION"
+            : "RESOLVED // ASSUMPTION MITIGATED",
+        guidance:
+          architectOpinion.mustTestBeforeBuilding[0] ||
+          `Validate the ${domain.primaryCustomer} workflow-fit assumption with direct field observation before build.`
       },
       ...(crossfireContradiction ? [crossfireContradiction] : [])
     ];
@@ -1305,8 +1393,8 @@ Market & Prediction Signals: ${marketContext}`;
       mustTestBeforeBuilding: [cheapestValidationExperiment.title],
       rationale: `Swarm consensus for [${domain.archetypeLabel}]: Concept has strong technical grounding (${technicalFeasibility}/100) and regulatory fit (${defensibilityAndMoat}/100), but must resolve commercial procurement and habit inertia (${demandAndAdoption}/100) before committing full MVP engineering.`,
       telemetryMetadata: {
-        latencyMs: 150,
-        claimsVerified: 6,
+        latencyMs: Date.now() - synthesisStart,
+        claimsVerified: evidenceFeed.length,
         threatSeverity: riskLevel
       }
     };
@@ -1339,10 +1427,18 @@ Market & Prediction Signals: ${marketContext}`;
       }
     ];
 
+    const externalEvidenceSources: ExternalEvidenceSource[] = [
+      ...marketResearch.rawResults.map(r => ({ title: r.title, url: r.url, provider: marketResearch.reconProvider })),
+      ...marketResearch.community.discussions.map(d => ({ title: d.title, url: d.url, provider: d.platform })),
+      ...polymarketSignals.marketsFound.map(m => ({ title: m.title, url: m.marketUrl, provider: "polymarket" }))
+    ];
+
     const dossier: IdeaDossier = {
       id: `DOSSIER-${Date.now().toString().slice(-6)}`,
       dossierCode: `TF-007-${domain.archetype.toUpperCase().slice(0, 3)}`,
       timestamp: new Date().toISOString(),
+      evaluationMode,
+      externalEvidenceSources,
       idea,
       domainClassification: domain,
       epistemicSummary,

@@ -262,10 +262,20 @@ export interface VerificationAudit {
   auditItems: VerificationAuditItem[];
 }
 
+export interface ExternalEvidenceSource {
+  title: string;
+  url: string;
+  provider: string; // "exa" | "tavily" | "polymarket"
+}
+
 export interface IdeaDossier {
   id: string;
   dossierCode: string; // e.g. "TF-007"
   timestamp: string;
+  /** Which engine produced this dossier: live LLM swarm or the deterministic heuristic engine. */
+  evaluationMode?: "LIVE_LLM" | "HEURISTIC_ENGINE";
+  /** Actually-retrieved external sources backing this dossier (empty when no recon provider ran). */
+  externalEvidenceSources?: ExternalEvidenceSource[];
   idea: IdeaInput;
   domainClassification: DomainClassification;
   epistemicSummary?: EpistemicTaxonomySummary;
