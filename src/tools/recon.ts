@@ -9,6 +9,8 @@ export interface ReconSourceResult {
   title: string;
   url: string;
   snippet: string;
+  /** Which recon query produced this: "competitive" (rivals/pricing) or "sentiment" (complaints/churn). */
+  queryLabel: "competitive" | "sentiment";
 }
 
 export interface ReconOutcome {
@@ -116,17 +118,18 @@ export async function performLiveWebRecon(queries: string[]): Promise<ReconOutco
   const seenUrls = new Set<string>();
   const errors: string[] = [];
 
-  for (const query of cleanQueries) {
+  for (let q = 0; q < cleanQueries.length; q++) {
+    const queryLabel: ReconSourceResult["queryLabel"] = q === 0 ? "competitive" : "sentiment";
     try {
-      const results = await search(query);
+      const results = await search(cleanQueries[q]);
       for (const result of results) {
         if (seenUrls.has(result.url)) continue;
         seenUrls.add(result.url);
-        collected.push(result);
+        collected.push({ ...result, queryLabel });
         if (collected.length >= MAX_TOTAL_RESULTS) break;
       }
     } catch (err: any) {
-      errors.push(`${query}: ${err?.message || "recon failed"}`);
+      errors.push(`${cleanQueries[q]}: ${err?.message || "recon failed"}`);
     }
     if (collected.length >= MAX_TOTAL_RESULTS) break;
   }

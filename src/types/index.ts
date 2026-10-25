@@ -296,6 +296,8 @@ export interface IdeaDossier {
   killScore: number; // 0 to 100 (composite resilience score)
   confidenceScore: number; // swarm-agreement strength (0-100), NOT idea quality
   swarmDissent?: SwarmDissent;
+  /** IDs of the dated falsifiable forecasts this dossier registered in the calibration ledger. */
+  forecastIds?: string[];
   overallVerdict: ValidationVerdict;
   riskLevel: RiskLevel;
   executiveSummary: string;

@@ -1,4 +1,5 @@
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
+import { getLLMStatus } from "./services/llm.js";
 import { IdeaInput } from "./types/index.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -217,9 +218,17 @@ function modalVerdict(values: string[]): string {
 }
 
 const SCORE_DISPERSION_GATE = 18;
+const REPLAY_SNAPSHOT_PATH = path.join(process.cwd(), "reports", "benchmark_last.json");
 
-export async function runDossierBenchmark(): Promise<void> {
-  const RUNS = Math.max(1, Math.min(5, Number.parseInt(process.env.BENCHMARK_RUNS || "3", 10) || 3));
+type VerdictBand = "BUILD" | "REFINE" | "KILL";
+function verdictBand(v: string): VerdictBand {
+  const normalized = v === "BUILD_IF_VALIDATED" ? "BUILD" : v;
+  return normalized === "BUILD" ? "BUILD" : normalized === "REFINE" ? "REFINE" : "KILL";
+}
+
+export async function runDossierBenchmark(options: { replay?: boolean } = {}): Promise<void> {
+  const replay = options.replay === true;
+  const RUNS = replay ? 1 : Math.max(1, Math.min(5, Number.parseInt(process.env.BENCHMARK_RUNS || "3", 10) || 3));
 
   console.log("\n=======================================================");
   console.log("  ⚡ DOSSIER DOMAIN-AWARE BENCHMARK SUITE");
@@ -374,6 +383,55 @@ export async function runDossierBenchmark(): Promise<void> {
     process.exitCode = 1;
   }
 
+  if (replay) {
+    // Verdict-replay regression: diff this run against the last recorded snapshot.
+    let previous: { results?: Array<{ id: string; score: number; verdict: string }> } | null = null;
+    try {
+      previous = JSON.parse(fs.readFileSync(REPLAY_SNAPSHOT_PATH, "utf-8"));
+    } catch {
+      console.error("\n✗ REPLAY ABORTED: no recorded snapshot at reports/benchmark_last.json — run the full benchmark once first.\n");
+      process.exitCode = 1;
+      return;
+    }
+    const prevById = new Map((previous?.results || []).map((r) => [r.id, r]));
+    console.log("\n🔍 VERDICT REPLAY DIFF (vs recorded snapshot):");
+    let flips = 0;
+    for (const r of results) {
+      const prev = prevById.get(r.id);
+      if (!prev) {
+        console.log(`  ${r.id.padEnd(6)} NEW — no previous record`);
+        continue;
+      }
+      const prevBand = verdictBand(prev.verdict);
+      const nowBand = verdictBand(r.verdict);
+      const delta = r.score - prev.score;
+      const flipped = prevBand !== nowBand;
+      if (flipped) flips++;
+      console.log(`  ${r.id.padEnd(6)} ${String(prev.score).padStart(3)}/100 ${prevBand.padEnd(6)} → ${String(r.score).padStart(3)}/100 ${nowBand.padEnd(6)} (Δ ${delta >= 0 ? "+" : ""}${delta}) ${flipped ? "⚠ VERDICT FLIP" : "ok"}`);
+    }
+    if (flips > 0) {
+      console.error(`\n✗ REPLAY FAILED: ${flips} verdict band flip(s) — a prompt/model change altered outcomes. Investigate before shipping.\n`);
+      process.exitCode = 1;
+    } else {
+      console.log("\n✓ REPLAY PASSED: no verdict band flips.\n");
+    }
+    return;
+  }
+
+  // Record the machine-readable snapshot future replays diff against.
+  try {
+    fs.mkdirSync(path.dirname(REPLAY_SNAPSHOT_PATH), { recursive: true });
+    fs.writeFileSync(REPLAY_SNAPSHOT_PATH, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      provider: getLLMStatus(),
+      runs: RUNS,
+      results: results.map((r) => ({ id: r.id, score: r.score, verdict: r.verdict, verdictBand: verdictBand(r.verdict) }))
+    }, null, 2));
+    console.log(`✔ Replay snapshot saved: ${REPLAY_SNAPSHOT_PATH}`);
+  } catch (err: any) {
+    console.warn(`⚠ Could not save replay snapshot: ${err?.message}`);
+  }
+
   // Export to Markdown Report
   const mdReport = `# Dossier Domain-Aware Adversarial Benchmark Report
 
@@ -418,7 +476,7 @@ ${results.map(r => `| **${r.id}** | ${r.title} | ${r.domainArchetype} | **${r.sc
 
 // Auto-run if executed directly
 if (process.argv[1]?.endsWith("benchmark.ts") || process.argv[1]?.endsWith("benchmark.js")) {
-  runDossierBenchmark().catch((err) => {
+  runDossierBenchmark({ replay: process.argv.includes("--replay") }).catch((err) => {
     console.error("Benchmark failed:", err);
     process.exit(1);
   });

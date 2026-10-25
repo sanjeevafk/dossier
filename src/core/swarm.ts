@@ -33,6 +33,7 @@ import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
+import { forecastLedger } from "../services/ledger.js";
 import { z } from "zod";
 
 export interface SwarmExecutionOptions {
@@ -120,7 +121,7 @@ export class IdeaSwarmOrchestrator {
   private async evaluateRoleWithLLM(
     role: SwarmRole,
     idea: IdeaInput,
-    marketContext: string,
+    agentContext: string,
     domain: DomainClassification,
     invariants: AdversarialInvariants
   ): Promise<{ opinion: AgentOpinion | null; fallbackReason?: string }> {
@@ -172,7 +173,8 @@ Target Audience: ${idea.targetAudience}
 Monetization & Model: ${idea.monetization}
 Tech Stack: ${idea.techStack || "Standard"}
 Domain: ${domain.archetypeLabel}
-Market & Prediction Signals: ${marketContext}`;
+Evidence pack retrieved for your role (may be partially empty — statements above each line's provenance):
+${agentContext}`;
 
     try {
       const turnStart = Date.now();
@@ -791,35 +793,38 @@ Market & Prediction Signals: ${marketContext}`;
 
     const mc = sandboxSim.metrics.monteCarlo;
 
-    // Evidence provenance block: only REAL retrieved sources are described as
-    // sourced. When recon/markets/community are unavailable this is stated
-    // explicitly so agents never mistake heuristic priors for external evidence.
-    const reconSourceParts: string[] = [];
-    if (marketResearch.dataSource === "live-web-recon" && marketResearch.rawResults.length > 0) {
-      reconSourceParts.push(
-        `Live web recon (${marketResearch.reconProvider}): ${marketResearch.rawResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
-      );
-    } else {
-      reconSourceParts.push(
-        `No live web recon results were retrieved (${marketResearch.reconError || "provider unavailable"}) — treat competitive and demand statements as heuristic priors, not sourced evidence.`
-      );
-    }
-    if (marketResearch.community.discussions.length > 0) {
-      reconSourceParts.push(
-        `Community discussions (${marketResearch.community.provider}): ${marketResearch.community.discussions.slice(0, 3).map(d => `"${d.title}"${typeof d.score === "number" ? ` (${d.score} pts${typeof d.comments === "number" ? `, ${d.comments} comments` : ""})` : ""} [${d.url}]`).join("; ")}`
-      );
-    } else {
-      reconSourceParts.push("No community discussions (Reddit/HN/X) were retrievable for this concept.");
-    }
-    if (polymarketSignals.marketsFound.length > 0) {
-      reconSourceParts.push(
-        `Prediction markets: ${polymarketSignals.marketsFound.map(m => `"${m.title}" @ ${m.probabilityYesPercent}% [${m.marketUrl}]`).join("; ")}. ${polymarketSignals.keyTakeaway}`
-      );
-    } else {
-      reconSourceParts.push(polymarketSignals.keyTakeaway);
-    }
+    // Evidence packs: each agent receives the slice of RETRIEVED evidence relevant
+    // to its mandate, or an explicit absence statement — never a shared digest,
+    // never fabricated data.
+    const competitiveResults = marketResearch.rawResults.filter((r) => r.queryLabel === "competitive");
+    const sentimentResults = marketResearch.rawResults.filter((r) => r.queryLabel === "sentiment");
+    const communityDiscussions = marketResearch.community.discussions;
 
-    const marketContext = `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
+    const competitiveLine = competitiveResults.length > 0
+      ? `Live competitor recon (${marketResearch.reconProvider}): ${competitiveResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
+      : `No competitive recon was retrieved — do NOT assert specific competitor names, prices, or market shares; reason from priors and label them as priors.`;
+    const sentimentLine = sentimentResults.length > 0
+      ? `Customer-sentiment recon: ${sentimentResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
+      : `No customer-sentiment recon was retrieved.`;
+    const communityLine = communityDiscussions.length > 0
+      ? `Community discussions (${marketResearch.community.provider}): ${communityDiscussions.slice(0, 3).map(d => `"${d.title}"${typeof d.score === "number" ? ` (${d.score} pts)` : ""} [${d.url}]`).join("; ")}`
+      : `No community discussions (Reddit/HN/X) were retrievable — do NOT claim community sentiment either way.`;
+    const marketLine = polymarketSignals.marketsFound.length > 0
+      ? `Prediction markets: ${polymarketSignals.marketsFound.map(m => `"${m.title}" @ ${m.probabilityYesPercent}% [${m.marketUrl}]`).join("; ")}. ${polymarketSignals.keyTakeaway}`
+      : `No correlated prediction-market data is available.`;
+    const econContext = `Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
+
+    const agentContextFor = (role: SwarmRole): string => {
+      const lines: string[] = [];
+      if (role === "analyst") lines.push(competitiveLine, marketLine);
+      else if (role === "redteam") lines.push(sentimentLine, communityLine);
+      else if (role === "customer") lines.push(communityLine);
+      else if (role === "investor") lines.push(marketLine);
+      // architect & expert: their evidence is the sandbox computation and domain
+      // regulatory priors, both already in the system prompt.
+      lines.push(econContext);
+      return lines.join(" ");
+    };
 
     // 03 INVESTIGATE (Domain-Tailored Specialist Subagents)
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
@@ -836,7 +841,7 @@ Market & Prediction Signals: ${marketContext}`;
       AGENT_ROLES.map(async (role) => {
         emit({ type: "agent_start", role, roleTitle: domain.specialistRoleLabels[role].title });
         const roleStart = Date.now();
-        const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, marketContext, domain, invariants) : null;
+        const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, agentContextFor(role), domain, invariants) : null;
         if (live?.fallbackReason) {
           emit({ type: "parse_fallback", role, reason: live.fallbackReason });
         }
@@ -1532,6 +1537,16 @@ Market & Prediction Signals: ${marketContext}`;
       });
       dossier.mutationProposals = mutationProposals;
       emit({ type: "mutation_proposals", proposals: mutationProposals });
+    }
+
+    // Calibration ledger: persist dated falsifiable forecasts (kill conditions,
+    // weakest assumption, validation experiment) with verdict-implied probabilities.
+    // The ledger is additive — a persistence failure must never fail an evaluation.
+    try {
+      const forecasts = await forecastLedger.persistDossierForecasts(dossier);
+      dossier.forecastIds = forecasts.map((f) => f.id);
+    } catch {
+      // non-blocking
     }
 
     // Persist dossier asynchronously for historical retrieval and export

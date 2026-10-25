@@ -8,6 +8,7 @@ import { dossierStorage } from "./services/storage.js";
 import { getLLMStatus } from "./services/llm.js";
 import { runStressTestSuite } from "./stress-test.js";
 import { runEconomicsSimulation } from "./tools/sandbox.js";
+import { forecastLedger, ForecastRecord } from "./services/ledger.js";
 
 const program = new Command();
 
@@ -310,6 +311,71 @@ program
     console.log(pc.bold(pc.yellow("\n🔥 EXECUTING DOSSIER 5-INVARIANT ADVERSARIAL STRESS TEST SUITE...\n")));
     await runStressTestSuite();
     console.log(pc.green("\n✔ Stress test execution completed.\n"));
+  });
+
+program
+  .command("forecast-list")
+  .description("List calibration-ledger forecasts (the dated falsifiable claims behind verdicts)")
+  .option("-s, --status <status>", "Filter by status: PENDING | HIT | MISS")
+  .option("-l, --limit <number>", "Max records to show", "30")
+  .action(async (options) => {
+    const status = options.status ? String(options.status).toUpperCase() as ForecastRecord["status"] : undefined;
+    const forecasts = await forecastLedger.listForecasts(parseInt(options.limit, 10) || 30, status);
+    console.log(pc.bold(pc.cyan(`\n📆 FORECAST LEDGER (${status || "ALL"}):\n`)));
+    if (forecasts.length === 0) {
+      console.log(pc.dim("  No forecasts yet. Run 'dossier evaluate' to register some.\n"));
+      return;
+    }
+    for (const f of forecasts) {
+      const color = f.status === "PENDING" ? pc.yellow : f.status === "HIT" ? pc.green : pc.red;
+      console.log(`  ${color(f.status.padEnd(7))} ${pc.cyan(f.id)}  due ${f.dueDate.slice(0, 10)}  P=${(f.probability * 100).toFixed(0)}%  ${pc.dim(f.kind)}`);
+      console.log(`    ${pc.dim(`[${f.domainArchetype}${f.modelId ? ` · ${f.modelId}` : ""}]`)} ${f.statement.slice(0, 110)}`);
+    }
+    console.log();
+  });
+
+program
+  .command("forecast-resolve <forecastId> <outcome>")
+  .description("Resolve a forecast: outcome is HIT (event happened) or MISS (it did not)")
+  .option("-n, --notes <notes>", "Resolution notes (how you observed the outcome)")
+  .action(async (forecastId, outcome, options) => {
+    const normalized = String(outcome).toUpperCase();
+    if (normalized !== "HIT" && normalized !== "MISS") {
+      console.error(pc.red("Outcome must be HIT or MISS."));
+      process.exit(1);
+    }
+    const record = await forecastLedger.resolveForecast(forecastId, normalized as "HIT" | "MISS", options.notes);
+    if (!record) {
+      console.error(pc.red(`Forecast '${forecastId}' not found or already resolved.`));
+      process.exit(1);
+    }
+    console.log(pc.green(`✔ Forecast ${forecastId} resolved as ${normalized}. Run 'dossier forecast-score' to update calibration.`));
+  });
+
+program
+  .command("forecast-score")
+  .description("Brier-score resolved forecasts (overall, by domain, by model, calibration bins)")
+  .action(async () => {
+    const score = await forecastLedger.scoreForecasts();
+    console.log(pc.bold(pc.cyan("\n🎯 FORECAST CALIBRATION (Brier — lower is better, 0.25 = coin flip):\n")));
+    if (score.resolvedCount === 0) {
+      console.log(pc.dim(`  No resolved forecasts yet (${score.pendingCount} pending). Resolve some with 'dossier forecast-resolve'.\n`));
+      return;
+    }
+    console.log(`  Overall Brier  : ${pc.bold(String(score.overallBrier))} over ${score.resolvedCount} resolved forecasts`);
+    for (const [domain, b] of Object.entries(score.byDomain)) {
+      console.log(`  • ${domain.padEnd(42)} ${b}`);
+    }
+    for (const [model, b] of Object.entries(score.byModel)) {
+      console.log(`  • model ${String(model).padEnd(36)} ${b}`);
+    }
+    console.log(pc.dim("  Calibration bins (P band → observed hit rate):"));
+    for (const bin of score.calibrationBins) {
+      if (bin.count > 0) {
+        console.log(`    ${bin.bin.padEnd(8)} n=${String(bin.count).padEnd(4)} meanP=${bin.meanProbability} hitRate=${bin.hitRate}%`);
+      }
+    }
+    console.log();
   });
 
 program.parse(process.argv);

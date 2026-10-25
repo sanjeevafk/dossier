@@ -5,6 +5,7 @@ import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
 import { generateAgentTurn, getLLMStatus } from "./services/llm.js";
 import { dossierStorage } from "./services/storage.js";
+import { forecastLedger } from "./services/ledger.js";
 import { SWARM_ROLES } from "./config/prompts.js";
 import { IdeaInput, SwarmRole } from "./types/index.js";
 
@@ -220,6 +221,43 @@ app.post("/api/approval/:actionId", requireAuth, async (req: Request, res: Respo
     persisted: result.updated,
     dossierId: result.dossierId,
     message: `Action ${actionId} has been successfully ${decision === "APPROVE" ? "approved" : "rejected"} by human operator.`
+  });
+});
+
+// Calibration ledger: list forecasts behind verdicts
+app.get("/api/forecasts", async (req: Request, res: Response) => {
+  try {
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+    const status = req.query.status ? String(req.query.status).toUpperCase() as "PENDING" | "HIT" | "MISS" : undefined;
+    const forecasts = await forecastLedger.listForecasts(limit, status);
+    res.json({ success: true, count: forecasts.length, forecasts });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Calibration ledger: resolve a forecast with an observed field outcome (auth-gated write)
+app.post("/api/forecasts/:id/outcome", requireAuth, async (req: Request, res: Response) => {
+  const forecastId = String(req.params.id);
+  const { outcome, notes } = req.body;
+
+  if (!["HIT", "MISS"].includes(outcome)) {
+    res.status(400).json({ error: "Outcome must be 'HIT' (event happened) or 'MISS' (it did not)" });
+    return;
+  }
+
+  const record = await forecastLedger.resolveForecast(forecastId, outcome, notes);
+  if (!record) {
+    res.status(404).json({ success: false, error: `Forecast '${forecastId}' not found or already resolved` });
+    return;
+  }
+
+  res.json({
+    success: true,
+    forecastId,
+    status: record.status,
+    resolvedAt: record.resolvedAt,
+    message: `Forecast resolved as ${outcome}. Brier scores update via 'dossier forecast-score'.`
   });
 });
 
