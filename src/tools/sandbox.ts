@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { MonteCarloStats } from "../types/index.js";
+import { MonteCarloStats, SobolSensitivityStats, ValueOfInformationStats } from "../types/index.js";
 
 const execAsync = promisify(exec);
 
@@ -19,6 +19,8 @@ export interface SandboxExecutionResult {
     estimatedPaybackMonths: number;
     monthlyInfraCostUsd: number;
     tamEstimateUsd: string;
+    sobol?: SobolSensitivityStats;
+    voi?: ValueOfInformationStats;
     monteCarlo?: MonteCarloStats;
   };
 }
@@ -93,6 +95,27 @@ export async function runEconomicsSimulation(
     });
 
     const parsed = JSON.parse(stdout.trim());
+
+    // Sobol global sensitivity enrichment (A1): runs the Saltelli scheme over the
+    // same model. Opt-out via DOSSIER_SOBOL=0; silently absent if the script or
+    // runtime is unavailable — never fabricates indices.
+    let sobol: SobolSensitivityStats | undefined;
+    if (process.env.DOSSIER_SOBOL !== "0") {
+      try {
+        const sobolScript = path.resolve(process.cwd(), "scripts", "simulate_sobol.py");
+        await fs.access(sobolScript);
+        const sobolInputPath = path.join(tmpDir, "sobol_inputs.json");
+        await fs.writeFile(sobolInputPath, JSON.stringify({ ...inputPayload, sobol_samples: 512 }), "utf-8");
+        const { stdout: sobolStdout } = await execAsync(`python3 "${sobolScript}" "${sobolInputPath}"`, {
+          timeout: 30000,
+          maxBuffer: 1024 * 1024
+        });
+        sobol = JSON.parse(sobolStdout.trim());
+      } catch {
+        // Sobol enrichment is optional — absence is honest, not an error.
+      }
+    }
+
     const metrics: SandboxExecutionResult["metrics"] = {
       cacEstimateUsd: parsed.cacEstimateUsd,
       ltvEstimateUsd: parsed.ltvEstimateUsd,
@@ -100,6 +123,8 @@ export async function runEconomicsSimulation(
       estimatedPaybackMonths: parsed.estimatedPaybackMonths,
       monthlyInfraCostUsd: parsed.monthlyInfraCostUsd,
       tamEstimateUsd: parsed.tamEstimateUsd,
+      sobol,
+      voi: parsed.valueOfInformation,
       monteCarlo: {
         iterations: parsed.iterations,
         survivalProbability12Mo: parsed.survivalProbability12Mo,

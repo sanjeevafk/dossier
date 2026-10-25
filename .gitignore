@@ -67,3 +67,4 @@ logs/
 .DS_Store
 Thumbs.db
 BLOG_POST_LOCAL.md
+node_modules

@@ -164,6 +164,35 @@ export interface SandboxStressStats {
   stressPayback50?: number;
 }
 
+export interface SobolSensitivityStats {
+  method: string;
+  baseSamples: number;
+  modelEvaluations: number;
+  params: string[];
+  outputs: Record<
+    string,
+    { variance: number; firstOrder: Record<string, number>; totalOrder: Record<string, number> }
+  >;
+  ltvCacSensitivityRanking: Array<{ param: string; totalOrderIndex: number }>;
+  simulationNotes?: string;
+}
+
+export interface ValueOfInformationStats {
+  decisionModel: string;
+  expectedPayoffIfProceeding: number;
+  expectedPayoffWithPerfectInfo: number;
+  evpiPerCustomer: number;
+  partialEvpi: Array<{ param: string; evpiPerCustomer: number; shareOfEvpi: number }>;
+}
+
+export interface ValidationPriorityItem {
+  param: string;
+  evpiPerCustomer: number;
+  shareOfEvpi: number;
+  experimentTitle: string;
+  experimentDescription: string;
+}
+
 export interface SimulationResult {
   cacEstimateUsd: number;
   ltvEstimateUsd: number;
@@ -172,6 +201,8 @@ export interface SimulationResult {
   monthlyInfraCostUsd: number;
   tamEstimateUsd: string;
   monteCarlo?: MonteCarloStats;
+  sobol?: SobolSensitivityStats;
+  voi?: ValueOfInformationStats;
   stressMetrics?: SandboxStressStats;
   sandboxExecutionProof: {
     runtime: string;
@@ -316,6 +347,8 @@ export interface IdeaDossier {
   claimDag?: ClaimNode[];
   crossfireToolTraces?: string[];
   mutationProposals?: MutationProposal[];
+  /** Validation experiments ranked by expected value of information (EVPI share). */
+  validationPriority?: ValidationPriorityItem[];
   simulation: SimulationResult;
   validationRoadmap: {
     day1to2: string[];

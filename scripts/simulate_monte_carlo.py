@@ -99,6 +99,40 @@ def run_simulation(data):
         np.maximum(margin_per_user, 0.01),
     )
 
+    # --- Value of Information (empirical partial EVPI, per-customer gross NPV) ---
+    # Decision model: proceed iff expected payoff > 0; payoff per acquired customer
+    # = LTV - CAC (both already stochastic draws). Perfect information on parameter i
+    # lets the founder switch decision per bin of x_i; partial EVPI_i is the expected
+    # decision-value gain from that knowledge. Pricing uncertainty is not drawn here —
+    # it is covered by the separate Sobol module's ±25% founder-estimate band.
+    payoff = ltv - cac
+    baseline_proceed_value = float(np.mean(payoff))
+    baseline_best = max(baseline_proceed_value, 0.0)
+    perfect_info_value = float(np.mean(np.maximum(payoff, 0.0)))
+    evpi = max(perfect_info_value - baseline_best, 0.0)
+
+    partial_evpi = {}
+    for name, draws in (
+        ("churn_mean", churn),
+        ("cac_mean", cac),
+        ("token_cost", token_cost_per_user * token_multiplier),
+    ):
+        order = np.argsort(draws)
+        sorted_payoff = payoff[order]
+        n_bins = 10
+        bin_edges = np.array_split(np.arange(len(sorted_payoff)), n_bins)
+        informed_value = 0.0
+        for idx in bin_edges:
+            if idx.size == 0:
+                continue
+            informed_value += (idx.size / len(sorted_payoff)) * max(
+                float(np.mean(sorted_payoff[idx])), 0.0
+            )
+        partial_evpi[name] = max(min(informed_value - baseline_best, evpi), 0.0)
+
+    evpi_ranking = sorted(partial_evpi.items(), key=lambda kv: kv[1], reverse=True)
+
+
     def percentiles(values):
         p10, p50, p90 = np.percentile(values, [10, 50, 90])
         return {
@@ -149,6 +183,20 @@ def run_simulation(data):
         "paybackPercentiles": percentiles(payback),
         "tokenCostBurdenPercent": percentiles(token_share),
         "sensitivity": tornado,
+        "valueOfInformation": {
+            "decisionModel": "per-customer gross NPV (LTV - CAC); proceed iff expected payoff > 0",
+            "expectedPayoffIfProceeding": round(baseline_proceed_value, 2),
+            "expectedPayoffWithPerfectInfo": round(perfect_info_value, 2),
+            "evpiPerCustomer": round(evpi, 2),
+            "partialEvpi": [
+                {
+                    "param": name,
+                    "evpiPerCustomer": round(value, 2),
+                    "shareOfEvpi": round(value / evpi, 3) if evpi > 0 else 0.0,
+                }
+                for name, value in evpi_ranking
+            ],
+        },
         "medianInferredUsers": users,
         "cacEstimateUsd": round(float(np.percentile(cac, 50)), 2),
         "ltvEstimateUsd": round(float(np.percentile(ltv, 50)), 2),

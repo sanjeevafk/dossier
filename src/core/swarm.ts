@@ -17,6 +17,7 @@ import {
   EpistemicTier,
   EpistemicTaxonomySummary,
   ValidationVerdict,
+  ValidationPriorityItem,
   SwarmEvent,
   IdeaDomainArchetype,
   SandboxStressStats,
@@ -75,6 +76,31 @@ const WRAPPER_KILL_CEILINGS: Partial<Record<SwarmRole, { score: number; verdict:
   redteam: { score: 24, verdict: "STRONG_KILL" }
 };
 const HIGH_CHURN_KILL_CEILING = 39;
+
+// Maps value-of-information parameters to the cheapest experiment that resolves
+// them, so EVPI ranking translates directly into a validation plan.
+const VOI_EXPERIMENT_MAP: Record<string, { title: string; description: string }> = {
+  churn_mean: {
+    title: "Churn Resolution Cohort",
+    description:
+      "Track a 50-user pilot cohort for 14 days and measure real weekly retention within ±20% — churn uncertainty carries the largest decision value, and resolving it reshapes every downstream economic estimate."
+  },
+  cac_mean: {
+    title: "Live-Channel CAC Test",
+    description:
+      "Spend $50–100 across one realistic acquisition channel and measure cost per activated user — resolves CAC uncertainty before any build spend scales it."
+  },
+  token_cost: {
+    title: "Inference Load Benchmark",
+    description:
+      "Benchmark real token burn per core workflow at production prompt sizes — resolves the compute-cost share of gross margin."
+  },
+  pricing_monthly: {
+    title: "Willingness-to-Pay Price Test",
+    description:
+      "A/B two price points on a smoke-test landing page and measure signed pre-commitment rates — resolves pricing power without building the product."
+  }
+};
 
 const CROSS_EXAM_SCHEMA = z.object({
   crossExam: z.string().min(1),
@@ -1007,7 +1033,20 @@ Market & Prediction Signals: ${marketContext}`;
         provenance: `Customer Advocate vs Red Team Debate Clash (${debateSource})`,
         indicator: "CONTRADICTING",
         confidencePercent: 60
-      }
+      },
+      ...(sandboxSim.metrics.voi && sandboxSim.metrics.voi.evpiPerCustomer > 0
+        ? [
+            {
+              id: "EV-09",
+              claim: `Value-of-information computation (empirical partial-EVPI over ${sandboxSim.metrics.monteCarlo?.iterations ?? 0} Monte Carlo runs, LTV−CAC decision model): resolving "${sandboxSim.metrics.voi.partialEvpi[0]?.param}" is worth $${sandboxSim.metrics.voi.partialEvpi[0]?.evpiPerCustomer}/customer (${Math.round((sandboxSim.metrics.voi.partialEvpi[0]?.shareOfEvpi ?? 0) * 100)}% of the $${sandboxSim.metrics.voi.evpiPerCustomer}/customer decision value at stake).`,
+              tier: "VERIFIED_COMPUTATION",
+              claimType: "VERIFIED_COMPUTATION",
+              provenance: "TrueForge Python3 Sandbox (empirical partial-EVPI)",
+              indicator: "SUPPORTING",
+              confidencePercent: 92
+            } as EvidenceItem
+          ]
+        : [])
     ];
 
     const verifier = new StanfordRobustVerifier();
@@ -1399,8 +1438,23 @@ Market & Prediction Signals: ${marketContext}`;
       }
     };
 
-    const approvalGates: ApprovalAction[] = [
-      {
+    // Validation priority (A2): rank assumption-resolution experiments by their
+    // expected value of information, computed empirically in the Monte Carlo sandbox.
+    const validationPriority: ValidationPriorityItem[] | undefined = sandboxSim.metrics.voi
+      ? sandboxSim.metrics.voi.partialEvpi
+          .filter((e) => e.evpiPerCustomer > 0)
+          .map((e) => ({
+            param: e.param,
+            evpiPerCustomer: e.evpiPerCustomer,
+            shareOfEvpi: e.shareOfEvpi,
+            experimentTitle: VOI_EXPERIMENT_MAP[e.param]?.title ?? `Resolve ${e.param} uncertainty`,
+            experimentDescription:
+              VOI_EXPERIMENT_MAP[e.param]?.description ??
+              `Run a targeted experiment to resolve ${e.param} before committing further capital.`
+          }))
+      : undefined;
+
+    const approvalGates: ApprovalAction[] = [      {
         id: "GATE-01",
         actionType: "PILOT_LOI_DRAFT",
         summary: `Dispatch 10 tailored pilot Letter of Intent (LOI) requests to verified design partners in ${domain.primaryCustomer}.`,
@@ -1479,6 +1533,8 @@ Market & Prediction Signals: ${marketContext}`;
         monthlyInfraCostUsd: sandboxSim.metrics.monthlyInfraCostUsd,
         tamEstimateUsd: sandboxSim.metrics.tamEstimateUsd,
         monteCarlo: sandboxSim.metrics.monteCarlo,
+        sobol: sandboxSim.metrics.sobol,
+        voi: sandboxSim.metrics.voi,
         stressMetrics,
         sandboxExecutionProof: {
           runtime: sandboxSim.runtime,
@@ -1486,6 +1542,7 @@ Market & Prediction Signals: ${marketContext}`;
           stdout: sandboxSim.stdout
         }
       },
+      validationPriority,
       validationRoadmap: {
         day1to2: [
           `01 — Execute "${cheapestValidationExperiment.title}": Interview 5 prospective buyers in ${domain.primaryCustomer}.`,
