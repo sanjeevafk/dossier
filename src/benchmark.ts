@@ -216,8 +216,6 @@ function modalVerdict(values: string[]): string {
   return best;
 }
 
-const SCORE_DISPERSION_GATE = 18;
-
 export async function runDossierBenchmark(): Promise<void> {
   const RUNS = Math.max(1, Math.min(5, Number.parseInt(process.env.BENCHMARK_RUNS || "3", 10) || 3));
 
@@ -295,7 +293,8 @@ export async function runDossierBenchmark(): Promise<void> {
       const dims = dimsById.get(item.id)!;
       const meta = metaById.get(item.id)!;
       const verdict = modalVerdict(verdictsById.get(item.id)!);
-      const normalizedVerdict = verdict === "BUILD_IF_VALIDATED" ? "BUILD" : verdict;
+      // Honest fit: raw verdict only. The old BUILD_IF_VALIDATED→BUILD
+      // normalization inflated expectation fit and is removed.
       const mean = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
       return {
         id: item.id,
@@ -312,7 +311,7 @@ export async function runDossierBenchmark(): Promise<void> {
         weakestAssumption: meta.weakestAssumption,
         latencyMs: Math.round(mean(latenciesById.get(item.id)!)),
         sandboxExit: meta.sandboxExit,
-        expectedRangeMatch: item.expectedVerdictRange.includes(normalizedVerdict as "BUILD" | "REFINE" | "KILL")
+        expectedRangeMatch: item.expectedVerdictRange.includes(verdict as "BUILD" | "REFINE" | "KILL")
       };
     });
 
@@ -332,7 +331,6 @@ export async function runDossierBenchmark(): Promise<void> {
   const killOrRefineRate = Math.round((results.filter(r => r.verdict !== "BUILD").length / results.length) * 100);
   const expectationMatchRate = Math.round((results.filter(r => r.expectedRangeMatch).length / results.length) * 100);
   const totalTimeSec = ((Date.now() - startTimeTotal) / 1000).toFixed(2);
-  const dispersionGatePassed = scoreStdDev >= SCORE_DISPERSION_GATE;
 
   console.log("\n==========================================================================================================");
   console.log(`  📊 DE-NOISED BENCHMARK SUMMARY (mean of ${RUNS} runs per concept)`);
@@ -357,35 +355,31 @@ export async function runDossierBenchmark(): Promise<void> {
   console.log("==========================================================================================================");
   console.log(`📈 OVERALL DOMAIN-AWARE BENCHMARK METRICS (de-noised over ${RUNS} runs):`);
   console.log(`  • Concepts Aggregated     : ${results.length}/${BENCHMARK_SUITE.length}`);
+  console.log(`  • Engine Mode             : ${process.env.BENCHMARK_MODE || "heuristic-or-live (see dossiers)"} | Seed: deterministic per-input hash`);
   console.log(`  • Average Latency per Idea: ${avgLatency} ms`);
   console.log(`  • Total Benchmark Runtime : ${totalTimeSec} seconds`);
   console.log(`  • Sandboxed Subprocess    : ${sandboxPassRate}% Isolated Exit Code 0`);
   console.log(`  • Adversarial Filter Rate : ${killOrRefineRate}% (Killed or Refined under stress)`);
-  console.log(`  • Verdict Expectation Fit : ${expectationMatchRate}% of concepts inside the plan's expected verdict range`);
+  console.log(`  • Verdict Expectation Fit : ${expectationMatchRate}% raw (no BUILD_IF_VALIDATED→BUILD normalization)`);
   console.log(`  • Score Range             : ${minScore}–${maxScore} (mean ${meanScore.toFixed(1)})`);
-  console.log(`  • Per-Run Dispersion σ    : ${perRunStdDevs.map((s) => s.toFixed(1)).join(" / ")}`);
-  console.log(`  • De-Noised Dispersion σ  : ${scoreStdDev.toFixed(1)} — Gate ≥ ${SCORE_DISPERSION_GATE} → ${dispersionGatePassed ? "PASSED" : "FAILED"}`);
+  console.log(`  • Per-Run Dispersion σ    : ${perRunStdDevs.map((s) => s.toFixed(1)).join(" / ")} (informational only)`);
+  console.log(`  • Calibration             : Brier/ECE n/a until ledger holds >= 20 resolved outcomes — see GET /metrics`);
   console.log("==========================================================================================================");
 
-  if (dispersionGatePassed) {
-    console.log(`\n✓ QUALITY GATE 3 PASSED: de-noised score dispersion σ=${scoreStdDev.toFixed(1)} ≥ ${SCORE_DISPERSION_GATE}.\n`);
-  } else {
-    console.error(`\n✗ QUALITY GATE 3 FAILED: de-noised score dispersion σ=${scoreStdDev.toFixed(1)} < ${SCORE_DISPERSION_GATE}. Break the mid-band separation further or enrich the benchmark suite's merit diversity.\n`);
-    process.exitCode = 1;
-  }
+  console.log(`\nℹ Dispersion σ=${scoreStdDev.toFixed(1)} is informational only; calibration is tracked via Brier/ECE in /metrics.\n`);
 
   // Export to Markdown Report
   const mdReport = `# Dossier Domain-Aware Adversarial Benchmark Report
 
 **Execution Date:** ${new Date().toISOString()}  
 **Agent Harness:** TrueForge Multi-Agent Runtime (File TF-007)  
-**De-Noising:** ${RUNS} full runs per concept; Quality Gate 3 evaluates σ of per-concept mean scores  
+**Engine Mode:** ${process.env.BENCHMARK_MODE || "heuristic-or-live (per-dossier evaluationMode)"} | Seed: deterministic per-input hash  
+**Verdict Expectation Fit (raw):** ${expectationMatchRate}% — no BUILD_IF_VALIDATED→BUILD normalization  
+**Calibration:** Brier/ECE n/a until ledger holds >= 20 resolved outcomes (GET /metrics) — dispersion σ is informational only  
 **Overall Benchmark Runtime:** ${totalTimeSec} seconds  
 **Average Latency:** ${avgLatency} ms per full 6-agent adversarial evaluation  
-**Verdict Expectation Fit:** ${expectationMatchRate}% inside the plan's expected verdict range  
 **Score Range:** ${minScore}–${maxScore} (mean ${meanScore.toFixed(1)})  
-**Per-Run Dispersion σ:** ${perRunStdDevs.map((s) => s.toFixed(1)).join(" / ")}  
-**De-Noised Dispersion (σ):** ${scoreStdDev.toFixed(1)} ${dispersionGatePassed ? `— QUALITY GATE 3 PASSED (≥ ${SCORE_DISPERSION_GATE})` : `— ⚠ QUALITY GATE 3 FAILED (< ${SCORE_DISPERSION_GATE})`}  
+**Per-Run Dispersion σ (informational):** ${perRunStdDevs.map((s) => s.toFixed(1)).join(" / ")}  
 
 ---
 

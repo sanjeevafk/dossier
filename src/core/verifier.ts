@@ -122,7 +122,23 @@ export class StanfordRobustVerifier {
 
     // Invariant 1: Mathematical Invariance & Input Assumption Separation
     const p50LtvCacRatio = sandboxSim.monteCarlo?.ltvCacPercentiles.p50 ?? sandboxSim.ltvCacRatio;
+    const p10LtvCacRatio = sandboxSim.monteCarlo?.ltvCacPercentiles.p10 ?? p50LtvCacRatio;
     const investorOpinion = verifiedOpinions.investor;
+
+    // P10-tail kill: insolvent downside tail constrains the Red Team regardless of P50.
+    const redTeamOpinion = verifiedOpinions.redteam;
+    if (redTeamOpinion && p10LtvCacRatio < 1.0) {
+      redTeamOpinion.score = Math.max(10, Math.min(redTeamOpinion.score, redTeamOpinion.score - 8));
+      hallucinationsBlocked++;
+      testTimeSelfCorrections++;
+      auditItems.push({
+        id: "VERIFY-P10-INSOLVENCY",
+        claimOrOpinion: `MC P10 LTV/CAC ${p10LtvCacRatio.toFixed(2)}x < 1.0x — downside tail is insolvent`,
+        verdict: "CORRECTED",
+        rationale: "P10-tail invariant: Red Team penalized 8pts because the pessimistic decile cannot pay back CAC.",
+        confidencePercent: 93
+      });
+    }
 
     if (investorOpinion) {
       if (investorOpinion.score > 85 && p50LtvCacRatio < 3.0) {

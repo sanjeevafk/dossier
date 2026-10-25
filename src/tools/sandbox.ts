@@ -25,10 +25,13 @@ export interface SandboxExecutionResult {
 
 export interface EconomicsSimulationOptions {
   churnStd?: number;
+  churnDecay?: number;
   cacStd?: number;
   grossMarginTarget?: number;
   iterations?: number;
   startingCashUsd?: number;
+  runwayMonths?: number;
+  seed?: number;
 }
 
 /**
@@ -61,13 +64,23 @@ export async function runEconomicsSimulation(
     pricing_monthly: cleanPricing,
     churn_mean: cleanChurn,
     churn_std: Math.max(0.002, typeof options.churnStd === "number" ? Math.min(0.35, Math.abs(options.churnStd)) : cleanChurn * 0.25),
+    churn_decay: typeof options.churnDecay === "number" ? Math.max(0.9, Math.min(1.0, options.churnDecay)) : 0.98,
     cac: cleanCac,
     cac_std: Math.max(1, typeof options.cacStd === "number" ? Math.abs(options.cacStd) : cleanCac * 0.30),
     users_m12: cleanUsers,
     tokens_per_req: cleanTokens,
     reqs_monthly: cleanReqs,
+    runway_months: typeof options.runwayMonths === "number" ? Math.max(1, Math.min(60, options.runwayMonths)) : 18,
     iterations: Math.max(1000, Math.min(50000, Math.round(options.iterations ?? 10000)))
   };
+  if (typeof options.seed === "number") {
+    inputPayload.seed = Math.round(Math.abs(options.seed));
+  } else {
+    let hash = 0;
+    const key = `${cleanPricing}|${cleanChurn}|${cleanCac}|${cleanUsers}`;
+    for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    inputPayload.seed = hash;
+  }
   if (typeof options.grossMarginTarget === "number") {
     inputPayload.gross_margin_target = Math.max(0.1, Math.min(0.98, options.grossMarginTarget));
   }

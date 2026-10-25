@@ -8,6 +8,7 @@ import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
 import { generateAgentTurn, getLLMStatus } from "./services/llm.js";
 import { dossierStorage } from "./services/storage.js";
+import { summarizeCalibration } from "./services/calibration.js";
 import { SWARM_ROLES } from "./config/prompts.js";
 import { IdeaInput, SwarmRole } from "./types/index.js";
 
@@ -223,6 +224,31 @@ app.post("/api/evaluate/stream", requireAuth, async (req: Request, res: Response
   }
 });
 
+// Calibration metrics: Brier / ECE / veto rate from the ledger.
+// Uncalibrated (n/a) until >= 20 resolved outcomes — never sigma-gated.
+app.get("/metrics", async (_req: Request, res: Response) => {
+  try {
+    const rows = dossierStorage.listLedger() as Array<{
+      dossier_id: string; score: number; archetype: string; outcome: string | null;
+    }>;
+    const byArchetype = new Map<string, Array<{ score: number; outcome: string | null }>>();
+    for (const r of rows) {
+      const key = String(r.archetype || "general_startup");
+      if (!byArchetype.has(key)) byArchetype.set(key, []);
+      byArchetype.get(key)!.push({ score: Number(r.score ?? 0), outcome: r.outcome });
+    }
+    const archetypes: Record<string, ReturnType<typeof summarizeCalibration>> = {};
+    for (const [key, list] of byArchetype) {
+      archetypes[key] = summarizeCalibration(list);
+    }
+    const overall = summarizeCalibration(rows.map(r => ({ score: Number(r.score ?? 0), outcome: r.outcome })));
+    res.json({ success: true, overall, archetypes, note: "Brier/ECE are n/a until >= 20 resolved outcomes per scope" });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "metrics failed";
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
 // Approval action gate endpoint (Persistent Human-in-the-loop)
 app.post("/api/approval/:actionId", requireAuth, async (req: Request, res: Response) => {
   const actionId = String(req.params.actionId);
@@ -246,6 +272,29 @@ app.post("/api/approval/:actionId", requireAuth, async (req: Request, res: Respo
     dossierId: result.dossierId,
     message: `Action ${actionId} has been successfully ${decision === "APPROVE" ? "approved" : "rejected"} by human operator.`
   });
+});
+
+// Ledger outcome ingestion: resolves fatal assumptions for calibration.
+// Body: { outcome: "built" | "killed" | "pivoted", revenueUsd?, pilots? }
+app.post("/api/dossiers/:id/outcome", requireAuth, async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { outcome, revenueUsd, pilots } = req.body;
+  if (!["built", "killed", "pivoted"].includes(outcome)) {
+    res.status(400).json({ error: "outcome must be one of: built | killed | pivoted" });
+    return;
+  }
+  const dossier = await dossierStorage.getDossier(id);
+  if (!dossier) {
+    res.status(404).json({ success: false, error: `Dossier '${id}' not found` });
+    return;
+  }
+  const updated = dossierStorage.updateOutcome(
+    dossier.id,
+    outcome,
+    typeof revenueUsd === "number" ? revenueUsd : undefined,
+    typeof pilots === "number" ? pilots : undefined
+  );
+  res.json({ success: updated, dossierId: dossier.id, outcome });
 });
 
 // Interactive Playground / Swarm Chat endpoint

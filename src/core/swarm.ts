@@ -32,6 +32,7 @@ import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
+import { getBaseRate, shrinkTowardBaseRate } from "./baseRates.js";
 import { z } from "zod";
 
 export interface SwarmExecutionOptions {
@@ -840,6 +841,9 @@ Market & Prediction Signals: ${marketContext}`;
           emit({ type: "parse_fallback", role, reason: live.fallbackReason });
         }
         const opinion: AgentOpinion = live?.opinion || this.generateHeuristicOpinion(role, idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+        if (evaluationMode === "HEURISTIC_ENGINE" && !invariants.isPromptInjection && !invariants.isImpossiblePhysics) {
+          opinion.score = Math.max(10, Math.min(100, shrinkTowardBaseRate(opinion.score, domain.archetype)));
+        }
         opinion.telemetryMetadata = {
           latencyMs: Date.now() - roleStart,
           threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE"
@@ -979,7 +983,9 @@ Market & Prediction Signals: ${marketContext}`;
         claimType: "MODELLED_ASSUMPTION",
         provenance: "Founder Input & Value Proposition Claim",
         indicator: "CONTRADICTING",
-        confidencePercent: 45
+        confidencePercent: 45,
+        fatal: true,
+        tested: false
       },
       {
         id: "EV-06",
@@ -1249,7 +1255,8 @@ Market & Prediction Signals: ${marketContext}`;
     const unknownsCount = evidenceFeed.filter(e => e.tier === "UNKNOWN").length;
     const contradictionsCount = evidenceFeed.filter(e => e.tier === "CONTRADICTED").length;
 
-    const hasUnvalidatedFatalAssumptions = modelledAssumptionsCount > 0 || verifiedOpinions.redteam.score < 50;
+    const fatalUntested = evidenceFeed.filter(e => e.fatal === true && e.tested !== true);
+    const fatalUntestedCount = fatalUntested.length;
     const hasUnresolvedUnknownsOrContradictions = unknownsCount > 0 || contradictionsCount > 0;
 
     const epistemicSummary: EpistemicTaxonomySummary = {
@@ -1260,7 +1267,7 @@ Market & Prediction Signals: ${marketContext}`;
       inferencesCount,
       unknownsCount,
       contradictionsCount,
-      hasUnvalidatedFatalAssumptions,
+      hasUnvalidatedFatalAssumptions: fatalUntestedCount > 0,
       hasUnresolvedUnknownsOrContradictions
     };
 
@@ -1284,7 +1291,7 @@ Market & Prediction Signals: ${marketContext}`;
       riskLevel = "MEDIUM";
     } else {
       // compositeScore >= 75
-      if (hasUnvalidatedFatalAssumptions || hasUnresolvedUnknownsOrContradictions) {
+      if (fatalUntestedCount > 0 || hasUnresolvedUnknownsOrContradictions) {
         overallVerdict = "BUILD_IF_VALIDATED";
         riskLevel = "MEDIUM"; // Constrained: never LOW while critical assumptions/unknowns are unresolved
       } else {
@@ -1293,7 +1300,21 @@ Market & Prediction Signals: ${marketContext}`;
       }
     }
 
-    const confidenceScore = Math.min(Math.max(compositeScore + 10, 65), 95);
+    // Calibration: P(build-worthy) as an explicit probability for ledger tracking.
+    // Uncalibrated until the ledger holds >= 20 outcomes for this archetype.
+    const agentScores = [
+      verifiedOpinions.analyst.score,
+      verifiedOpinions.customer.score,
+      verifiedOpinions.architect.score,
+      verifiedOpinions.investor.score,
+      verifiedOpinions.redteam.score,
+      verifiedOpinions.expert.score
+    ];
+    const verdictSpread = Math.max(...agentScores) - Math.min(...agentScores);
+    const confidenceScore = Math.min(
+      95,
+      Math.max(55, Math.round(100 - verdictSpread / 2))
+    );
 
     // 08 STRUCTURED EVIDENCE WITH PROVENANCE
     const strongestEvidence = evidenceFeed[0];
@@ -1438,6 +1459,9 @@ Market & Prediction Signals: ${marketContext}`;
       dossierCode: `TF-007-${domain.archetype.toUpperCase().slice(0, 3)}`,
       timestamp: new Date().toISOString(),
       evaluationMode,
+      pSuccess: Math.round(compositeScore) / 100,
+      baseRate: getBaseRate(domain.archetype).baseRate,
+      fatalsResolved: fatalUntestedCount === 0,
       externalEvidenceSources,
       idea,
       domainClassification: domain,

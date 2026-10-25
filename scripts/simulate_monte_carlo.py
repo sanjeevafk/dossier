@@ -7,6 +7,7 @@ Input JSON (argv[1] or stdin):
   "pricing_monthly": float,
   "churn_mean": float (0..1),
   "churn_std":  float (optional, default 25% of mean),
+  "churn_decay": float (optional, default 1.0; monthly retention improvement 0.90-1.0),
   "cac_mean":   float,
   "cac_std":    float (optional, default 30% of mean),
   "users_m12":  int,
@@ -15,13 +16,16 @@ Input JSON (argv[1] or stdin):
   "token_cost_per_user": float (optional; overrides tokens/reqs derived cost, USD/user/month),
   "gross_margin_target": float (optional, default 0.80),
   "iterations": int (optional, default 10000, clamped 1000..50000),
-  "starting_cash_usd": float (optional; default 3x worst-case monthly burn)
+  "starting_cash_usd": float (optional; default 3x worst-case monthly burn),
+  "runway_months": float (optional; explicit burn runway for notes, default 18),
+  "seed": int (optional; RNG seed for reproducible runs)
 }
 
 Output JSON: survival probabilities (cash > 0 at month 12/24), monthly insolvency curve,
-LTV/CAC + payback percentiles (P10/P50/P90), token-cost burden percentiles, and a
+cohort LTV, LTV/CAC + payback percentiles (P10/P50/P90), token-cost burden percentiles, and a
 tornado sensitivity ranking of which parameter moves the P50 LTV/CAC most.
 """
+import hashlib
 import json
 import sys
 
@@ -49,7 +53,12 @@ def run_simulation(data):
     tokens_per_req = int(clamp(data.get("tokens_per_req", 500), 0, 10_000))
     reqs_monthly = int(clamp(data.get("reqs_monthly", 30), 0, 10_000))
     gross_margin_target = clamp(float(data.get("gross_margin_target", 0.80)), 0.1, 0.98)
+    churn_decay = clamp(float(data.get("churn_decay", 1.0)), 0.90, 1.0)
+    runway_months = clamp(float(data.get("runway_months", 18.0)), 1.0, 60.0)
     iterations = int(clamp(data.get("iterations", 10_000), 1000, 50_000))
+    seed = data.get("seed")
+    if seed is None:
+        seed = int(hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:8], 16)
 
     derived_token_cost = (tokens_per_req * reqs_monthly / 1_000_000.0) * 2.50
     token_cost_per_user = float(
@@ -66,15 +75,23 @@ def run_simulation(data):
         )
         starting_cash = 3.0 * worst_monthly_burn
 
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(int(seed) % (2 ** 32))
 
     churn = np.clip(rng.normal(churn_mean, churn_std, iterations), 0.004, 0.5)
     cac = np.clip(rng.normal(cac_mean, cac_std, iterations), 1.0, 1e6)
     token_multiplier = rng.uniform(0.7, 1.3, iterations)
 
+    # Cohort LTV: month-1 cohort decays by churn*decay^t; LTV = sum of cohort margin.
+    # churn_decay < 1.0 models retention improvement (expansion, habit formation).
+    months = np.arange(1, 25)
+    decay_matrix = np.power(churn_decay, months - 1)  # (24,)
+    cohort_survival = np.clip(1.0 - churn[:, None] * decay_matrix[None, :], 0.0, 1.0)
+    cohort_margin = pricing * gross_margin_target - token_cost_per_user * token_multiplier[:, None]
+    cohort_ltv = np.sum(np.maximum(cohort_margin, 0.0) * cohort_survival, axis=1)
+
     margin_per_user = pricing * gross_margin_target
     ltv = np.where(churn > 0, margin_per_user / churn, 1e9)
-    ltv_cac = np.minimum(np.divide(ltv, cac), 999.0)
+    ltv_cac = np.minimum(np.divide(np.maximum(cohort_ltv, ltv * 0.5), cac), 999.0)
     payback = np.where(margin_per_user > 0, np.minimum(cac / margin_per_user, 999.0), 999.0)
 
     revenue_monthly = users * margin_per_user
@@ -115,19 +132,15 @@ def run_simulation(data):
             "token_cost": token_cost_per_user,
         }
         probe[name] = probe[name] * shift
-        churn_p = np.clip(
-            rng.normal(
-                clamp(float(data.get(name, churn_mean)) if name == "churn_mean" else churn_mean, 0.005, 0.5),
-                churn_std,
-                iterations,
-            ),
-            0.004,
-            0.5,
-        )
+        probe_churn = clamp(probe["churn_mean"], 0.005, 0.5)
+        probe_cac = clamp(probe["cac_mean"], 1.0, 1e6)
+        probe_token = clamp(probe["token_cost"], 0.0, 1e4)
+        churn_p = np.clip(rng.normal(probe_churn, churn_std, iterations), 0.004, 0.5)
         cac_p = cac if name != "cac_mean" else np.clip(
-            rng.normal(clamp(probe[name], 1.0, 1e6), cac_std, iterations), 1.0, 1e6
+            rng.normal(probe_cac, cac_std, iterations), 1.0, 1e6
         )
-        margin_p = probe["pricing_monthly"] * gross_margin_target
+        margin_p = probe["pricing_monthly"] * gross_margin_target - probe_token
+        margin_p = np.maximum(margin_p, 0.01)
         ltv_p = np.where(churn_p > 0, margin_p / churn_p, 1e9)
         ratio_p = np.minimum(np.divide(ltv_p, cac_p), 999.0)
         return float(np.percentile(ratio_p, 50))
@@ -155,26 +168,21 @@ def run_simulation(data):
         "ltvCacRatio": round(base_p50, 2),
         "estimatedPaybackMonths": round(float(np.percentile(payback, 50)), 1),
         "monthlyInfraCostUsd": round(float(infra_monthly), 2),
-        "tamEstimateUsd": "$%sB" % (
-            round(
-                max(
-                    (pricing * 12 * (500_000 if pricing * 12 > 200 else 5_000_000)) / 1_000_000_000,
-                    0.1,
-                ),
-                1,
-            )
-        ),
+        "tamEstimateUsd": "UNKNOWN — no citable TAM source for this archetype",
         "simulationNotes": (
-            "Steady-state replacement Monte Carlo: %d runs, churn ~ N(%.3f, %.3f), "
-            "CAC ~ N(%.0f, %.0f), gross margin %.0f%%, token cost $%.4f/user/mo."
+            "Cohort Monte Carlo: %d runs, seed %d, churn ~ N(%.3f, %.3f) decay %.2f, "
+            "CAC ~ N(%.0f, %.0f), gross margin %.0f%%, token cost $%.4f/user/mo, runway %.0fmo."
             % (
                 iterations,
+                int(seed) % (2 ** 32),
                 churn_mean,
                 churn_std,
+                churn_decay,
                 cac_mean,
                 cac_std,
                 gross_margin_target * 100,
                 token_cost_per_user,
+                runway_months,
             )
         ),
     }
