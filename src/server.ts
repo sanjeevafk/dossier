@@ -3,7 +3,7 @@ import cors from "cors";
 import path from "node:path";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
-import { generateAgentTurn, getLLMStatus } from "./services/llm.js";
+import { generateAgentTurn, streamAgentTurn, getLLMStatus } from "./services/llm.js";
 import { dossierStorage } from "./services/storage.js";
 import { forecastLedger } from "./services/forecastLedger.js";
 import { SWARM_ROLES } from "./config/prompts.js";
@@ -289,21 +289,12 @@ app.post("/api/chat", async (req: Request, res: Response) => {
     let agentName = "";
     let epistemicState = "MODELLED_ASSUMPTION";
 
-    if (process.env.ORCAROUTER_API_KEY || process.env.OPENAI_API_KEY) {
-      const rolePrompt = role === "all" 
-        ? "Consensus of 6 adversarial agents (Skeptic, Investor, Architect, Market, Customer, Founder)"
-        : `Agent ${role.toUpperCase()}`;
-        
-      const systemPrompt = `You are part of the Dossier Adversarial Intelligence Swarm built on TrueForge.
-Role: ${rolePrompt}
-Domain Archetype: ${domain.archetypeLabel}
-Idea: "${ideaTitle}" — ${ideaSummary}
+    const turn = buildChatTurn(role, message, ideaContext, ideaTitle, ideaSummary, domain);
 
-Give a direct, razor-sharp, analytical response. Challenge unvalidated assumptions, probe unit economics, test distribution friction, and provide actionable next validation moves. Keep it structured and punchy.`;
-
+    if (getLLMStatus().hasLiveLLM) {
       try {
-        reply = await generateAgentTurn(systemPrompt, message, { temperature: 0.6, maxTokens: 800 });
-        agentName = role === "all" ? "Swarm Multi-Agent Debate" : (SWARM_ROLES[role as SwarmRole]?.name || "Agent " + role);
+        reply = await generateAgentTurn(turn.systemPrompt, message, { temperature: 0.6, maxTokens: 800 });
+        agentName = turn.agentName;
       } catch (err: any) {
         // Fallback to heuristic if LLM call fails
         const fallback = generateHeuristicChatReply(message, role, ideaTitle, ideaSummary, domain);
@@ -329,6 +320,108 @@ Give a direct, razor-sharp, analytical response. Challenge unvalidated assumptio
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message || "Playground chat failed" });
+  }
+});
+
+// Shared chat turn construction for /api/chat and /api/chat/stream.
+function buildChatTurn(
+  role: string,
+  message: string,
+  ideaContext: any,
+  ideaTitle: string,
+  ideaSummary: string,
+  domain: any
+): { systemPrompt: string; agentName: string } {
+  const rolePrompt = role === "all"
+    ? "Consensus of 6 adversarial agents (Skeptic, Investor, Architect, Market, Customer, Founder)"
+    : `Agent ${role.toUpperCase()}`;
+
+  const systemPrompt = `You are part of the Dossier Adversarial Intelligence Swarm built on TrueForge.
+Role: ${rolePrompt}
+Domain Archetype: ${domain.archetypeLabel}
+Idea: "${ideaTitle}" — ${ideaSummary}
+
+Give a direct, razor-sharp, analytical response. Challenge unvalidated assumptions, probe unit economics, test distribution friction, and provide actionable next validation moves. Keep it structured and punchy.`;
+
+  const agentName = role === "all"
+    ? "Swarm Multi-Agent Debate"
+    : (SWARM_ROLES[role as SwarmRole]?.name || "Agent " + role);
+
+  return { systemPrompt, agentName };
+}
+
+// Streaming playground chat (SSE): chunk events as tokens arrive, then done.
+// Falls back to the heuristic reply as a single chunk when no LLM is live or
+// streaming fails — the stream never hangs and never fabricates.
+app.post("/api/chat/stream", async (req: Request, res: Response) => {
+  const { message, role = "all", ideaContext } = req.body;
+
+  if (!message) {
+    res.status(400).json({ error: "Missing required field: 'message'" });
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  let isClientConnected = true;
+  res.on("close", () => { isClientConnected = false; });
+  const send = (event: string, data: any) => {
+    if (!isClientConnected) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const ideaTitle = ideaContext?.title || "Target Idea";
+    const ideaSummary = ideaContext?.summary || message;
+    const domain = classifyIdeaDomain({
+      title: ideaTitle,
+      summary: ideaSummary,
+      targetAudience: ideaContext?.targetAudience || "Target Customers",
+      monetization: ideaContext?.monetization || "Subscription"
+    });
+    const turn = buildChatTurn(role, message, ideaContext, ideaTitle, ideaSummary, domain);
+
+    const finishHeuristic = () => {
+      const fallback = generateHeuristicChatReply(message, role, ideaTitle, ideaSummary, domain);
+      send("chunk", { text: fallback.reply });
+      send("done", { agentName: fallback.agentName, epistemicState: fallback.epistemicState, degraded: true });
+      res.end();
+    };
+
+    if (!getLLMStatus().hasLiveLLM) {
+      finishHeuristic();
+      return;
+    }
+
+    let streamed = false;
+    try {
+      await streamAgentTurn(turn.systemPrompt, message, { temperature: 0.6, maxTokens: 800 }, (chunk) => {
+        streamed = true;
+        send("chunk", { text: chunk });
+      });
+      send("done", {
+        agentName: turn.agentName,
+        epistemicState: "SWARM_CONSENSUS",
+        domain: domain.archetypeLabel
+      });
+      res.end();
+    } catch {
+      // Mid-stream provider failure: keep whatever arrived, mark partial.
+      // A pre-stream failure falls back to the honest heuristic reply.
+      if (streamed) {
+        send("done", { agentName: turn.agentName, epistemicState: "SWARM_CONSENSUS", partial: true });
+        res.end();
+      } else {
+        finishHeuristic();
+      }
+    }
+  } catch (error: any) {
+    send("error", { error: error.message || "Chat stream failed" });
+    res.end();
   }
 });
 

@@ -110,6 +110,60 @@
       background-color: #e4e4e7;
       border-radius: 9999px;
     }
+    /* ===== Dark terminal theme (class-driven override layer) ===== */
+    html.dark body { background-color: #09090b; color: #f4f4f5; }
+    html.dark .bg-white { background-color: #101015 !important; }
+    html.dark .bg-white\/90, html.dark .bg-white\/80 { background-color: rgba(13,13,17,0.92) !important; }
+    html.dark .bg-zinc-50 { background-color: #0e0e12 !important; }
+    html.dark .bg-zinc-50\/70 { background-color: #0d0d11 !important; }
+    html.dark .bg-zinc-100 { background-color: #1b1b22 !important; }
+    html.dark .bg-zinc-200 { background-color: #27272f !important; }
+    html.dark .hover\:bg-zinc-50:hover { background-color: #17171d !important; }
+    html.dark .hover\:bg-zinc-100:hover { background-color: #212129 !important; }
+    html.dark .hover\:bg-zinc-200:hover { background-color: #2b2b35 !important; }
+    html.dark .text-zinc-950 { color: #f4f4f5 !important; }
+    html.dark .text-zinc-900 { color: #ececf1 !important; }
+    html.dark .text-zinc-800 { color: #d6d6de !important; }
+    html.dark .text-zinc-700 { color: #babac4 !important; }
+    html.dark .text-zinc-600 { color: #90909c !important; }
+    html.dark .text-zinc-500 { color: #767680 !important; }
+    html.dark .text-zinc-400 { color: #5f5f69 !important; }
+    html.dark .text-zinc-300 { color: #a8a8b3 !important; }
+    html.dark .border-zinc-200, html.dark .border-zinc-100 { border-color: #26262e !important; }
+    html.dark .border-zinc-200\/90, html.dark .border-zinc-200\/80 { border-color: rgba(38,38,46,0.9) !important; }
+    html.dark .border-zinc-300 { border-color: #34343e !important; }
+    html.dark .divide-zinc-100 > :not([hidden]) ~ :not([hidden]) { border-color: #22222a !important; }
+    html.dark .bg-amber-50\/50 { background-color: rgba(250,204,21,0.06) !important; }
+    html.dark .bg-amber-100 { background-color: rgba(250,204,21,0.10) !important; }
+    html.dark .bg-red-100 { background-color: rgba(248,113,113,0.12) !important; }
+    html.dark .bg-red-50 { background-color: rgba(248,113,113,0.08) !important; }
+    html.dark .bg-emerald-50 { background-color: rgba(52,211,153,0.08) !important; }
+    html.dark .bg-badgeGreenBg { background-color: rgba(52,211,153,0.12) !important; }
+    html.dark .bg-badgeAmberBg { background-color: rgba(250,204,21,0.10) !important; }
+    html.dark .bg-badgeRedBg { background-color: rgba(248,113,113,0.12) !important; }
+    html.dark .bg-blue-600 { background-color: #2563eb !important; }
+    html.dark ::-webkit-scrollbar { background: #0e0e12; }
+    html.dark ::-webkit-scrollbar-thumb { background: #2b2b35; border-radius: 6px; }
+    html.dark .chat-scroll::-webkit-scrollbar-thumb { background: #2b2b35; }
+    html.dark .bg-zinc-900 { background-color: #14141a !important; }
+    html.dark .hover\:bg-zinc-900:hover { background-color: #191920 !important; }
+    html.dark .bg-zinc-900\/60 { background-color: rgba(16,16,21,0.6) !important; }
+    html.dark .hover\:bg-zinc-800:hover, html.dark .hover\:bg-zinc-700:hover { background-color: #1d1d25 !important; }
+
+    /* Streaming chat cursor */
+    .stream-cursor::after {
+      content: '▋';
+      display: inline-block;
+      margin-left: 2px;
+      color: #71717a;
+      animation: streamBlink 1s steps(1) infinite;
+    }
+    @keyframes streamBlink { 50% { opacity: 0; } }
+
+    /* Orbit SVG labels follow the theme (CSS fill beats SVG attributes) */
+    html.dark .orbit-label-bg { fill: #17171d; }
+    html.dark .orbit-label-title { fill: #f4f4f5; }
+    html.dark .orbit-label-sub { fill: #90909c; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between">
@@ -138,6 +192,9 @@
         <button id="navPlaygroundBtn" onclick="switchView('playground')" class="nav-link text-zinc-600 font-semibold px-3 py-1.5 rounded-lg hover:text-zinc-950 hover:bg-zinc-100 transition cursor-pointer flex items-center gap-2">
           <span>Playground</span>
           <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brandYellow text-black font-mono">LIVE</span>
+        </button>
+        <button onclick="toggleTheme()" id="themeToggle" title="Toggle terminal theme" class="text-zinc-600 font-semibold px-2.5 py-1.5 rounded-lg hover:text-zinc-950 hover:bg-zinc-100 transition cursor-pointer text-sm">
+          🌙
         </button>
         <button onclick="openIntakeModal()" class="hidden sm:inline-flex items-center gap-1.5 bg-brandYellow hover:bg-brandYellowHover text-zinc-950 font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition cursor-pointer">
           + New Evaluation
@@ -193,9 +250,9 @@
               <!-- ================= 1. FOUNDER (Top Center) ================= -->
               <g id="svgNodeFounder" class="transition-all duration-300" transform="translate(260, 70)">
                 <!-- Text Label Background to avoid dashed line collision -->
-                <rect x="26" y="-20" width="145" height="38" fill="#ffffff" rx="4" />
-                <text x="30" y="-4" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="12" fill="#09090b">Founder</text>
-                <text x="30" y="12" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10.5" fill="#71717a">Opportunity Framing</text>
+                <rect x="26" y="-20" width="145" height="38" class="orbit-label-bg" fill="#ffffff" rx="4" />
+                <text x="30" y="-4" font-family="'Plus Jakarta Sans', sans-serif" class="orbit-label-title" font-weight="700" font-size="12" fill="#09090b">Founder</text>
+                <text x="30" y="12" font-family="'Plus Jakarta Sans', sans-serif" class="orbit-label-sub" font-weight="400" font-size="10.5" fill="#71717a">Opportunity Framing</text>
                 <!-- Node Circle -->
                 <circle id="svgCircleFounder" cx="0" cy="0" r="21" fill="#facc15" stroke="#000000" stroke-width="1.5" />
                 <!-- Person Icon -->
@@ -205,9 +262,9 @@
               <!-- ================= 2. MARKET RECON (Top Right) ================= -->
               <g id="svgNodeAnalyst" class="transition-all duration-300" transform="translate(368, 133)">
                 <!-- Text Label Background -->
-                <rect x="26" y="-18" width="130" height="36" fill="#ffffff" rx="4" />
-                <text x="30" y="-3" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="12" fill="#09090b">Market Recon</text>
-                <text x="30" y="13" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10.5" fill="#71717a">Competition Trends</text>
+                <rect x="26" y="-18" width="130" height="36" class="orbit-label-bg" fill="#ffffff" rx="4" />
+                <text x="30" y="-3" font-family="'Plus Jakarta Sans', sans-serif" class="orbit-label-title" font-weight="700" font-size="12" fill="#09090b">Market Recon</text>
+                <text x="30" y="13" font-family="'Plus Jakarta Sans', sans-serif" class="orbit-label-sub" font-weight="400" font-size="10.5" fill="#71717a">Competition Trends</text>
                 <!-- Node Circle -->
                 <circle id="svgCircleAnalyst" cx="0" cy="0" r="21" fill="#facc15" stroke="#000000" stroke-width="1.5" />
                 <!-- Live confidence dial (Phase 3.1) -->
@@ -219,8 +276,8 @@
               <!-- ================= 3. FINANCIAL (Bottom Right) ================= -->
               <g id="svgNodeInvestor" class="transition-all duration-300" transform="translate(368, 257)">
                 <!-- Text Label Background -->
-                <rect x="26" y="-22" width="130" height="46" fill="#ffffff" rx="4" />
-                <text x="30" y="-6" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="12" fill="#09090b">Financial</text>
+                <rect x="26" y="-22" width="130" height="46" class="orbit-label-bg" fill="#ffffff" rx="4" />
+                <text x="30" y="-6" font-family="'Plus Jakarta Sans', sans-serif" class="orbit-label-title" font-weight="700" font-size="12" fill="#09090b">Financial</text>
                 <text x="30" y="9" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10" fill="#71717a">Unit Economics</text>
                 <text x="30" y="22" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10" fill="#71717a">Stress Test</text>
                 <!-- Node Circle -->
@@ -234,9 +291,9 @@
               <!-- ================= 4. HUMAN / USER (Bottom Center) ================= -->
               <g id="svgNodeCustomer" class="transition-all duration-300" transform="translate(260, 320)">
                 <!-- Text Label Background -->
-                <rect x="-85" y="24" width="170" height="36" fill="#ffffff" rx="4" />
-                <text x="0" y="38" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="12" fill="#09090b" text-anchor="middle">Human / User</text>
-                <text x="0" y="53" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10.5" fill="#71717a" text-anchor="middle">Empathy Reality Check</text>
+                <rect x="-85" y="24" width="170" height="36" class="orbit-label-bg" fill="#ffffff" rx="4" />
+                <text x="0" y="38" font-family="'Plus Jakarta Sans', sans-serif" class="orbit-label-title" font-weight="700" font-size="12" fill="#09090b" text-anchor="middle">Human / User</text>
+                <text x="0" y="53" font-family="'Plus Jakarta Sans', sans-serif" class="orbit-label-sub" font-weight="400" font-size="10.5" fill="#71717a" text-anchor="middle">Empathy Reality Check</text>
                 <!-- Node Circle -->
                 <circle id="svgCircleCustomer" cx="0" cy="0" r="21" fill="#facc15" stroke="#000000" stroke-width="1.5" />
                 <!-- Live confidence dial (Phase 3.1) -->
@@ -248,8 +305,8 @@
               <!-- ================= 5. TECHNICAL (Bottom Left) ================= -->
               <g id="svgNodeArchitect" class="transition-all duration-300" transform="translate(152, 257)">
                 <!-- Text Label Background -->
-                <rect x="-145" y="-22" width="128" height="46" fill="#ffffff" rx="4" />
-                <text x="-22" y="-6" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="12" fill="#09090b" text-anchor="end">Technical</text>
+                <rect x="-145" y="-22" width="128" height="46" class="orbit-label-bg" fill="#ffffff" rx="4" />
+                <text x="-22" y="-6" font-family="'Plus Jakarta Sans', sans-serif" class="orbit-label-title" font-weight="700" font-size="12" fill="#09090b" text-anchor="end">Technical</text>
                 <text x="-22" y="9" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10" fill="#71717a" text-anchor="end">Feasibility</text>
                 <text x="-22" y="22" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10" fill="#71717a" text-anchor="end">Architecture</text>
                 <!-- Node Circle -->
@@ -263,8 +320,8 @@
               <!-- ================= 6. SKEPTIC (Top Left) ================= -->
               <g id="svgNodeRedteam" class="transition-all duration-300" transform="translate(152, 133)">
                 <!-- Text Label Background -->
-                <rect x="-140" y="-22" width="122" height="46" fill="#ffffff" rx="4" />
-                <text x="-22" y="-6" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="12" fill="#09090b" text-anchor="end">Skeptic</text>
+                <rect x="-140" y="-22" width="122" height="46" class="orbit-label-bg" fill="#ffffff" rx="4" />
+                <text x="-22" y="-6" font-family="'Plus Jakarta Sans', sans-serif" class="orbit-label-title" font-weight="700" font-size="12" fill="#09090b" text-anchor="end">Skeptic</text>
                 <text x="-22" y="9" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10" fill="#71717a" text-anchor="end">Red Team</text>
                 <text x="-22" y="22" font-family="'Plus Jakarta Sans', sans-serif" font-weight="400" font-size="10" fill="#71717a" text-anchor="end">Contrarian</text>
                 <!-- Node Circle -->
@@ -1013,6 +1070,29 @@
     }
     window.addEventListener('hashchange', route);
 
+    // ======================= Terminal theme toggle =======================
+    function applyTheme(dark) {
+      document.documentElement.classList.toggle('dark', dark);
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.textContent = dark ? '☀️' : '🌙';
+      try { localStorage.setItem('dossier-theme', dark ? 'dark' : 'light'); } catch {}
+      // Canvas charts bake colors at draw time — redraw the visible dossier.
+      const dossier = window.lastRenderedDossier;
+      if (dossier && dossier.simulation && dossier.simulation.monteCarlo &&
+          !document.getElementById('resultsSection').classList.contains('hidden')) {
+        renderSurvivalChart(dossier.simulation.monteCarlo);
+        renderPaybackChart(dossier.simulation.monteCarlo);
+      }
+    }
+    function toggleTheme() {
+      applyTheme(!isDarkTheme());
+    }
+    function initTheme() {
+      let stored = null;
+      try { stored = localStorage.getItem('dossier-theme'); } catch {}
+      applyTheme(stored ? stored === 'dark' : false);
+    }
+
     // ======================= Archive =======================
     let archiveCache = [];
     let archiveVerdictFilter = 'ALL';
@@ -1164,23 +1244,78 @@
       spinner.classList.remove('hidden');
 
       try {
-        const res = await fetch('/api/chat', {
+        // Preferred path: token-streaming SSE. Falls back to the buffered
+        // /api/chat endpoint when the stream is unavailable.
+        const res = await fetch('/api/chat/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: text,
-            role: currentChatRole,
-            ideaContext: currentIdeaContext
-          })
+          body: JSON.stringify({ message: text, role: currentChatRole, ideaContext: currentIdeaContext })
         });
-        const data = await res.json();
-        if (data.success) {
-          appendAgentMessage(data.agentName, data.reply, data.epistemicState);
-        } else {
-          appendAgentMessage("System Alert", "Error: " + (data.error || "Execution failed"), "ERROR");
+        if (!res.ok || !res.body) throw new Error('stream unavailable');
+
+        const { root, bodyEl, nameEl, badgeEl } = buildAgentMessage('Swarm Multi-Agent Debate', 'STREAMING');
+        badgeEl.className = 'msg-badge px-2 py-0.2 rounded text-[9px] font-mono font-bold border bg-amber-50 text-amber-800 border-amber-200';
+        bodyEl.innerHTML = '<span class="stream-cursor"></span>';
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '', acc = '', agentName = 'Swarm Multi-Agent Debate', state = 'SWARM_CONSENSUS', degraded = false;
+
+        const finalize = () => {
+          nameEl.textContent = agentName;
+          badgeEl.textContent = state;
+          bodyEl.innerHTML = acc
+            ? formatChatMarkdown(acc) + (degraded ? '<div class="text-[9px] text-zinc-400 font-mono mt-2">HEURISTIC FALLBACK — no live LLM available for this turn.</div>' : '')
+            : '<span class="text-zinc-400 font-mono">_(no response)_</span>';
+          document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split('\n\n');
+          buffer = blocks.pop() || '';
+          for (const block of blocks) {
+            let evt = 'message', dataStr = '';
+            for (const line of block.split('\n')) {
+              if (line.startsWith('event: ')) evt = line.slice(7).trim();
+              if (line.startsWith('data: ')) dataStr += line.slice(6).trim();
+            }
+            if (!dataStr) continue;
+            let data;
+            try { data = JSON.parse(dataStr); } catch { continue; }
+            if (evt === 'chunk' && data.text) {
+              acc += data.text;
+              bodyEl.innerHTML = formatChatMarkdown(acc) + '<span class="stream-cursor"></span>';
+              document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+            } else if (evt === 'done') {
+              agentName = data.agentName || agentName;
+              state = data.epistemicState || state;
+              degraded = Boolean(data.degraded);
+            } else if (evt === 'error') {
+              throw new Error(data.error || 'chat stream failed');
+            }
+          }
         }
-      } catch (err) {
-        appendAgentMessage("System Alert", "Network error: " + err.message, "ERROR");
+        finalize();
+      } catch (streamErr) {
+        // Fallback: buffered endpoint (original behavior).
+        try {
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, role: currentChatRole, ideaContext: currentIdeaContext })
+          });
+          const data = await res.json();
+          if (data.success) {
+            appendAgentMessage(data.agentName, data.reply, data.epistemicState);
+          } else {
+            appendAgentMessage("System Alert", "Error: " + (data.error || "Execution failed"), "ERROR");
+          }
+        } catch (err) {
+          appendAgentMessage("System Alert", "Network error: " + err.message, "ERROR");
+        }
       } finally {
         submitBtn.disabled = false;
         btnText.textContent = "Send";
@@ -1204,16 +1339,14 @@
       container.scrollTop = container.scrollHeight;
     }
 
-    function appendAgentMessage(agentName, markdownText, epistemicState) {
+    function buildAgentMessage(agentName, epistemicState) {
       const container = document.getElementById('chatMessages');
       const div = document.createElement('div');
       div.className = 'flex items-start gap-3 max-w-3xl';
-      
+
       const badgeColor = epistemicState === 'CHALLENGE_FLAGGED' ? 'bg-red-50 text-red-700 border-red-200' :
         (epistemicState === 'VERIFIED_COMPUTATION' || epistemicState === 'VERIFIED_FACT' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
         'bg-amber-50 text-amber-800 border-amber-200');
-
-      const formattedHtml = formatChatMarkdown(markdownText);
 
       div.innerHTML = `
         <div class="w-8 h-8 rounded-full bg-brandYellow border border-black flex items-center justify-center font-bold text-xs text-black shrink-0">
@@ -1221,19 +1354,31 @@
         </div>
         <div class="space-y-1.5 flex-1">
           <div class="flex items-center gap-2">
-            <span class="font-bold text-xs text-zinc-900">${escapeHtml(agentName)}</span>
-            <span class="px-2 py-0.2 rounded text-[9px] font-mono font-bold border ${badgeColor}">
+            <span class="msg-agent-name font-bold text-xs text-zinc-900">${escapeHtml(agentName)}</span>
+            <span class="msg-badge px-2 py-0.2 rounded text-[9px] font-mono font-bold border ${badgeColor}">
               ${escapeHtml(epistemicState)}
             </span>
             <span class="text-[10px] text-zinc-400 font-mono">Just now</span>
           </div>
-          <div class="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl rounded-tl-xs text-xs text-zinc-800 leading-relaxed font-sans space-y-2">
-            ${formattedHtml}
-          </div>
+          <div class="msg-body p-4 bg-zinc-50 border border-zinc-200 rounded-2xl rounded-tl-xs text-xs text-zinc-800 leading-relaxed font-sans space-y-2"></div>
         </div>
       `;
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
+      return {
+        root: div,
+        bodyEl: div.querySelector('.msg-body'),
+        nameEl: div.querySelector('.msg-agent-name'),
+        badgeEl: div.querySelector('.msg-badge')
+      };
+    }
+
+    function appendAgentMessage(agentName, markdownText, epistemicState) {
+      const { root, bodyEl } = buildAgentMessage(agentName, epistemicState);
+      bodyEl.innerHTML = formatChatMarkdown(markdownText);
+      const container = document.getElementById('chatMessages');
+      container.scrollTop = container.scrollHeight;
+      return root;
     }
 
     function appendSystemNote(note) {
@@ -1696,10 +1841,21 @@
       return { ctx, w, h: logicalHeight };
     }
 
+    // Chart palette adapts to the terminal theme; accents (emerald/amber) read on both.
+    function isDarkTheme() {
+      return document.documentElement.classList.contains('dark');
+    }
+    function chartPalette() {
+      return isDarkTheme()
+        ? { grid: '#2b2b33', gridSoft: '#232329', textMuted: '#8e8e9a', textStrong: '#c9c9d1', p50Mark: '#f4f4f5' }
+        : { grid: '#e4e4e7', gridSoft: '#d4d4d8', textMuted: '#71717a', textStrong: '#a1a1aa', p50Mark: '#09090b' };
+    }
+
     function renderSurvivalChart(mc) {
       const canvas = document.getElementById('survivalChart');
       if (!canvas) return;
       const { ctx, w, h } = setupChartCanvas(canvas, 420, 200);
+      const pal = chartPalette();
       const pad = { l: 40, r: 12, t: 14, b: 26 };
       const months = 24;
       const insol = Array.isArray(mc.insolvencyCurveByMonth) ? mc.insolvencyCurveByMonth : [];
@@ -1710,14 +1866,14 @@
       const xFor = (m) => pad.l + (m / months) * (w - pad.l - pad.r);
       const yFor = (pct) => pad.t + (1 - pct / 100) * (h - pad.t - pad.b);
 
-      ctx.strokeStyle = '#e4e4e7';
+      ctx.strokeStyle = pal.grid;
       ctx.lineWidth = 1;
       [0, 25, 50, 75, 100].forEach((p) => {
         ctx.beginPath();
         ctx.moveTo(xFor(0), yFor(p));
         ctx.lineTo(xFor(months), yFor(p));
         ctx.stroke();
-        ctx.fillStyle = '#a1a1aa';
+        ctx.fillStyle = pal.textStrong;
         ctx.font = '9px "IBM Plex Mono", monospace';
         ctx.textAlign = 'right';
         ctx.fillText(`${p}%`, pad.l - 6, yFor(p) + 3);
@@ -1739,7 +1895,7 @@
       ctx.fillStyle = 'rgba(16,185,129,0.12)';
       ctx.fill();
 
-      ctx.strokeStyle = '#d4d4d8';
+      ctx.strokeStyle = pal.gridSoft;
       ctx.setLineDash([3, 3]);
       [12, 24].forEach((m) => {
         ctx.beginPath();
@@ -1749,7 +1905,7 @@
       });
       ctx.setLineDash([]);
 
-      ctx.fillStyle = '#71717a';
+      ctx.fillStyle = pal.textMuted;
       ctx.font = '9px "IBM Plex Mono", monospace';
       ctx.textAlign = 'center';
       [0, 6, 12, 18, 24].forEach((m) => ctx.fillText(`${m}`, xFor(m), h - 8));
@@ -1803,7 +1959,7 @@
       ctx.fill();
 
       ctx.font = '9px "IBM Plex Mono", monospace';
-      [[p10, '#f59e0b', 'P10'], [p50, '#09090b', 'P50'], [p90, '#f59e0b', 'P90']].forEach(([v, color, label]) => {
+      [[p10, '#f59e0b', 'P10'], [p50, chartPalette().p50Mark, 'P50'], [p90, '#f59e0b', 'P90']].forEach(([v, color, label]) => {
         ctx.strokeStyle = color;
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
@@ -2016,6 +2172,7 @@
     };
 
     function renderDossier(dossier) {
+      window.lastRenderedDossier = dossier;
       document.getElementById('resultsSection').classList.remove('hidden');
       document.getElementById('resSubjectTitle').textContent = dossier.idea.title.toUpperCase();
       document.getElementById('resExecutiveSummary').textContent = dossier.executiveSummary;
@@ -2408,8 +2565,9 @@
       }
     }
 
-    // Initialize recent dossiers on page load
+    // Initialize theme, routing, and live panels on page load
     window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
       route();
       loadCalibrationPanel();
     });

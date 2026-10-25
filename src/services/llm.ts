@@ -184,6 +184,77 @@ export const llmClient = new OpenAI({
 });
 
 /**
+ * Streaming variant: emits text deltas via onChunk as they arrive and returns
+ * the full text. CLI (agy) providers stream as one buffered chunk; API providers
+ * stream token-by-token. Fails over across the provider chain like
+ * generateAgentTurn, but a mid-stream failure surfaces to the caller (partial
+ * output may already have been emitted).
+ */
+export async function streamAgentTurn(
+  systemPrompt: string,
+  userPrompt: string,
+  options: LLMGenerateOptions,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const providers = resolveProviders();
+
+  if (providers.length === 0) {
+    throw new Error("No live LLM configured (API keys, LOCAL_LLM_URL, or authenticated `agy` CLI)");
+  }
+
+  let lastError: Error | null = null;
+
+  for (const provider of providers) {
+    try {
+      if (provider.kind === "cli") {
+        const text = await runAgyCliTurn(provider, systemPrompt, userPrompt, options);
+        if (text.trim()) {
+          onChunk(text);
+          return text;
+        }
+        throw new Error("agy returned empty response");
+      }
+
+      const client = new OpenAI({
+        baseURL: provider.baseURL,
+        apiKey: provider.apiKey,
+        timeout: 25000,
+        maxRetries: 1
+      });
+      const model = options.model || provider.defaultModel;
+      const temperature = options.temperature ?? 0.7;
+
+      const stream = await client.chat.completions.create({
+        model,
+        temperature,
+        max_tokens: options.maxTokens || 2500,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        stream: true
+      });
+
+      let full = "";
+      for await (const part of stream) {
+        const delta = part.choices?.[0]?.delta?.content || "";
+        if (delta) {
+          full += delta;
+          onChunk(delta);
+        }
+      }
+      if (full.trim()) return full;
+      throw new Error(`provider ${provider.name} streamed nothing`);
+    } catch (err: any) {
+      lastError = err;
+      // Continue to next provider in failover chain
+    }
+  }
+
+  throw lastError || new Error("All configured LLM providers failed to stream a completion");
+}
+
+/**
  * Execute an LLM completion turn across available providers with graceful failover.
  */
 export async function generateAgentTurn(
