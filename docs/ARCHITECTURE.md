@@ -28,7 +28,7 @@ Dossier avoids single-prompt hallucinations by decomposing the problem into six 
 
 | Role ID | Role Name | Primary Mandate | Key Metrics Audited |
 | :--- | :--- | :--- | :--- |
-| **01** | **Market Analyst** | Competition mapping, market size, whitespace, search signals. | TAM/SAM, competitor density, market timing. |
+| **01** | **Analyst** | Competition mapping, market size, whitespace, search signals. | Competitor density, market timing, recon citations. |
 | **02** | **Customer Advocate** | User pain, adoption friction, switching costs, habit inertia. | Workflow disruption, willingness-to-pay (WTP). |
 | **03** | **Technical Architect** | Engineering feasibility, compute/API unit economics, sandbox safety. | Monthly inference token burn, latency, edge vs cloud. |
 | **04** | **Investor** | Business model viability, defensibility, pricing power, venture margins. | Gross margin, CAC payback period, LTV/CAC ratio. |
@@ -68,14 +68,11 @@ Inspired by **Stanford University's CS329A (Self-Improving AI Agents)** and **Az
 ### A. Polymarket Prediction Market Oracle (`src/tools/polymarket.ts`)
 Queries Polymarket's open Gamma API (`https://gamma-api.polymarket.com/events`) with zero API key dependencies to pull real-time trading volumes, betting odds, and crowd-sourced probability for macro tech trends.
 
-### B. Agent Reach Social Intelligence (`src/tools/search.ts`)
-Integrates the `agent-reach` engine to inspect community discussions across Reddit (`r/startups`, `r/SaaS`), Hacker News, Twitter/X, and Jina Reader to detect real user sentiment and competitor churn complaints.
+### B. Live Recon (Exa/Tavily + Hacker News + CLI bridges)
+Live web recon (Exa or Tavily, 7-day SQLite cache, MiniLM rerank) plus zero-key Hacker News Algolia and best-effort Reddit/X CLI bridges surface real competitor pages and community threads with source URLs. No provider → explicit `dataSource: "none"`; free tier gates live recon to Pro (`DOSSIER_PRO=1`).
 
-### C. Model Context Protocol Client (`src/tools/mcp.ts` & `dossier.mcp.json`)
-Implements `@modelcontextprotocol/sdk` to spawn and manage external MCP servers via STDIO transports:
-- `@modelcontextprotocol/server-filesystem` (Isolated dossier export storage)
-- `@modelcontextprotocol/server-github` (Repo inspection and code verification)
-- `@modelcontextprotocol/server-brave-search` (Live web research)
+### C. Dossier MCP Server (`src/mcp-server.ts`)
+Exposes 9 tools over STDIO: `evaluate_idea`, `stress_test_concept`, `run_sandbox_economics`, `verify_claims_epistemics`, `list_dossiers`, `get_dossier`, `export_dossier`, `update_approval_gate`, `update_outcome` (ledger outcome ingestion for calibration). `src/tools/mcp.ts` + `dossier.mcp.json` are legacy client scaffolding, currently unused by the swarm.
 
 ### D. Isolated Subprocess Sandbox Runner (`src/tools/sandbox.ts`)
 Compiles financial simulations into standalone Python scripts and executes them inside isolated temporary directories (`/tmp/trueforge-sandbox-*`) with strict execution timeouts:

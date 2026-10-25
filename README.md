@@ -34,7 +34,7 @@ Dossier stress-tests startup concepts, product features, and technical proposals
           |               |                       |               |
           v               v                       v               v
    +--------------+ +--------------+       +--------------+ +--------------+
-   | The Skeptic  | | The Investor |  ...  |  Architect   | | Market Lead  |
+   |   Analyst    | |   Investor   |  ...  |  Architect   | |   RedTeam    |
    +------+-------+ +------+-------+       +------+-------+ +------+-------+
           \               /                       \               /
            \             /                         \             /
@@ -60,14 +60,15 @@ Dossier stress-tests startup concepts, product features, and technical proposals
 
 ---
 
-## Swarm Perspectives
+## Swarm Perspectives (code: `src/config/prompts.ts:SWARM_ROLES`, `src/types/index.ts:SwarmRole`)
 
-- **The Skeptic (Chief Devil's Advocate):** Identifies fatal flaws, churn traps, regulatory risks, and distribution bottlenecks.
-- **The Investor (VC Partner):** Evaluates TAM/SAM, defensibility, pricing power, and venture scalability.
-- **The Technical Architect (Principal Systems Engineer):** Evaluates technical feasibility, compute and token unit economics, latency, and sandbox isolation.
-- **The Market Analyst (Competitive Intelligence Lead):** Analyzes direct and indirect competitors, industry trends, and market positioning.
-- **The Customer Persona (Target Buyer):** Tests psychological inertia, switching friction, and true willingness to pay.
-- **The Founder Synthesizer:** Resolves contradictions, computes the consensus Resilience Score (0–100), and formulates the 7-day validation plan.
+- **Analyst (01):** Competition mapping, market size, whitespace, search signals.
+- **Customer Advocate (02):** User pain, adoption friction, switching costs, habit inertia.
+- **Technical Architect (03):** Engineering feasibility, compute/token unit economics, sandbox safety.
+- **Investor (04):** Business model viability, defensibility, pricing power, venture margins.
+- **Red Team (05, Chief Adversary):** Fatal flaws, churn traps, regulatory risks, distribution death traps. `STRONG_KILL` vetoes BUILD.
+- **Domain Expert (06):** Industry-specific compliance, standards, operational benchmarks.
+- **Synthesizer (00):** Resolves contradictions, computes the Resilience Score (0–100), formulates the 7-day validation plan.
 
 ---
 

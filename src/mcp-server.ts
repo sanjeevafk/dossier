@@ -204,6 +204,20 @@ class DossierMCPServer {
               },
               required: ["actionId", "decision"]
             }
+          },
+          {
+            name: "update_outcome",
+            description: "Records a real-world outcome (built, killed, pivoted) for a dossier. Feeds the calibration ledger (Brier/ECE) — resolves fatal assumptions and gates BUILD.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Dossier ID or Code" },
+                outcome: { type: "string", enum: ["built", "killed", "pivoted"], description: "What actually happened" },
+                revenueUsd: { type: "number", description: "Optional revenue to date in USD" },
+                pilots: { type: "number", description: "Optional signed pilot count" }
+              },
+              required: ["id", "outcome"]
+            }
           }
         ]
       };
@@ -475,6 +489,38 @@ class DossierMCPServer {
                     null,
                     2
                   )
+                }
+              ]
+            };
+          }
+
+          case "update_outcome": {
+            const id = String(args?.id || "");
+            const outcome = String(args?.outcome || "");
+            if (!["built", "killed", "pivoted"].includes(outcome)) {
+              return {
+                content: [{ type: "text", text: "Error: outcome must be one of: built | killed | pivoted." }],
+                isError: true
+              };
+            }
+            const dossier = await dossierStorage.getDossier(id);
+            if (!dossier) {
+              return {
+                content: [{ type: "text", text: `Error: Dossier '${id}' not found.` }],
+                isError: true
+              };
+            }
+            const updated = dossierStorage.updateOutcome(
+              dossier.id,
+              outcome,
+              typeof args?.revenueUsd === "number" ? args.revenueUsd : undefined,
+              typeof args?.pilots === "number" ? args.pilots : undefined
+            );
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({ success: updated, dossierId: dossier.id, outcome }, null, 2)
                 }
               ]
             };

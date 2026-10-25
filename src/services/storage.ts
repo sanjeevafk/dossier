@@ -84,6 +84,14 @@ export class DossierStorageService {
         created_at TEXT,
         outcome_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS monitor_alerts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        dossier_id TEXT,
+        source TEXT,
+        url TEXT,
+        summary TEXT,
+        created_at TEXT
+      );
     `);
     this.db = db;
     return db;
@@ -132,6 +140,38 @@ export class DossierStorageService {
   public listLedger(): Array<Record<string, unknown>> {
     try {
       return this.getDb().prepare("SELECT * FROM ledger ORDER BY created_at DESC LIMIT 500").all();
+    } catch {
+      return [];
+    }
+  }
+
+  public appendMonitorAlerts(
+    alerts: Array<{ dossierId: string; source: string; url: string; summary: string; at?: string }>
+  ): void {
+    if (alerts.length === 0) return;
+    try {
+      const db = this.getDb();
+      const stmt = db.prepare(
+        "INSERT INTO monitor_alerts (dossier_id, source, url, summary, created_at) VALUES (?, ?, ?, ?, ?)"
+      );
+      for (const a of alerts) {
+        stmt.run(a.dossierId, a.source, a.url, a.summary, a.at ?? new Date().toISOString());
+      }
+    } catch {
+      // alert persistence must never break the monitor
+    }
+  }
+
+  public listMonitorAlerts(dossierId?: string, limit = 50): Array<Record<string, unknown>> {
+    try {
+      if (dossierId) {
+        return this.getDb()
+          .prepare("SELECT * FROM monitor_alerts WHERE dossier_id = ? ORDER BY created_at DESC LIMIT ?")
+          .all(dossierId, Math.max(1, Math.min(200, limit)));
+      }
+      return this.getDb()
+        .prepare("SELECT * FROM monitor_alerts ORDER BY created_at DESC LIMIT ?")
+        .all(Math.max(1, Math.min(200, limit)));
     } catch {
       return [];
     }

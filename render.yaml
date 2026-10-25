@@ -5,6 +5,10 @@ services:
     plan: free
     region: oregon
     branch: main
+    # NOTE: canonical live deploy is Azure App Service (B1, Central India)
+    # per README. This Render spec is the fallback; free tier has no disk —
+    # set DOSSIER_DATA_DIR to a persistent volume before relying on the
+    # SQLite ledger in production.
     healthCheckPath: /health
     disk:
       name: dossier-data

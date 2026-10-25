@@ -37,15 +37,22 @@ export interface ResearchFindings {
  * `dataSource: "none"` — downstream consumers must surface that as "no
  * external evidence" instead of heuristic filler.
  */
-export async function performMarketResearch(ideaTitle: string, domainKeywords: string[]): Promise<ResearchFindings> {
+export async function performMarketResearch(
+  ideaTitle: string,
+  domainKeywords: string[],
+  opts: { liveRecon?: boolean } = {}
+): Promise<ResearchFindings> {
   const query = `${ideaTitle} ${domainKeywords.join(" ")}`.trim();
   const cleanTitle = ideaTitle.trim().slice(0, 120);
 
+  const liveReconAllowed = opts.liveRecon ?? process.env.DOSSIER_PRO === "1";
   const [recon, community] = await Promise.all([
-    performLiveWebRecon([
-      `${cleanTitle} competitors alternatives pricing`,
-      `${cleanTitle} ${domainKeywords.slice(0, 2).join(" ")} customer complaints churn reviews`
-    ]),
+    liveReconAllowed
+      ? performLiveWebRecon([
+          `${cleanTitle} competitors alternatives pricing`,
+          `${cleanTitle} ${domainKeywords.slice(0, 2).join(" ")} customer complaints churn reviews`
+        ])
+      : Promise.resolve({ provider: "none" as const, queries: [], results: [], error: "Free tier: live recon gated to Pro (DOSSIER_PRO=1)" }),
     queryCommunitySentiment(cleanTitle)
   ]);
 

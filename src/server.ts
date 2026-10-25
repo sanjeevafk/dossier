@@ -152,15 +152,18 @@ app.post("/api/evaluate", requireAuth, async (req: Request, res: Response) => {
       monetization: monetization || "$49/month SaaS"
     };
 
+    const proTier = req.headers["x-dossier-pro"] === "1" || process.env.DOSSIER_PRO === "1";
     const dossier = await orchestrator.evaluateIdea(ideaInput, {
       pricingMonthlyUsd: pricingMonthlyUsd ? parseFloat(pricingMonthlyUsd) : undefined,
       estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined,
-      useLiveLLM: useLiveLLM !== false
+      useLiveLLM: useLiveLLM !== false,
+      proTier
     });
 
-    res.json({ success: true, dossier, llmStatus: getLLMStatus() });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message || "Evaluation failed" });
+    res.json({ success: true, dossier, llmStatus: getLLMStatus(), costUsd: dossier.evaluationMode === "LIVE_LLM" ? 0.3 : 0.0 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Evaluation failed";
+    res.status(500).json({ success: false, error: message });
   }
 });
 
@@ -207,6 +210,7 @@ app.post("/api/evaluate/stream", requireAuth, async (req: Request, res: Response
       pricingMonthlyUsd: pricingMonthlyUsd ? parseFloat(pricingMonthlyUsd) : undefined,
       estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined,
       useLiveLLM: useLiveLLM !== false,
+      proTier: req.headers["x-dossier-pro"] === "1" || process.env.DOSSIER_PRO === "1",
       onProgress: (stage, detail) => {
         sendSSE("progress", { stage, detail, timestamp: new Date().toISOString() });
       },
@@ -230,7 +234,8 @@ app.get("/metrics", async (_req: Request, res: Response) => {
   try {
     const rows = dossierStorage.listLedger() as Array<{
       dossier_id: string; score: number; archetype: string; outcome: string | null;
-    }>;
+    }>; 
+    const alerts = dossierStorage.listMonitorAlerts(undefined, 10);
     const byArchetype = new Map<string, Array<{ score: number; outcome: string | null }>>();
     for (const r of rows) {
       const key = String(r.archetype || "general_startup");
@@ -242,7 +247,7 @@ app.get("/metrics", async (_req: Request, res: Response) => {
       archetypes[key] = summarizeCalibration(list);
     }
     const overall = summarizeCalibration(rows.map(r => ({ score: Number(r.score ?? 0), outcome: r.outcome })));
-    res.json({ success: true, overall, archetypes, note: "Brier/ECE are n/a until >= 20 resolved outcomes per scope" });
+    res.json({ success: true, overall, archetypes, recentAlerts: alerts, note: "Brier/ECE are n/a until >= 20 resolved outcomes per scope" });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "metrics failed";
     res.status(500).json({ success: false, error: message });

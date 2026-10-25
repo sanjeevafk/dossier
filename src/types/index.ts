@@ -282,6 +282,8 @@ export interface IdeaDossier {
   baseRate?: number;
   /** True once a ledger outcome resolves every fatal assumption (gates BUILD). */
   fatalsResolved?: boolean;
+  /** Estimated marginal run cost in USD (recon queries + LLM tokens). */
+  costUsd?: number;
   /** Actually-retrieved external sources backing this dossier (empty when no recon provider ran). */
   externalEvidenceSources?: ExternalEvidenceSource[];
   idea: IdeaInput;

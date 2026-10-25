@@ -42,6 +42,8 @@ export interface SwarmExecutionOptions {
   expectedChurnMonthly?: number;
   estimatedCacUsd?: number;
   useLiveLLM?: boolean;
+  /** Pro tier enables live recon (Exa/Tavily); free tier uses heuristic + HN cache only. */
+  proTier?: boolean;
 }
 
 /**
@@ -768,7 +770,7 @@ Market & Prediction Signals: ${marketContext}`;
         idea.targetAudience,
         idea.monetization,
         domain.regulatoryEnvironment
-      ]),
+      ], { liveRecon: options.proTier ?? process.env.DOSSIER_PRO === "1" }),
       queryPolymarketMarkets(idea.title),
       runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30),
       // Pessimistic stress run feeding the crossfire tool traces (plan 2.2 ReAct evidence)
@@ -1481,6 +1483,7 @@ Market & Prediction Signals: ${marketContext}`;
       pSuccess: Math.round(compositeScore) / 100,
       baseRate: getBaseRate(domain.archetype).baseRate,
       fatalsResolved: fatalUntestedCount === 0,
+      costUsd: evaluationMode === "LIVE_LLM" ? 0.3 : 0.0,
       externalEvidenceSources,
       idea,
       domainClassification: domain,
