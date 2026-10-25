@@ -554,6 +554,7 @@
               <p id="resExecutiveSummary" class="text-sm text-zinc-700 mt-2 max-w-3xl leading-relaxed"></p>
               <div id="resTrustBlock" class="hidden mt-3 font-mono text-[11px] space-y-1 bg-zinc-50 border border-zinc-200 rounded-lg p-2.5">
                 <div id="resSwarmDissent" class="text-zinc-700"></div>
+                <div id="resOutsideView" class="text-purple-700"></div>
                 <div id="resEvidenceSources" class="text-zinc-500 break-all"></div>
               </div>
 
@@ -1707,6 +1708,15 @@
           : `SOURCES: none retrieved — signals below are heuristic priors, not sourced evidence`;
         trustBlock.classList.remove('hidden');
         document.getElementById('resSwarmDissent').textContent = dissentLine;
+        const ov = dossier.outsideView;
+        if (ov) {
+          const cls = ov.matchedClasses.map(c => `${c.label} ${Math.round(c.survival24moLow*100)}–${Math.round(c.survival24moHigh*100)}%`).join(' + ');
+          const deltaPct = Math.round(ov.optimismDelta * 100);
+          document.getElementById('resOutsideView').textContent =
+            `OUTSIDE VIEW: ${cls} · swarm implies ${Math.round(ov.impliedSurvival*100)}% vs base ${Math.round(ov.baseSurvivalMidpoint*100)}% → ${deltaPct >= 0 ? '+' : ''}${deltaPct}pts optimism premium`;
+        } else {
+          document.getElementById('resOutsideView').textContent = '';
+        }
         document.getElementById('resEvidenceSources').textContent = srcLine;
       }
       if (document.getElementById('resScoreVal')) {

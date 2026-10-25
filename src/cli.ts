@@ -88,6 +88,15 @@ program
       }
     }
 
+    if (dossier.outsideView) {
+      const ov = dossier.outsideView;
+      const classes = ov.matchedClasses.map((c: { label: string; survival24moLow: number; survival24moHigh: number }) => `${c.label} (${Math.round(c.survival24moLow * 100)}–${Math.round(c.survival24moHigh * 100)}%)`).join(" + ");
+      console.log(pc.bold(pc.magenta("  🔭 Outside View    : ") + `${classes}`));
+      console.log(`     Swarm implies ${Math.round(ov.impliedSurvival * 100)}% survival vs base midpoint ${Math.round(ov.baseSurvivalMidpoint * 100)}% → optimism delta ${ov.optimismDelta >= 0 ? "+" : ""}${Math.round(ov.optimismDelta * 100)}pts`);
+      console.log(pc.dim(`     ${ov.guidance}`));
+      console.log(pc.dim(`     Dominant class failure causes: ${ov.topFailureCauses.join("; ")}`));
+    }
+
     if (dossier.epistemicSummary) {
       const es = dossier.epistemicSummary;
       console.log(`  Epistemic Balance  : ${pc.cyan(`${es.verifiedFactsCount} Facts`)} | ${pc.green(`${es.verifiedComputationsCount} Computations`)} | ${pc.magenta(`${es.externalEvidenceCount} External Evidence`)} | ${pc.yellow(`${es.modelledAssumptionsCount} Hypotheses`)} | ${pc.blue(`${es.inferencesCount} Inferences`)} | ${pc.red(`${es.unknownsCount} Unknowns`)} | ${pc.red(`${es.contradictionsCount} Contradictions`)}`);

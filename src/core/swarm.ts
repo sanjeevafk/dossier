@@ -28,6 +28,7 @@ import { classifyIdeaDomain } from "./classifier.js";
 import { StanfordRobustVerifier } from "./verifier.js";
 import { buildMutationProposals } from "./mutator.js";
 import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
+import { buildOutsideViewPanel } from "./outside-view.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
@@ -1313,6 +1314,11 @@ ${agentContext}`;
     };
     const confidenceScore = Math.round(Math.max(25, Math.min(92, 90 - scoreSpread * 0.7 - killGradeAgents * 5)));
 
+    // Outside view: reference-class base rates vs the swarm verdict. Deterministic,
+    // model-independent — quantifies the swarm's optimism premium instead of hiding it.
+    const outsideView = buildOutsideViewPanel(idea, compositeScore);
+    notify("07 VERDICT [OUTSIDE VIEW]", `Reference classes: ${outsideView.matchedClasses.map((c) => c.label).join(", ")} — optimism delta ${outsideView.optimismDelta >= 0 ? "+" : ""}${Math.round(outsideView.optimismDelta * 100)}pts vs base rate.`);
+
     // 08 STRUCTURED EVIDENCE WITH PROVENANCE
     const strongestEvidence = evidenceFeed[0];
 
@@ -1465,6 +1471,7 @@ ${agentContext}`;
       killScore: compositeScore,
       confidenceScore,
       swarmDissent,
+      outsideView,
       overallVerdict,
       riskLevel,
       executiveSummary: executiveSynthesizerOpinion.rationale,

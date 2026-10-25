@@ -298,6 +298,8 @@ export interface IdeaDossier {
   swarmDissent?: SwarmDissent;
   /** IDs of the dated falsifiable forecasts this dossier registered in the calibration ledger. */
   forecastIds?: string[];
+  /** Outside view: reference-class base rates vs the swarm verdict (optimism premium). */
+  outsideView?: import("../core/outside-view.js").OutsideViewPanel;
   overallVerdict: ValidationVerdict;
   riskLevel: RiskLevel;
   executiveSummary: string;
