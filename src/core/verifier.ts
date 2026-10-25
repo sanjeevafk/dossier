@@ -10,6 +10,7 @@ import {
   VerificationAudit,
   VerificationAuditItem
 } from "../types/index.js";
+import { contradictionScore } from "../tools/nli.js";
 
 // Inference lineage: which evidence claims are logical descendants of which roots.
 // MODELLED_ASSUMPTION (EV-05) and UNKNOWN (EV-07) are the volatile roots; the
@@ -240,6 +241,7 @@ export class StanfordRobustVerifier {
     }
 
     // Invariant 5: Strict Epistemic Labeling (Never mark assumption, inference, or external feeds as VERIFIED_FACT)
+    // NLI demote-only pass runs separately via verifyWithNli() (async, lazy model).
     evidenceFeed.forEach(item => {
       const text = item.claim.toLowerCase();
 
@@ -295,5 +297,48 @@ export class StanfordRobustVerifier {
       audit,
       claimDag
     };
+  }
+
+  /**
+   * NLI demote-only pass (async, lazy ~100MB model). For each EXTERNAL_EVIDENCE
+   * item, score agent claims against the retrieved snippet: contradiction
+   * >= 0.75 AND a cited URL demotes the claim to CONTRADICTED. Never promotes
+   * to VERIFIED_FACT. Null-safe: model unavailable → no changes.
+   */
+  public async verifyWithNli(
+    evidenceFeed: EvidenceItem[],
+    opinions: Record<SwarmRole, AgentOpinion>
+  ): Promise<{ demotions: number; auditItems: VerificationAuditItem[] }> {
+    const auditItems: VerificationAuditItem[] = [];
+    let demotions = 0;
+    const external = evidenceFeed.filter(
+      (e) => e.tier === "EXTERNAL_EVIDENCE" && /^https?:\/\//.test(e.provenance)
+    );
+    if (external.length === 0) return { demotions, auditItems };
+
+    const claims: Array<{ text: string; role: string }> = [];
+    for (const [role, op] of Object.entries(opinions)) {
+      if (role === "synthesizer" || !op) continue;
+      if (op.rationale) claims.push({ text: op.rationale, role });
+      for (const flaw of op.fatalFlaws.slice(0, 1)) claims.push({ text: flaw, role });
+    }
+
+    for (const ev of external.slice(0, 4)) {
+      for (const claim of claims.slice(0, 6)) {
+        const result = await contradictionScore(ev.claim, claim.text);
+        if (!result || result.score < 0.75) continue;
+        demotions++;
+        auditItems.push({
+          id: `VERIFY-NLI-${ev.id}`,
+          claimOrOpinion: `${claim.role} claim contradicted by ${ev.provenance} (NLI contradiction ${result.score.toFixed(2)})`,
+          verdict: "CORRECTED",
+          rationale: "NLI demote-only: cited external evidence contradicts the agent claim — flagged CONTRADICTED, never auto-verified.",
+          confidencePercent: Math.round(result.score * 100)
+        });
+        break;
+      }
+      if (demotions >= 3) break;
+    }
+    return { demotions, auditItems };
   }
 }

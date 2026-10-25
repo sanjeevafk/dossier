@@ -1,6 +1,7 @@
 import { performLiveWebRecon, ReconSourceResult } from "./recon.js";
 import { queryCommunitySentiment, CommunityDiscussion } from "./community.js";
 import { rerank } from "./rerank.js";
+import nlp from "compromise";
 
 export interface MarketCompetitor {
   name: string;
@@ -69,13 +70,50 @@ export async function performMarketResearch(ideaTitle: string, domainKeywords: s
   const rawResults = ranked ?? recon.results;
   const reranked = ranked !== null;
 
+  // Competitor extraction (tiny, local): org/product nouns from titles.
+  // Best-effort — empty list when nothing parses, never blocks evaluation.
+  const identifiedCompetitors = extractCompetitors(rawResults.slice(0, 6));
+
   return {
     query,
     dataSource: "live-web-recon",
     reconProvider: `${recon.provider}${cacheHit ? " (cached, $0 marginal)" : ""}${reranked ? " + minilm-rerank" : ""}`,
-    identifiedCompetitors: [],
+    identifiedCompetitors,
     marketSignals: rawResults.map((r) => `${r.title} — ${r.url}`),
     rawResults,
     community
   };
+}
+
+/**
+ * Extract candidate competitor names via compromise org/product noun phrases.
+ * Dedupes case-insensitively, caps at 5, requires a URL-bearing source title.
+ */
+export function extractCompetitors(results: ReconSourceResult[]): MarketCompetitor[] {
+  const seen = new Set<string>();
+  const competitors: MarketCompetitor[] = [];
+  for (const r of results) {
+    try {
+      const orgs = nlp(r.title).organizations().out("array") as string[];
+      const terms = (Array.isArray(orgs) ? orgs : [])
+        .map((o) => String(o).trim())
+        .filter((o) => o.length >= 2 && o.length <= 40);
+      for (const name of terms) {
+        const key = name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        competitors.push({
+          name,
+          url: r.url,
+          category: "direct",
+          strengths: `Surfaced in live recon: "${r.title.slice(0, 100)}"`,
+          vulnerability: "Unverified from title alone — confirm via source URL before citing as evidence."
+        });
+        if (competitors.length >= 5) return competitors;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return competitors;
 }

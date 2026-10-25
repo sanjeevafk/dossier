@@ -1054,6 +1054,25 @@ Market & Prediction Signals: ${marketContext}`;
       });
     }
 
+    // NLI demote-only pass (async, lazy model): cited external evidence that
+    // contradicts an agent claim appends a CORRECTED audit item. Null-safe.
+    try {
+      const nli = await verifier.verifyWithNli(evidenceFeed, verifiedOpinions);
+      if (nli.demotions > 0) {
+        audit.auditItems.push(...nli.auditItems);
+        audit.testTimeSelfCorrections += nli.demotions;
+        audit.totalClaimsAudited = audit.auditItems.length;
+        notify("05 VERIFY [NLI]", `NLI contradiction pass flagged ${nli.demotions} claim(s) against cited evidence.`);
+        emit({
+          type: "audit_correction",
+          detail: `NLI contradiction pass flagged ${nli.demotions} claim(s) against cited evidence.`,
+          hallucinationsBlocked: audit.hallucinationsBlocked
+        });
+      }
+    } catch {
+      // NLI failure never breaks evaluation
+    }
+
     // 06 CONVERGE (Multi-Round Convergence Loop)
     let convergenceRounds = 1;
     const initialScores = [
