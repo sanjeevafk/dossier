@@ -1,5 +1,6 @@
 import { performLiveWebRecon, ReconSourceResult } from "./recon.js";
 import { queryCommunitySentiment, CommunityDiscussion } from "./community.js";
+import { rerank } from "./rerank.js";
 
 export interface MarketCompetitor {
   name: string;
@@ -62,13 +63,19 @@ export async function performMarketResearch(ideaTitle: string, domainKeywords: s
     };
   }
 
+  // Local MiniLM rerank (best-effort): top-6 by cosine similarity to the query.
+  // Falls back to provider order when the model is unavailable (offline/CI).
+  const ranked = await rerank(query, recon.results, 6);
+  const rawResults = ranked ?? recon.results;
+  const reranked = ranked !== null;
+
   return {
     query,
     dataSource: "live-web-recon",
-    reconProvider: cacheHit ? `${recon.provider} (cached, $0 marginal)` : recon.provider,
+    reconProvider: `${recon.provider}${cacheHit ? " (cached, $0 marginal)" : ""}${reranked ? " + minilm-rerank" : ""}`,
     identifiedCompetitors: [],
-    marketSignals: recon.results.map((r) => `${r.title} — ${r.url}`),
-    rawResults: recon.results,
+    marketSignals: rawResults.map((r) => `${r.title} — ${r.url}`),
+    rawResults,
     community
   };
 }
