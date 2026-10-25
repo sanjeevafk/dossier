@@ -1,5 +1,8 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import pino from "pino";
 import path from "node:path";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
@@ -8,8 +11,13 @@ import { dossierStorage } from "./services/storage.js";
 import { SWARM_ROLES } from "./config/prompts.js";
 import { IdeaInput, SwarmRole } from "./types/index.js";
 
+const log = pino({ name: "dossier-server" });
+
 const app: Application = express();
 const port = process.env.PORT || 3000;
+
+app.use(helmet({ contentSecurityPolicy: false }));
+app.disable("x-powered-by");
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
@@ -32,16 +40,33 @@ app.use(express.static(path.join(process.cwd(), "public")));
 
 function requireAuth(req: Request, res: Response, next: () => void) {
   const secret = process.env.DOSSIER_API_KEY;
-  const isLoopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.hostname === "localhost";
-  if (!secret && process.env.NODE_ENV !== "production" && isLoopback) {
-    return next();
+  if (!secret) {
+    if (process.env.NODE_ENV !== "production") return next();
+    return res.status(503).json({ error: "Server misconfigured: DOSSIER_API_KEY is not set" });
   }
   const authHeader = req.headers.authorization;
-  if (secret && authHeader === `Bearer ${secret}`) {
+  if (authHeader === `Bearer ${secret}`) {
     return next();
   }
-  return res.status(401).json({ error: "Unauthorized: valid Bearer token required for action gates" });
+  return res.status(401).json({ error: "Unauthorized: valid Bearer token required" });
 }
+
+const evaluateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Rate limit exceeded: max 10 evaluations per hour per IP" }
+});
+
+app.use("/api/evaluate", evaluateLimiter);
+app.use("/api/chat", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Rate limit exceeded: max 60 chat messages per hour per IP" }
+}));
 
 const orchestrator = new IdeaSwarmOrchestrator();
 
@@ -110,7 +135,7 @@ app.get("/api/dossiers/:id/export", async (req: Request, res: Response) => {
 });
 
 // Evaluate endpoint
-app.post("/api/evaluate", async (req: Request, res: Response) => {
+app.post("/api/evaluate", requireAuth, async (req: Request, res: Response) => {
   try {
     const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
 
@@ -139,7 +164,7 @@ app.post("/api/evaluate", async (req: Request, res: Response) => {
 });
 
 // Evaluate with Real-Time Server-Sent Events (SSE) Stream
-app.post("/api/evaluate/stream", async (req: Request, res: Response) => {
+app.post("/api/evaluate/stream", requireAuth, async (req: Request, res: Response) => {
   const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
 
   if (!title || !summary) {
@@ -191,9 +216,9 @@ app.post("/api/evaluate/stream", async (req: Request, res: Response) => {
 
     sendSSE("done", { success: true, dossierId: dossier.id });
     res.end();
-  } catch (error: any) {
-    console.error("evaluateIdea stream error:", error);
-    sendSSE("error", { error: error.message || "Evaluation stream failed" });
+  } catch (error: unknown) {
+    log.error({ err: error }, "evaluateIdea stream error");
+    sendSSE("error", { error: error instanceof Error ? error.message : "Evaluation stream failed" });
     res.end();
   }
 });
@@ -224,7 +249,7 @@ app.post("/api/approval/:actionId", requireAuth, async (req: Request, res: Respo
 });
 
 // Interactive Playground / Swarm Chat endpoint
-app.post("/api/chat", async (req: Request, res: Response) => {
+app.post("/api/chat", requireAuth, async (req: Request, res: Response) => {
   try {
     const { message, role = "all", ideaContext } = req.body;
 
@@ -356,7 +381,7 @@ function generateHeuristicChatReply(
 
 if (process.env.NODE_ENV !== "test") {
   app.listen(port, () => {
-    console.log(`⚡ Dossier Intelligence Server listening on http://localhost:${port}`);
+    log.info(`Dossier Intelligence Server listening on http://localhost:${port}`);
   });
 }
 

@@ -1,11 +1,11 @@
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { MonteCarloStats } from "../types/index.js";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface SandboxExecutionResult {
   runtime: string;
@@ -87,7 +87,7 @@ export async function runEconomicsSimulation(
       scriptPath = path.resolve(process.cwd(), "dist", "scripts", "simulate_monte_carlo.py");
     }
 
-    const { stdout, stderr } = await execAsync(`python3 "${scriptPath}" "${inputPath}"`, {
+    const { stdout, stderr } = await execFileAsync("python3", [scriptPath, inputPath], {
       timeout: 20000,
       maxBuffer: 1024 * 1024
     });
@@ -120,20 +120,21 @@ export async function runEconomicsSimulation(
       stderr: stderr.trim(),
       metrics
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Fallback calculation if python runtime execution fails
     const grossMargin = 0.80;
     const arpu = cleanPricing * grossMargin;
     const ltv = arpu > 0 ? Number((arpu / cleanChurn).toFixed(2)) : 0;
     const ltvCacRatio = cleanCac > 0 ? Number(Math.min(ltv / cleanCac, 99.9).toFixed(2)) : 99.9;
     const payback = arpu > 0 ? Number(Math.min(cleanCac / arpu, 999.0).toFixed(1)) : 999.0;
-    const numericExitCode = typeof error.code === "number" ? error.code : 1;
+    const execErr = error as { code?: unknown; stdout?: string; message?: string };
+    const numericExitCode = typeof execErr.code === "number" ? execErr.code : 1;
 
     return {
       runtime: "fallback-embedded-sandbox",
       exitCode: numericExitCode,
-      stdout: error.stdout || "",
-      stderr: error.message || "",
+      stdout: typeof execErr.stdout === "string" ? execErr.stdout : "",
+      stderr: execErr.message ?? "",
       metrics: {
         cacEstimateUsd: cleanCac,
         ltvEstimateUsd: ltv,

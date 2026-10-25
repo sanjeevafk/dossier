@@ -1,8 +1,17 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { IdeaDossier, ApprovalAction } from "../types/index.js";
 
-const STORAGE_DIR = path.resolve(process.cwd(), "reports");
+const require = createRequire(import.meta.url);
+
+const DATA_DIR = process.env.DOSSIER_DATA_DIR
+  ? path.resolve(process.env.DOSSIER_DATA_DIR)
+  : path.resolve(process.cwd(), "data");
+const STORAGE_DIR = path.join(DATA_DIR, "reports");
+const DB_PATH = path.join(DATA_DIR, "dossiers.db");
+
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface DossierSummary {
   id: string;
@@ -16,9 +25,19 @@ export interface DossierSummary {
   timestamp: string;
 }
 
+type SqliteDb = {
+  exec: (sql: string) => void;
+  prepare: (sql: string) => {
+    run: (...args: unknown[]) => void;
+    get: (...args: unknown[]) => Record<string, unknown> | undefined;
+    all: (...args: unknown[]) => Record<string, unknown>[];
+  };
+};
+
 export class DossierStorageService {
   private static instance: DossierStorageService;
   private memoryCache: Map<string, IdeaDossier> = new Map();
+  private db: SqliteDb | null = null;
 
   private constructor() {}
 
@@ -27,6 +46,109 @@ export class DossierStorageService {
       DossierStorageService.instance = new DossierStorageService();
     }
     return DossierStorageService.instance;
+  }
+
+  private getDb(): SqliteDb {
+    if (this.db) return this.db;
+    const Database = require("better-sqlite3");
+    const db: SqliteDb = new Database(DB_PATH);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS dossiers (
+        id TEXT PRIMARY KEY,
+        code TEXT,
+        title TEXT,
+        archetype TEXT,
+        verdict TEXT,
+        score INTEGER,
+        risk TEXT,
+        mode TEXT,
+        created_at TEXT,
+        dossier_json TEXT
+      );
+      CREATE TABLE IF NOT EXISTS recon_cache (
+        query_key TEXT PRIMARY KEY,
+        provider TEXT,
+        response_json TEXT,
+        expires_at INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS ledger (
+        dossier_id TEXT PRIMARY KEY,
+        score INTEGER,
+        archetype TEXT,
+        mode TEXT,
+        outcome TEXT,
+        revenue_usd REAL,
+        pilots INTEGER,
+        created_at TEXT,
+        outcome_at TEXT
+      );
+    `);
+    this.db = db;
+    return db;
+  }
+
+  public getReconCache(queryKey: string): { provider: string; response: unknown } | null {
+    try {
+      const row = this.getDb()
+        .prepare("SELECT provider, response_json, expires_at FROM recon_cache WHERE query_key = ?")
+        .get(queryKey.toLowerCase()) as { provider: string; response_json: string; expires_at: number } | undefined;
+      if (!row || row.expires_at < Date.now()) return null;
+      return { provider: row.provider, response: JSON.parse(row.response_json) };
+    } catch {
+      return null;
+    }
+  }
+
+  public setReconCache(queryKey: string, provider: string, response: unknown): void {
+    try {
+      this.getDb()
+        .prepare("INSERT OR REPLACE INTO recon_cache (query_key, provider, response_json, expires_at) VALUES (?, ?, ?, ?)")
+        .run(queryKey.toLowerCase(), provider, JSON.stringify(response), Date.now() + ONE_WEEK_MS);
+    } catch {
+      // cache write failure must never break evaluation
+    }
+  }
+
+  public recordLedger(dossier: IdeaDossier): void {
+    try {
+      this.getDb()
+        .prepare(
+          "INSERT OR IGNORE INTO ledger (dossier_id, score, archetype, mode, outcome, created_at) VALUES (?, ?, ?, ?, NULL, ?)"
+        )
+        .run(
+          dossier.id,
+          dossier.killScore,
+          dossier.domainClassification?.archetype ?? "general_startup",
+          (dossier as { evaluationMode?: string }).evaluationMode ?? "HEURISTIC_ENGINE",
+          dossier.timestamp
+        );
+    } catch {
+      // ledger write failure must never break evaluation
+    }
+  }
+
+  public listLedger(): Array<Record<string, unknown>> {
+    try {
+      return this.getDb().prepare("SELECT * FROM ledger ORDER BY created_at DESC LIMIT 500").all();
+    } catch {
+      return [];
+    }
+  }
+
+  public updateOutcome(
+    dossierId: string,
+    outcome: string,
+    revenueUsd?: number,
+    pilots?: number
+  ): boolean {
+    try {
+      this.getDb()
+        .prepare("UPDATE ledger SET outcome = ?, revenue_usd = ?, pilots = ?, outcome_at = ? WHERE dossier_id = ?")
+        .run(outcome, revenueUsd ?? null, pilots ?? null, new Date().toISOString(), dossierId);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async ensureStorageDir(): Promise<void> {
@@ -44,13 +166,36 @@ export class DossierStorageService {
     await this.ensureStorageDir();
     this.memoryCache.set(dossier.id, dossier);
 
+    try {
+      this.getDb()
+        .prepare(
+          "INSERT OR REPLACE INTO dossiers (id, code, title, archetype, verdict, score, risk, mode, created_at, dossier_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .run(
+          dossier.id,
+          dossier.dossierCode,
+          dossier.idea?.title ?? "Untitled Concept",
+          dossier.domainClassification?.archetype ?? "general_startup",
+          dossier.overallVerdict,
+          dossier.killScore,
+          dossier.riskLevel,
+          (dossier as { evaluationMode?: string }).evaluationMode ?? "HEURISTIC_ENGINE",
+          dossier.timestamp,
+          JSON.stringify(dossier)
+        );
+      this.recordLedger(dossier);
+    } catch {
+      // SQLite write failure falls through to JSON backup below
+    }
+
     const safeId = dossier.id.replace(/[^a-zA-Z0-9_-]/g, "_");
     const filePath = path.join(STORAGE_DIR, `dossier_${safeId}.json`);
 
     try {
       await fs.writeFile(filePath, JSON.stringify(dossier, null, 2), "utf-8");
-    } catch (err: any) {
-      console.warn(`[Storage] Failed to write dossier to disk: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[Storage] Failed to write dossier to disk: ${message}`);
     }
   }
 
@@ -60,6 +205,19 @@ export class DossierStorageService {
   public async getDossier(id: string): Promise<IdeaDossier | null> {
     if (this.memoryCache.has(id)) {
       return this.memoryCache.get(id)!;
+    }
+
+    try {
+      const row = this.getDb()
+        .prepare("SELECT dossier_json FROM dossiers WHERE id = ? OR code = ?")
+        .get(id, id) as { dossier_json: string } | undefined;
+      if (row?.dossier_json) {
+        const dossier: IdeaDossier = JSON.parse(row.dossier_json);
+        this.memoryCache.set(dossier.id, dossier);
+        return dossier;
+      }
+    } catch {
+      // fall through to JSON backup
     }
 
     await this.ensureStorageDir();
@@ -97,6 +255,43 @@ export class DossierStorageService {
     await this.ensureStorageDir();
     const summaries: DossierSummary[] = [];
     const seenIds = new Set<string>();
+
+    try {
+      const rows = this.getDb()
+        .prepare("SELECT id, code, title, archetype, verdict, score, risk, created_at FROM dossiers ORDER BY created_at DESC LIMIT ?")
+        .all(Math.max(1, Math.min(500, limit))) as Array<{
+        id: string; code: string; title: string; archetype: string;
+        verdict: string; score: number; risk: string; created_at: string;
+      }>;
+      const archetypeLabels: Record<string, string> = {
+        b2b_saas: "B2B Enterprise & Vertical SaaS",
+        b2g_govtech: "Government Technology & Civic Systems (B2G)",
+        healthcare_clinical: "Healthcare & Clinical Systems",
+        hardware_robotics: "Hardware, Robotics & Autonomous Systems",
+        consumer_social: "Consumer & Social Applications",
+        deeptech_research: "DeepTech & Formal Research",
+        web3_defi: "Web3 & Decentralized Infrastructure",
+        general_startup: "General Commercial"
+      };
+      for (const r of rows) {
+        if (!r?.id || seenIds.has(r.id)) continue;
+        seenIds.add(r.id);
+        summaries.push({
+          id: r.id,
+          dossierCode: r.code || "TF-001",
+          title: r.title || "Untitled Concept",
+          archetype: r.archetype || "general_startup",
+          archetypeLabel: archetypeLabels[r.archetype] || "General Commercial",
+          verdict: r.verdict || "BUILD_IF_VALIDATED",
+          score: r.score ?? 75,
+          riskLevel: r.risk || "MEDIUM",
+          timestamp: r.created_at || new Date().toISOString()
+        });
+      }
+      if (summaries.length > 0) return summaries.slice(0, limit);
+    } catch {
+      // fall through to memory + disk scan
+    }
 
     // 1. From memory cache
     for (const d of this.memoryCache.values()) {

@@ -1846,13 +1846,35 @@
       loadRecentDossiers();
     }
 
+    function dossierApiKey() {
+      let key = null;
+      try {
+        key = window.localStorage.getItem('dossier_api_key');
+      } catch (e) { /* storage unavailable */ }
+      if (!key) {
+        try {
+          key = window.prompt('Enter DOSSIER_API_KEY (stored locally for approval gates):');
+          if (key && window.localStorage) window.localStorage.setItem('dossier_api_key', key);
+        } catch (e) { /* prompt unavailable */ }
+      }
+      return key || '';
+    }
+
     async function handleApprovalAction(actionId, decision) {
       try {
         const res = await fetch(`/api/approval/${actionId}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${dossierApiKey()}`
+          },
           body: JSON.stringify({ decision })
         });
+        if (res.status === 401) {
+          try { window.localStorage.removeItem('dossier_api_key'); } catch (e) { /* ignore */ }
+          alert("Unauthorized (401): set a valid DOSSIER_API_KEY. Cleared stored key — retry after entering it.");
+          return;
+        }
         const data = await res.json();
         if (data.success) {
           const badge = document.getElementById(`gate-badge-${actionId}`);
