@@ -662,6 +662,20 @@
               <div class="text-[10px] text-zinc-500 uppercase font-bold mb-2">Sensitivity — Tornado <span class="text-zinc-400">// which variable moves P50 LTV/CAC most</span></div>
               <div id="tornadoList" class="space-y-2"></div>
             </div>
+            <div id="sobolCard" class="p-4 bg-white rounded-xl border border-zinc-200 hidden">
+              <div class="text-[10px] text-zinc-500 uppercase font-bold mb-2">Global Sensitivity — Sobol Indices <span class="text-zinc-400">// variance shares, log-space (Saltelli)</span></div>
+              <div id="sobolList" class="space-y-3"></div>
+              <div id="sobolNotes" class="text-[9px] text-zinc-400 mt-3 font-mono leading-relaxed"></div>
+            </div>
+          </div>
+
+          <!-- A2 — Validation Priority ranked by Expected Value of Information -->
+          <div id="validationPrioritySection" class="hidden space-y-2">
+            <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+              🎯 Validation Priority <span class="text-zinc-400">// ranked by expected value of information (EVPI)</span>
+            </h3>
+            <p class="text-[10px] text-zinc-500 font-sans">Empirical decision analysis over the Monte Carlo draws: resolving each uncertain assumption is worth a measurable share of the decision value at stake. Buy information where it is worth the most first.</p>
+            <div id="validationPriorityList" class="space-y-2"></div>
           </div>
 
           <!-- Phase 3.3 — Idea Autopsy & Mutation Engine -->
@@ -1606,6 +1620,101 @@
       });
     }
 
+    // ======================= A1 — Sobol Global Sensitivity =======================
+    function prettyParam(p) {
+      return String(p || '').replace(/_/g, ' ').replace('ltv cac', 'LTV/CAC');
+    }
+
+    function renderSobolPanel(dossier) {
+      const card = document.getElementById('sobolCard');
+      const list = document.getElementById('sobolList');
+      const notes = document.getElementById('sobolNotes');
+      if (!card || !list) return;
+      const sobol = dossier.simulation && dossier.simulation.sobol;
+      if (!sobol || !sobol.outputs || !sobol.outputs.ltv_cac) {
+        card.classList.add('hidden');
+        return;
+      }
+      card.classList.remove('hidden');
+      list.innerHTML = '';
+
+      const ranking = (sobol.ltvCacSensitivityRanking && sobol.ltvCacSensitivityRanking.length)
+        ? sobol.ltvCacSensitivityRanking
+        : Object.entries(sobol.outputs.ltv_cac.total_order)
+            .map(([param, v]) => ({ param, totalOrderIndex: v }))
+            .sort((a, b) => b.totalOrderIndex - a.totalOrderIndex);
+
+      const fo = sobol.outputs.ltv_cac.first_order || {};
+      const maxIdx = Math.max(...ranking.map((r) => r.totalOrderIndex || 0), 0.0001);
+      ranking.forEach((r) => {
+        const total = Math.max(0, r.totalOrderIndex || 0);
+        const direct = Math.max(0, fo[r.param] || 0);
+        const row = document.createElement('div');
+        row.className = 'space-y-1';
+        row.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <div class="w-36 font-mono text-[10px] text-zinc-600 uppercase shrink-0">${escapeHtml(prettyParam(r.param))}</div>
+            <div class="text-right font-mono text-[10px] text-zinc-500 shrink-0">
+              <span class="text-violet-700 font-bold">${Math.round(total * 100)}%</span> total
+              <span class="text-zinc-400">· ${Math.round(direct * 100)}% direct</span>
+            </div>
+          </div>
+          <div class="bg-zinc-100 rounded h-3 overflow-hidden">
+            <div class="h-3 rounded bg-violet-600/85" style="width: ${Math.round((total / maxIdx) * 100)}%" title="total-order (incl. interactions)"></div>
+          </div>
+          <div class="bg-zinc-100 rounded h-1.5 overflow-hidden">
+            <div class="h-1.5 rounded bg-zinc-400/70" style="width: ${Math.round((direct / maxIdx) * 100)}%" title="first-order (direct effect only)"></div>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+
+      if (notes) {
+        const top = ranking[0];
+        notes.textContent = `${sobol.baseSamples || '?'} base samples · ${sobol.modelEvaluations || '?'} model evals · uncertainty in ${escapeHtml(prettyParam(top ? top.param : ''))} explains the largest share of outcome variance. ${(sobol.simulationNotes || '').slice(0, 220)}`;
+      }
+    }
+
+    // ======================= A2 — Validation Priority (EVPI) =======================
+    function renderValidationPriority(dossier) {
+      const section = document.getElementById('validationPrioritySection');
+      const list = document.getElementById('validationPriorityList');
+      if (!section || !list) return;
+      const items = dossier.validationPriority || [];
+      if (!items.length) {
+        section.classList.add('hidden');
+        return;
+      }
+      section.classList.remove('hidden');
+      list.innerHTML = '';
+      const maxShare = Math.max(...items.map((i) => i.shareOfEvpi || 0), 0.0001);
+      items.forEach((item, idx) => {
+        const share = Math.max(0, item.shareOfEvpi || 0);
+        const row = document.createElement('div');
+        row.className = 'p-4 bg-white rounded-xl border border-zinc-200 flex flex-col sm:flex-row sm:items-center gap-3';
+        row.innerHTML = `
+          <div class="flex-1 space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-zinc-900 text-white font-mono text-[10px] font-bold flex items-center justify-center shrink-0">${idx + 1}</span>
+              <span class="text-xs font-bold text-zinc-900 font-sans">${escapeHtml(item.experimentTitle)}</span>
+              <span class="text-[9px] font-mono text-zinc-400 uppercase">${escapeHtml(prettyParam(item.param))}</span>
+            </div>
+            <p class="text-[11px] text-zinc-600 font-sans leading-relaxed">${escapeHtml(item.experimentDescription)}</p>
+          </div>
+          <div class="w-full sm:w-56 shrink-0 space-y-1">
+            <div class="flex justify-between font-mono text-[10px] text-zinc-500">
+              <span class="text-emerald-700 font-bold">$${escapeHtml(String(item.evpiPerCustomer))}/customer</span>
+              <span>${Math.round(share * 100)}% of decision value</span>
+            </div>
+            <div class="bg-zinc-100 rounded h-2.5 overflow-hidden">
+              <div class="h-2.5 rounded bg-emerald-600/85" style="width: ${Math.round((share / maxShare) * 100)}%"></div>
+            </div>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
     function renderMonteCarloPanel(dossier) {
       const section = document.getElementById('monteCarloSection');
       const summarySurv = document.getElementById('survivalSummary');
@@ -1803,6 +1912,8 @@
 
       // Phase 3.2 / 3.3 renderers — stochastic charts & mutation engine
       renderMonteCarloPanel(dossier);
+      renderSobolPanel(dossier);
+      renderValidationPriority(dossier);
       renderMutationPanel(dossier);
 
       // Store active dossier ID for exports
