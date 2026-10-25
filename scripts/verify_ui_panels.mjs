@@ -25,7 +25,12 @@ function extract(name) {
   return html.slice(start, j + 1);
 }
 
-const source = [extract("prettyParam"), extract("renderSobolPanel"), extract("renderValidationPriority")].join("\n");
+const source = [
+  extract("prettyParam"),
+  extract("renderSobolPanel"),
+  extract("renderValidationPriority"),
+  extract("renderCalibrationPanel")
+].join("\n");
 
 // --- minimal DOM shim ---
 function makeEl(id) {
@@ -72,8 +77,12 @@ function escapeHtml(s) {
 }
 
 // --- load renderers ---
-const factory = new Function("document", "escapeHtml", `${source}\nreturn { renderSobolPanel, renderValidationPriority };`);
-const { renderSobolPanel, renderValidationPriority } = factory(document, escapeHtml);
+const factory = new Function(
+  "document",
+  "escapeHtml",
+  `${source}\nreturn { renderSobolPanel, renderValidationPriority, renderCalibrationPanel };`
+);
+const { renderSobolPanel, renderValidationPriority, renderCalibrationPanel } = factory(document, escapeHtml);
 
 // --- real dossier from a heuristic-mode server run (fetched via storage file) ---
 const reportsDir = path.join(process.cwd(), "reports");
@@ -154,5 +163,48 @@ assert.ok(posHtml.includes("Churn Resolution Cohort"), "top experiment must rend
 assert.ok(posHtml.includes("$1.25/customer"), "EVPI value must render");
 assert.ok(posHtml.includes("62% of decision value"), "share must render");
 console.log("✓ Validation priority panel: positive case renders ranked EVPI rows");
+
+// --- Calibration panel: full summary renders totals, Brier, reliability ---
+renderCalibrationPanel({
+  totals: { recorded: 42, resolved: 17, pending: 25 },
+  brierOverall: 0.2113,
+  byDomain: [
+    { archetype: "B2B Enterprise & Vertical SaaS", recorded: 20, resolved: 12, brier: 0.19, observedOutcomeRate: 0.5 },
+    { archetype: "Consumer & Social", recorded: 10, resolved: 0, brier: null, observedOutcomeRate: null }
+  ],
+  reliability: [
+    { bucket: [0.4, 0.6], count: 5, predicted: 0.52, observed: 0.4 },
+    { bucket: [0.6, 0.8], count: 9, predicted: 0.71, observed: 0.78 },
+    { bucket: [0, 0.2], count: 0, predicted: 0, observed: 0 }
+  ],
+  mappingNote: "probabilityEstimate is the swarm's implied probability from the v1 score mapping..."
+});
+assert.ok(!el("calibrationCard").classes.has("hidden"), "calibration card must be visible with summary data");
+const calHtml = el("calibrationTotals").innerHTML + el("calibrationBrier").innerHTML + el("calibrationReliability").innerHTML + el("calibrationDomains").innerHTML;
+assert.ok(calHtml.includes("Brier 0.2113"), "Brier value must render");
+assert.ok(calHtml.includes("17"), "resolved total must render");
+assert.ok(calHtml.includes("52%") && calHtml.includes("78%"), "bucket predicted/observed percentages must render");
+assert.ok(calHtml.includes("overconfident"), "overconfidence flag must render for pred-obs > 0.05");
+assert.ok(calHtml.includes("B2B Enterprise"), "resolved domain row must render");
+assert.ok(!calHtml.includes("Consumer & Social"), "zero-resolved domain must be excluded");
+console.log("✓ Calibration panel: full summary renders Brier, buckets, overconfidence flag");
+
+// --- Calibration panel: honest empty state ---
+renderCalibrationPanel({
+  totals: { recorded: 6, resolved: 0, pending: 6 },
+  brierOverall: null,
+  byDomain: [],
+  reliability: [{ bucket: [0, 0.2], count: 0, predicted: 0, observed: 0 }],
+  mappingNote: "probabilityEstimate is the swarm's implied probability..."
+});
+const emptyBrier = el("calibrationBrier").textContent;
+assert.ok(emptyBrier.includes("No resolved forecasts yet"), "empty state must state absence honestly");
+assert.ok(el("calibrationReliability").innerHTML === "", "no fake reliability bars when nothing resolved");
+console.log("✓ Calibration panel: honest empty state (no fake curves)");
+
+// --- Calibration panel: null/failure hides the card ---
+renderCalibrationPanel(null);
+assert.ok(el("calibrationCard").classes.has("hidden"), "card must hide when calibration data is absent");
+console.log("✓ Calibration panel: hides when ledger unavailable");
 
 console.log("\n✔ UI panel verification passed");

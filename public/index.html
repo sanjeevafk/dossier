@@ -438,6 +438,19 @@
               </div>
 
             </div>
+
+            <!-- B1 — Calibration Track Record (from /api/calibration) -->
+            <div id="calibrationCard" class="hidden border border-zinc-200/90 rounded-xl bg-white shadow-xs p-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 class="font-mono text-xs font-bold text-zinc-900 uppercase tracking-wider">Calibration Track Record</h3>
+                <span id="calibrationBadge" class="text-[9px] font-mono px-2 py-0.5 rounded bg-zinc-100 text-zinc-500">LIVE LEDGER</span>
+              </div>
+              <div id="calibrationTotals" class="grid grid-cols-3 gap-2 text-center"></div>
+              <div id="calibrationBrier" class="text-[11px] font-mono text-zinc-600"></div>
+              <div id="calibrationReliability" class="space-y-1.5"></div>
+              <div id="calibrationDomains" class="space-y-1"></div>
+              <p id="calibrationNote" class="text-[9px] text-zinc-400 font-mono leading-relaxed"></p>
+            </div>
           </div>
 
         </div>
@@ -1993,6 +2006,83 @@
       window.open(`/api/dossiers/${window.currentRenderedDossierId}/export?format=${format}`, '_blank');
     }
 
+    // ======================= B1 — Calibration Track Record =======================
+    function renderCalibrationPanel(calibration) {
+      const card = document.getElementById('calibrationCard');
+      if (!card || !calibration || typeof calibration !== 'object') {
+        if (card) card.classList.add('hidden');
+        return;
+      }
+      card.classList.remove('hidden');
+
+      const totals = calibration.totals || { recorded: 0, resolved: 0, pending: 0 };
+      const totalsEl = document.getElementById('calibrationTotals');
+      totalsEl.innerHTML = [
+        ['Recorded', totals.recorded],
+        ['Resolved', totals.resolved],
+        ['Pending', totals.pending]
+      ].map(([label, value]) => `
+        <div class="p-2 bg-zinc-50 rounded-lg">
+          <div class="text-lg font-extrabold text-zinc-900 font-sans leading-none">${Number(value || 0)}</div>
+          <div class="text-[9px] font-mono text-zinc-500 uppercase mt-1">${label}</div>
+        </div>
+      `).join('');
+
+      const brierEl = document.getElementById('calibrationBrier');
+      if (calibration.brierOverall !== null && calibration.brierOverall !== undefined) {
+        brierEl.innerHTML = `<span class="font-bold text-zinc-900">Brier ${calibration.brierOverall}</span> · lower is better · 0.25 = always guessing 50%`;
+      } else {
+        brierEl.textContent = 'No resolved forecasts yet — resolve outcomes via POST /api/forecasts/:id/resolve to build the track record.';
+      }
+
+      const relEl = document.getElementById('calibrationReliability');
+      const buckets = (calibration.reliability || []).filter((b) => b.count > 0);
+      if (buckets.length > 0) {
+        relEl.innerHTML = buckets.map((b) => {
+          const pct = (v) => Math.round(v * 100);
+          const overconfident = b.predicted - b.observed > 0.05;
+          const flag = overconfident ? ' <span class="text-amber-600" title="swarm more confident than outcomes justify">⚠ overconfident</span>' : '';
+          return `
+            <div>
+              <div class="flex justify-between font-mono text-[9px] text-zinc-500">
+                <span>p ${b.bucket[0]}–${b.bucket[1]} <span class="text-zinc-400">(n=${b.count})</span>${flag}</span>
+                <span><span class="text-violet-700 font-bold">${pct(b.predicted)}%</span> pred · <span class="text-emerald-700 font-bold">${pct(b.observed)}%</span> obs</span>
+              </div>
+              <div class="bg-zinc-100 rounded h-1.5 overflow-hidden mt-0.5"><div class="h-1.5 bg-violet-600/85" style="width: ${pct(b.predicted)}%"></div></div>
+              <div class="bg-zinc-100 rounded h-1.5 overflow-hidden mt-0.5"><div class="h-1.5 bg-emerald-600/85" style="width: ${pct(b.observed)}%"></div></div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        relEl.innerHTML = '';
+      }
+
+      const domEl = document.getElementById('calibrationDomains');
+      const domains = (calibration.byDomain || []).filter((d) => d.resolved > 0).slice(0, 3);
+      domEl.innerHTML = domains.length
+        ? domains.map((d) => `
+            <div class="flex justify-between font-mono text-[10px] text-zinc-600">
+              <span class="truncate pr-2">${escapeHtml(d.archetype)}</span>
+              <span class="shrink-0">${d.resolved} resolved${d.brier !== null ? ` · Brier ${d.brier}` : ''}</span>
+            </div>
+          `).join('')
+        : '';
+
+      const noteEl = document.getElementById('calibrationNote');
+      if (noteEl && calibration.mappingNote) noteEl.textContent = calibration.mappingNote;
+    }
+
+    async function loadCalibrationPanel() {
+      try {
+        const res = await fetch('/api/calibration');
+        if (!res.ok) return; // older backend — keep the card hidden
+        const data = await res.json();
+        if (data.success && data.calibration) renderCalibrationPanel(data.calibration);
+      } catch {
+        // Ledger unavailable — honest absence.
+      }
+    }
+
     async function loadRecentDossiers() {
       try {
         const res = await fetch('/api/dossiers?limit=5');
@@ -2052,6 +2142,7 @@
     // Initialize recent dossiers on page load
     window.addEventListener('DOMContentLoaded', () => {
       loadRecentDossiers();
+      loadCalibrationPanel();
     });
   </script>
 </body>
