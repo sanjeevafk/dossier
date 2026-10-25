@@ -121,20 +121,26 @@
     <div class="max-w-7xl mx-auto px-6 md:px-12 py-4 flex items-center justify-between">
       
       <!-- Brand Name (No DS box) -->
-      <a href="#" onclick="switchView('home'); return false;" class="flex items-center gap-2 group">
+      <a href="#/" class="flex items-center gap-2 group">
         <span class="font-extrabold text-2xl tracking-tight text-zinc-950">
           DOSSIER
         </span>
       </a>
 
-      <!-- Navigation Links: Home and Playground -->
-      <nav class="flex items-center gap-4 text-sm font-semibold">
-        <button id="navHomeBtn" onclick="switchView('home')" class="text-zinc-950 font-bold px-3 py-1.5 rounded-lg bg-zinc-100 transition cursor-pointer">
+      <!-- Navigation: Home / Archive / Playground + primary CTA -->
+      <nav class="flex items-center gap-2 sm:gap-3 text-sm font-semibold">
+        <button id="navHomeBtn" onclick="switchView('home')" class="nav-link text-zinc-950 font-bold px-3 py-1.5 rounded-lg bg-zinc-100 transition cursor-pointer">
           Home
         </button>
-        <button id="navPlaygroundBtn" onclick="switchView('playground')" class="text-zinc-600 font-semibold px-3 py-1.5 rounded-lg hover:text-zinc-950 hover:bg-zinc-100 transition cursor-pointer flex items-center gap-2">
+        <button id="navArchiveBtn" onclick="switchView('archive')" class="nav-link text-zinc-600 font-semibold px-3 py-1.5 rounded-lg hover:text-zinc-950 hover:bg-zinc-100 transition cursor-pointer">
+          Archive
+        </button>
+        <button id="navPlaygroundBtn" onclick="switchView('playground')" class="nav-link text-zinc-600 font-semibold px-3 py-1.5 rounded-lg hover:text-zinc-950 hover:bg-zinc-100 transition cursor-pointer flex items-center gap-2">
           <span>Playground</span>
           <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brandYellow text-black font-mono">LIVE</span>
+        </button>
+        <button onclick="openIntakeModal()" class="hidden sm:inline-flex items-center gap-1.5 bg-brandYellow hover:bg-brandYellowHover text-zinc-950 font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition cursor-pointer">
+          + New Evaluation
         </button>
       </nav>
 
@@ -485,12 +491,16 @@
               <div class="text-sm font-semibold text-zinc-100 mt-0.5" id="streamCurrentDetail">Decomposing idea parameters across domain harness...</div>
             </div>
             <div class="shrink-0 flex items-center gap-2">
+              <span id="streamElapsed" class="text-[10px] font-mono text-zinc-500 tabular-nums">0.0s</span>
               <svg class="animate-spin h-4 w-4 text-brandYellow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </div>
           </div>
+
+          <!-- Stage Progress Rail -->
+          <div id="streamStageRail" class="flex flex-wrap gap-1.5"></div>
 
           <!-- Live Agent Opinion Tiles (6 Swarm Agents) -->
           <div>
@@ -591,6 +601,14 @@
             </div>
           </div>
 
+          <!-- Results tab bar -->
+          <div class="flex gap-1.5 border-b border-zinc-200 pb-3 -mb-1" id="resultsTabBar">
+            <button onclick="showResultsTab('verdict', this)" class="results-tab-btn px-3.5 py-2 rounded-lg text-xs font-mono font-bold bg-zinc-900 text-white transition cursor-pointer">VERDICT</button>
+            <button onclick="showResultsTab('simulation', this)" class="results-tab-btn px-3.5 py-2 rounded-lg text-xs font-mono font-bold bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition cursor-pointer">SIMULATION</button>
+            <button onclick="showResultsTab('pivots', this)" class="results-tab-btn px-3.5 py-2 rounded-lg text-xs font-mono font-bold bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition cursor-pointer">PIVOTS &amp; GATES</button>
+          </div>
+
+          <div id="rtab-verdict" class="space-y-6">
           <!-- 5-Dimensional Resilience Breakdown -->
           <div class="space-y-2">
             <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
@@ -654,6 +672,9 @@
             <div id="contradictionsList" class="space-y-3 font-mono text-xs"></div>
           </div>
 
+          </div><!-- /rtab-verdict -->
+
+          <div id="rtab-simulation" class="space-y-6 hidden">
           <!-- Phase 3.2 — Visual Monte Carlo & Survival Graph -->
           <div id="monteCarloSection" class="space-y-2">
             <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
@@ -691,6 +712,9 @@
             <div id="validationPriorityList" class="space-y-2"></div>
           </div>
 
+          </div><!-- /rtab-simulation -->
+
+          <div id="rtab-pivots" class="space-y-6 hidden">
           <!-- Phase 3.3 — Idea Autopsy & Mutation Engine -->
           <div id="mutationSection" class="hidden space-y-2">
             <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
@@ -717,6 +741,7 @@
             </div>
             <div id="approvalList" class="space-y-3"></div>
           </div>
+          </div><!-- /rtab-pivots -->
 
         </div>
       </section>
@@ -727,6 +752,39 @@
   <!-- ============================================================ -->
   <!-- 3. PLAYGROUND / CHAT INTERFACE VIEW                          -->
   <!-- ============================================================ -->
+  <!-- ============================================================ -->
+  <!-- 2.7 ARCHIVE VIEW (full dossier library)                      -->
+  <!-- ============================================================ -->
+  <div id="archiveView" class="flex-1 hidden">
+    <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 md:px-12 py-8 space-y-5">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-extrabold text-zinc-950 tracking-tight">Dossier Archive</h1>
+          <p class="text-sm text-zinc-500 font-sans mt-1">Every compiled dossier, verbatim. Click a row to open the full interactive report.</p>
+        </div>
+        <button onclick="openIntakeModal()" class="self-start sm:self-auto bg-brandYellow hover:bg-brandYellowHover text-zinc-950 font-bold text-sm px-5 py-2.5 rounded-lg shadow-sm transition inline-flex items-center gap-1.5 cursor-pointer">
+          + New Evaluation
+        </button>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <input id="archiveSearch" type="text" placeholder="Search title, domain, verdict…" oninput="renderArchiveList()"
+          class="flex-1 px-3.5 py-2.5 border border-zinc-300 rounded-lg text-sm font-sans focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition" />
+        <div class="flex gap-1.5" id="archiveVerdictChips">
+          <button onclick="setArchiveVerdictFilter('ALL', this)" class="archive-chip px-3 py-1.5 rounded-full text-xs font-bold bg-zinc-900 text-white transition cursor-pointer">ALL</button>
+          <button onclick="setArchiveVerdictFilter('BUILD', this)" class="archive-chip px-3 py-1.5 rounded-full text-xs font-bold bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition cursor-pointer">BUILD</button>
+          <button onclick="setArchiveVerdictFilter('REFINE', this)" class="archive-chip px-3 py-1.5 rounded-full text-xs font-bold bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition cursor-pointer">REFINE</button>
+          <button onclick="setArchiveVerdictFilter('KILL', this)" class="archive-chip px-3 py-1.5 rounded-full text-xs font-bold bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition cursor-pointer">KILL</button>
+        </div>
+      </div>
+
+      <div id="archiveList" class="border border-zinc-200/90 rounded-xl bg-white divide-y divide-zinc-100 shadow-xs overflow-hidden min-h-[120px]">
+        <div class="p-8 text-center text-sm text-zinc-400 font-mono">LOADING ARCHIVE…</div>
+      </div>
+      <div id="archiveCount" class="text-[11px] font-mono text-zinc-400"></div>
+    </div>
+  </div>
+
   <div id="playgroundView" class="flex-1 hidden">
     <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 md:px-12 py-8 flex flex-col h-[calc(100vh-80px)]">
       
@@ -904,29 +962,124 @@
       monetization: "$29/month"
     };
 
+    // ======================= Hash router (app shell) =======================
+    // Routes: #/ (home) · #/archive · #/playground · #/dossier/<id> (deep link)
     function switchView(viewName) {
-      const homeView = document.getElementById('homeView');
-      const playgroundView = document.getElementById('playgroundView');
-      const navHome = document.getElementById('navHomeBtn');
-      const navPlayground = document.getElementById('navPlaygroundBtn');
-
-      if (viewName === 'playground') {
-        homeView.classList.add('hidden');
-        playgroundView.classList.remove('hidden');
-        navPlayground.classList.add('bg-zinc-100', 'text-zinc-950', 'font-bold');
-        navPlayground.classList.remove('text-zinc-600');
-        navHome.classList.remove('bg-zinc-100', 'text-zinc-950');
-        navHome.classList.add('text-zinc-600');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+      const target = viewName === 'home' ? '/' : viewName;
+      if (location.hash === `#/${viewName === 'home' ? '' : viewName}` || (viewName === 'home' && (location.hash === '#/' || location.hash === ''))) {
+        route();
       } else {
-        playgroundView.classList.add('hidden');
-        homeView.classList.remove('hidden');
-        navHome.classList.add('bg-zinc-100', 'text-zinc-950', 'font-bold');
-        navHome.classList.remove('text-zinc-600');
-        navPlayground.classList.remove('bg-zinc-100', 'text-zinc-950');
-        navPlayground.classList.add('text-zinc-600');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        location.hash = target === '/' ? '#/' : `#/${viewName}`;
       }
+    }
+
+    function setActiveNav(target) {
+      const map = { home: 'navHomeBtn', archive: 'navArchiveBtn', playground: 'navPlaygroundBtn' };
+      Object.entries(map).forEach(([name, id]) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        if (name === target) {
+          btn.classList.add('bg-zinc-100', 'text-zinc-950', 'font-bold');
+          btn.classList.remove('text-zinc-600');
+        } else {
+          btn.classList.remove('bg-zinc-100', 'text-zinc-950', 'font-bold');
+          btn.classList.add('text-zinc-600');
+        }
+      });
+    }
+
+    function route() {
+      const hash = location.hash || '#/';
+      const dossierMatch = hash.match(/^#\/dossier\/(.+)$/);
+      let target = 'home';
+      if (dossierMatch) {
+        target = 'home';
+        loadDossierById(decodeURIComponent(dossierMatch[1]));
+      } else {
+        const seg = hash.replace(/^#\/?/, '').replace(/\/$/, '');
+        if (seg === 'archive' || seg === 'playground') target = seg;
+      }
+
+      document.getElementById('homeView').classList.toggle('hidden', target !== 'home');
+      document.getElementById('archiveView').classList.toggle('hidden', target !== 'archive');
+      document.getElementById('playgroundView').classList.toggle('hidden', target !== 'playground');
+      setActiveNav(target);
+      if (target === 'home') {
+        loadRecentDossiers();
+        loadCalibrationPanel();
+      }
+      if (target === 'archive') loadArchiveDossiers();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    window.addEventListener('hashchange', route);
+
+    // ======================= Archive =======================
+    let archiveCache = [];
+    let archiveVerdictFilter = 'ALL';
+
+    async function loadArchiveDossiers() {
+      try {
+        const res = await fetch('/api/dossiers?limit=200');
+        const data = await res.json();
+        archiveCache = (data.success && Array.isArray(data.dossiers)) ? data.dossiers : [];
+      } catch {
+        archiveCache = [];
+      }
+      renderArchiveList();
+    }
+
+    function setArchiveVerdictFilter(verdict, btn) {
+      archiveVerdictFilter = verdict;
+      document.querySelectorAll('.archive-chip').forEach((c) => {
+        c.classList.remove('bg-zinc-900', 'text-white');
+        c.classList.add('bg-zinc-100', 'text-zinc-600', 'hover:bg-zinc-200');
+      });
+      if (btn) {
+        btn.classList.add('bg-zinc-900', 'text-white');
+        btn.classList.remove('bg-zinc-100', 'text-zinc-600', 'hover:bg-zinc-200');
+      }
+      renderArchiveList();
+    }
+
+    function renderArchiveList() {
+      const container = document.getElementById('archiveList');
+      if (!container) return;
+      const query = (document.getElementById('archiveSearch')?.value || '').toLowerCase().trim();
+      const filtered = archiveCache.filter((d) => {
+        const verdictOk = archiveVerdictFilter === 'ALL' ||
+          (archiveVerdictFilter === 'BUILD' && (d.verdict === 'BUILD' || d.verdict === 'BUILD_IF_VALIDATED')) ||
+          d.verdict === archiveVerdictFilter;
+        if (!verdictOk) return false;
+        if (!query) return true;
+        return `${d.title} ${d.archetypeLabel || ''} ${d.verdict}`.toLowerCase().includes(query);
+      });
+
+      const countEl = document.getElementById('archiveCount');
+      if (countEl) countEl.textContent = `${filtered.length} of ${archiveCache.length} dossiers shown`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="p-10 text-center text-sm text-zinc-400 font-mono">NO DOSSIERS MATCH — compile one via “New Evaluation”.</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map((d) => {
+        const isBuild = d.verdict === 'BUILD' || d.verdict === 'BUILD_IF_VALIDATED';
+        const isRefine = d.verdict === 'REFINE';
+        const badgeBg = isBuild ? 'bg-badgeGreenBg text-badgeGreenText' : (isRefine ? 'bg-badgeAmberBg text-badgeAmberText' : 'bg-badgeRedBg text-badgeRedText');
+        const dateStr = d.timestamp ? d.timestamp.slice(0, 10) : 'Recent';
+        return `
+          <div onclick="loadDossierById('${d.id}')" class="p-3.5 hover:bg-zinc-50 flex items-center justify-between gap-3 cursor-pointer transition">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-lg bg-zinc-100 border border-zinc-200 flex items-center justify-center font-mono font-bold text-xs text-zinc-700 shrink-0">${d.score}</div>
+              <div class="min-w-0">
+                <div class="font-bold text-xs text-zinc-950 truncate">${escapeHtml(d.title)}</div>
+                <div class="text-[11px] text-zinc-500 font-mono mt-0.5 truncate">${escapeHtml(d.archetypeLabel || 'General')} • ${escapeHtml(d.dossierCode)} • ${dateStr}</div>
+              </div>
+            </div>
+            <span class="px-2.5 py-0.5 rounded text-[11px] font-bold ${badgeBg} tracking-wider shrink-0">${escapeHtml(d.verdict)}</span>
+          </div>
+        `;
+      }).join('');
     }
 
     function setChatRole(role) {
@@ -1178,6 +1331,61 @@
       document.getElementById('modalEvalForm').dispatchEvent(new Event('submit'));
     }
 
+    // ======================= Streaming stage rail + elapsed timer =======================
+    const STREAM_STAGES = [
+      ['01', 'INGEST'], ['01', 'CLASSIFY'], ['02', 'DECOMPOSE'], ['03', 'INVESTIGATE'],
+      ['04', 'ATTACK'], ['05', 'VERIFY'], ['06', 'CONVERGE'], ['07', 'VERDICT']
+    ];
+    let streamTimerInterval = null;
+    let streamStartedAt = 0;
+
+    function resetStageRail() {
+      const rail = document.getElementById('streamStageRail');
+      if (!rail) return;
+      rail.innerHTML = STREAM_STAGES.map(([num, label], i) => `
+        <span id="rail-${i}" class="px-2 py-1 rounded text-[9px] font-bold tracking-wider bg-zinc-900/60 border border-zinc-800 text-zinc-500 transition-all">
+          ${num} · ${label}
+        </span>
+      `).join('');
+    }
+
+    function updateStageRail(stageText) {
+      const match = /0?(\d+)/.exec(String(stageText || ''));
+      if (!match) return;
+      const num = Number.parseInt(match[1], 10);
+      const rail = document.getElementById('streamStageRail');
+      if (!rail || !rail.children.length) return;
+      STREAM_STAGES.forEach(([stageNum, label], i) => {
+        const chip = document.getElementById(`rail-${i}`);
+        if (!chip) return;
+        const stageNo = Number.parseInt(stageNum, 10);
+        const reached = num >= stageNo;
+        const isCurrent = num === stageNo;
+        chip.className = `px-2 py-1 rounded text-[9px] font-bold tracking-wider border transition-all ${
+          isCurrent ? 'bg-brandYellow border-brandYellow text-zinc-950'
+          : reached ? 'bg-emerald-500/15 border-emerald-700/50 text-emerald-400'
+          : 'bg-zinc-900/60 border-zinc-800 text-zinc-500'
+        }`;
+      });
+    }
+
+    function startStreamTimer() {
+      stopStreamTimer();
+      streamStartedAt = performance.now();
+      const el = document.getElementById('streamElapsed');
+      if (!el) return;
+      streamTimerInterval = setInterval(() => {
+        el.textContent = `${((performance.now() - streamStartedAt) / 1000).toFixed(1)}s`;
+      }, 100);
+    }
+
+    function stopStreamTimer() {
+      if (streamTimerInterval) {
+        clearInterval(streamTimerInterval);
+        streamTimerInterval = null;
+      }
+    }
+
     function resetStreamingHud(conceptTitle) {
       const hud = document.getElementById('streamingHudSection');
       hud.classList.remove('hidden');
@@ -1187,6 +1395,8 @@
       document.getElementById('streamCurrentStage').textContent = 'STAGE 01 // INGESTING';
       document.getElementById('streamCurrentDetail').textContent = 'Ingesting concept into TrueForge execution runtime...';
       document.getElementById('streamCrossfireBox').classList.add('hidden');
+      resetStageRail();
+      startStreamTimer();
 
       // Phase 3.1/3.2/3.3 reset — clear pulses, arcs, dials, charts, and mutation cards
       clearAllNodePulses();
@@ -1329,6 +1539,7 @@
       if (event === 'stage' || (data && data.stage)) {
         document.getElementById('streamCurrentStage').textContent = data.stage || 'STAGE // ACTIVE';
         document.getElementById('streamCurrentDetail').textContent = data.detail || '';
+        updateStageRail(data.stage);
       }
 
       if (event === 'agent_start') {
@@ -1371,6 +1582,7 @@
 
       if (event === 'dossier_complete' && data.dossier) {
         document.getElementById('streamStatusBadge').textContent = 'CONSENSUS REACHED // DOSSIER COMPILED';
+        stopStreamTimer();
         clearAllNodePulses();
         clearCrossfireArcs();
         renderDossier(data.dossier);
@@ -1459,10 +1671,10 @@
             renderDossier(data.dossier);
             document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
           } else {
-            alert("Evaluation Error: " + data.error);
+            showToast("Evaluation Error: " + data.error, "error");
           }
         } catch (postErr) {
-          alert("Failed to evaluate concept: " + postErr.message);
+          showToast("Failed to evaluate concept: " + postErr.message, "error");
         }
       } finally {
         submitBtn.disabled = false;
@@ -1810,7 +2022,7 @@
       document.getElementById('resConfidence').textContent = `${dossier.confidenceScore}%`;
       document.getElementById('resRiskLevel').textContent = dossier.riskLevel;
       if (document.getElementById('resScoreVal')) {
-        document.getElementById('resScoreVal').textContent = `${dossier.killScore}/100`;
+        animateCountUp(document.getElementById('resScoreVal'), dossier.killScore, '/100');
       }
 
       // Domain Banner
@@ -1991,19 +2203,76 @@
             btnGroup.innerHTML = `<span class="text-xs font-mono font-bold ${data.newStatus === 'APPROVED' ? 'text-emerald-700' : 'text-red-700'}">${data.newStatus === 'APPROVED' ? '✔ AUTHORIZED BY OPERATOR' : '✖ VETOED BY OPERATOR'}</span>`;
           }
         } else {
-          alert("Approval failed: " + data.error);
+          showToast("Approval failed: " + data.error, "error");
         }
       } catch (err) {
-        alert("Failed to update approval: " + err.message);
+        showToast("Failed to update approval: " + err.message, "error");
       }
+    }
+
+    // ======================= Results tabs + toast + count-up =======================
+    function showResultsTab(name, btn) {
+      ['verdict', 'simulation', 'pivots'].forEach((tab) => {
+        const panel = document.getElementById(`rtab-${tab}`);
+        if (panel) panel.classList.toggle('hidden', tab !== name);
+      });
+      document.querySelectorAll('.results-tab-btn').forEach((b) => {
+        b.classList.remove('bg-zinc-900', 'text-white');
+        b.classList.add('bg-zinc-100', 'text-zinc-600', 'hover:bg-zinc-200');
+      });
+      if (btn) {
+        btn.classList.add('bg-zinc-900', 'text-white');
+        btn.classList.remove('bg-zinc-100', 'text-zinc-600', 'hover:bg-zinc-200');
+      }
+    }
+
+    function showToast(message, kind = 'info') {
+      let container = document.getElementById('toastContainer');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'fixed bottom-5 right-5 z-[60] space-y-2 w-72';
+        document.body.appendChild(container);
+      }
+      const palette = kind === 'success' ? 'bg-zinc-900 text-emerald-300 border-zinc-700'
+        : kind === 'error' ? 'bg-zinc-900 text-red-300 border-zinc-700'
+        : 'bg-zinc-900 text-zinc-100 border-zinc-700';
+      const toast = document.createElement('div');
+      toast.className = `p-3 rounded-xl border shadow-lg text-xs font-mono leading-relaxed ${palette} opacity-0 translate-y-1 transition-all duration-200`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('opacity-0', 'translate-y-1'));
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-1');
+        setTimeout(() => toast.remove(), 250);
+      }, 3200);
+    }
+    window.showToast = showToast;
+
+    function animateCountUp(el, target, suffix = '', durationMs = 700) {
+      if (!el) return;
+      const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduceMotion || !Number.isFinite(target)) {
+        el.textContent = `${target}${suffix}`;
+        return;
+      }
+      const start = performance.now();
+      const tick = (now) => {
+        const t = Math.min(1, (now - start) / durationMs);
+        const eased = 1 - Math.pow(1 - t, 3);
+        el.textContent = `${Math.round(target * eased)}${suffix}`;
+        if (t < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
     }
 
     function downloadDossierExport(format) {
       if (!window.currentRenderedDossierId) {
-        alert("No active dossier compiled yet.");
+        showToast('No active dossier compiled yet.', 'error');
         return;
       }
       window.open(`/api/dossiers/${window.currentRenderedDossierId}/export?format=${format}`, '_blank');
+      showToast(`Export opened — dossier ${window.currentRenderedDossierId} (${format.toUpperCase()}).`, 'success');
     }
 
     // ======================= B1 — Calibration Track Record =======================
@@ -2135,13 +2404,13 @@
           document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
         }
       } catch (err) {
-        alert("Failed to load dossier: " + err.message);
+        showToast("Failed to load dossier: " + err.message, "error");
       }
     }
 
     // Initialize recent dossiers on page load
     window.addEventListener('DOMContentLoaded', () => {
-      loadRecentDossiers();
+      route();
       loadCalibrationPanel();
     });
   </script>
