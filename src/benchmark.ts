@@ -3,7 +3,7 @@ import { IdeaInput } from "./types/index.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-interface BenchmarkCase {
+export interface BenchmarkCase {
   id: string;
   category: string;
   idea: IdeaInput;
@@ -12,7 +12,7 @@ interface BenchmarkCase {
   expectedVerdictRange: ("BUILD" | "REFINE" | "KILL")[];
 }
 
-const BENCHMARK_SUITE: BenchmarkCase[] = [
+export const BENCHMARK_SUITE: BenchmarkCase[] = [
   {
     id: "BM-01",
     category: "B2B Enterprise SaaS",
