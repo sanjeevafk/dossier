@@ -394,31 +394,37 @@ function renderDossier(dossier) {
   const resGrid = document.getElementById('resilienceGrid');
   if (resGrid && dossier.resilienceBreakdown) {
     const rb = dossier.resilienceBreakdown;
+    const feas = rb.technicalFeasibility ?? 75;
+    const demand = rb.demandAndAdoption ?? rb.marketDemand ?? 70;
+    const econ = rb.economicsAndCapitalEfficiency ?? rb.unitEconomicsViability ?? 70;
+    const moat = rb.defensibilityAndMoat ?? rb.defensibility ?? 65;
+    const proc = rb.adversarialResilience ?? rb.regulatoryAndProcurement ?? 60;
+
     resGrid.innerHTML = `
       <div class="p-3 bg-white rounded-xl border border-sand-200">
         <div class="text-[10px] text-zinc-500 uppercase">Feasibility (20%)</div>
-        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${rb.technicalFeasibility}%</div>
+        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${feas}%</div>
         <div class="text-[9px] text-zinc-400 mt-1">Latency, architecture &amp; isolation</div>
       </div>
       <div class="p-3 bg-white rounded-xl border border-sand-200">
         <div class="text-[10px] text-zinc-500 uppercase">Market Demand (25%)</div>
-        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${rb.marketDemand}%</div>
+        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${demand}%</div>
         <div class="text-[9px] text-zinc-400 mt-1">Willingness to pay &amp; friction</div>
       </div>
       <div class="p-3 bg-white rounded-xl border border-sand-200">
         <div class="text-[10px] text-zinc-500 uppercase">Unit Economics (20%)</div>
-        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${rb.unitEconomicsViability}%</div>
+        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${econ}%</div>
         <div class="text-[9px] text-zinc-400 mt-1">LTV/CAC ratio &amp; gross margin</div>
       </div>
       <div class="p-3 bg-white rounded-xl border border-sand-200">
         <div class="text-[10px] text-zinc-500 uppercase">Defensibility (15%)</div>
-        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${rb.defensibility}%</div>
+        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${moat}%</div>
         <div class="text-[9px] text-zinc-400 mt-1">Incumbent displacement moat</div>
       </div>
       <div class="p-3 bg-white rounded-xl border border-sand-200">
-        <div class="text-[10px] text-zinc-500 uppercase">Procurement (20%)</div>
-        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${rb.regulatoryAndProcurement}%</div>
-        <div class="text-[9px] text-zinc-400 mt-1">Sales cycle &amp; compliance risks</div>
+        <div class="text-[10px] text-zinc-500 uppercase">Resilience (20%)</div>
+        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${proc}%</div>
+        <div class="text-[9px] text-zinc-400 mt-1">Sales cycle &amp; adversary resistance</div>
       </div>
     `;
   }
@@ -527,13 +533,16 @@ function renderDossier(dossier) {
   if (mutSection && mutGrid) {
     if (dossier.killScore < 55 && dossier.mutationProposals && dossier.mutationProposals.length > 0) {
       mutSection.classList.remove('hidden');
-      mutGrid.innerHTML = dossier.mutationProposals.map(m => `
-        <div class="p-3 bg-white border border-sand-200 rounded-xl space-y-1.5">
-          <div class="text-[10px] font-bold text-zinc-500 uppercase">${m.strategyType.replace('_', ' ')}</div>
-          <div class="font-bold text-zinc-950 text-xs">${escapeHtml(m.label)}</div>
-          <p class="text-[11px] text-zinc-600 leading-relaxed font-sans">${escapeHtml(m.rationale)}</p>
-        </div>
-      `).join('');
+      mutGrid.innerHTML = dossier.mutationProposals.map(m => {
+        const strat = (m.strategy || m.strategyType || 'STRATEGIC_PIVOT').toString().replace(/_/g, ' ');
+        return `
+          <div class="p-3 bg-white border border-sand-200 rounded-xl space-y-1.5">
+            <div class="text-[10px] font-bold text-zinc-500 uppercase">${escapeHtml(strat)}</div>
+            <div class="font-bold text-zinc-950 text-xs">${escapeHtml(m.label || '')}</div>
+            <p class="text-[11px] text-zinc-600 leading-relaxed font-sans">${escapeHtml(m.rationale || '')}</p>
+          </div>
+        `;
+      }).join('');
     } else {
       mutSection.classList.add('hidden');
     }
@@ -864,10 +873,10 @@ async function loadRecentDossiers() {
   if (!listEl) return;
 
   try {
-    const res = await fetch('/api/dossiers?limit=3');
+    const res = await fetch('/api/dossiers?limit=5');
     const data = await res.json();
     if (data.success && Array.isArray(data.dossiers) && data.dossiers.length > 0) {
-      listEl.innerHTML = data.dossiers.slice(0, 3).map(d => {
+      listEl.innerHTML = data.dossiers.slice(0, 5).map(d => {
         const isBuild = d.verdict === 'BUILD' || d.verdict === 'BUILD_IF_VALIDATED';
         const isRefine = d.verdict === 'REFINE';
         const badgeClass = isBuild ? 'bg-emerald-100 text-emerald-800' : (isRefine ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800');
