@@ -446,46 +446,8 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs" id="mcSummaryCards"></div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 shadow-md">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-mono text-zinc-400 uppercase font-bold tracking-wider">5-Year Survival Probability</span>
-              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Cohort Decay</span>
-            </div>
-            <div class="h-44 flex items-center justify-center canvas-container">
-              <canvas id="chartSurvival" class="w-full h-full"></canvas>
-            </div>
-            <div class="text-[10px] font-mono text-zinc-400 leading-tight pt-1 border-t border-zinc-800">
-              Share of 10,000 cohort runs staying cash-positive over 5 years.
-            </div>
-          </div>
-
-          <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 shadow-md">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-mono text-zinc-400 uppercase font-bold tracking-wider">CAC Payback Distribution</span>
-              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Months to Breakeven</span>
-            </div>
-            <div class="h-44 flex items-center justify-center canvas-container">
-              <canvas id="chartPayback" class="w-full h-full"></canvas>
-            </div>
-            <div class="text-[10px] font-mono text-zinc-400 leading-tight pt-1 border-t border-zinc-800">
-              Months of gross margin required to recover customer acquisition cost.
-            </div>
-          </div>
-
-          <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 shadow-md">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-mono text-zinc-400 uppercase font-bold tracking-wider">Sensitivity Tornado</span>
-              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Payback Drag</span>
-            </div>
-            <div class="h-44 flex items-center justify-center canvas-container">
-              <canvas id="chartTornado" class="w-full h-full"></canvas>
-            </div>
-            <div class="text-[10px] font-mono text-zinc-400 leading-tight pt-1 border-t border-zinc-800">
-              Which variable prolongs payback longest if assumptions degrade by 10%.
-            </div>
-          </div>
-        </div>
+        <!-- Editorial Stochastic Financial Ledger (Print & Screen Friendly Text) -->
+        <div class="bg-sand-50 border border-sand-200 rounded-xl divide-y divide-sand-200 font-mono text-xs shadow-2xs overflow-hidden" id="mcFinancialLedger"></div>
       </div>
 
       <!-- Strategic Mutation Proposals Panel (If Resilience < 55) -->

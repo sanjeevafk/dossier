@@ -671,233 +671,91 @@ function renderMonteCarloPanel(dossier) {
     `;
   }
 
-  // Draw Canvases
-  renderSurvivalChart(mc);
-  renderPaybackChart(mc);
-  renderTornadoChart(mc);
-}
+  // Render Editorial Financial Ledger (Text-first, print-safe)
+  const ledgerContainer = document.getElementById('mcFinancialLedger');
+  if (ledgerContainer) {
+    const rate = mc.annualSurvivalRate || mc.survivalProbability || 0.85;
+    const years = [1, 2, 3, 4, 5];
+    const probs = years.map(y => Math.round(Math.max(0.04, Math.pow(rate, y)) * 100));
 
-function renderSurvivalChart(mc) {
-  const canvas = document.getElementById('chartSurvival');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.parentElement.clientWidth || 300;
-  const h = 160;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  ctx.scale(dpr, dpr);
+    const p10P = mc.payback?.p10 ?? 1.8;
+    const p50P = mc.payback?.p50 ?? 3.0;
+    const p90P = mc.payback?.p90 ?? 4.2;
+    const efficiencyVerdict = p50P <= 6.0 ? "HIGH (Capital Efficient SaaS)" : (p50P <= 12.0 ? "MODERATE (Standard Venture Horizon)" : "CRITICAL (Prolonged Working Capital Drain)");
 
-  ctx.clearRect(0, 0, w, h);
+    const tornado = mc.tornado || [];
 
-  const rate = mc.annualSurvivalRate || mc.survivalProbability || 0.85;
-  const years = [1, 2, 3, 4, 5];
-  // Calculate projected survival trajectory over 5 years
-  const probs = years.map(y => Math.max(0.04, Math.pow(rate, y)));
+    ledgerContainer.innerHTML = `
+      <!-- Row 1: 5-Year Survival -->
+      <div class="p-4 space-y-2">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-bold text-zinc-950 uppercase">1. FIVE-YEAR SURVIVAL TRAJECTORY (10,000 Stochastic Cohort Runs)</span>
+          <span class="text-zinc-500 text-[10px]">ANNUAL RETENTION DECAY</span>
+        </div>
+        <div class="grid grid-cols-5 gap-2 pt-1">
+          ${years.map((y, idx) => `
+            <div class="p-2 bg-white rounded-lg border border-sand-200 text-center">
+              <div class="text-[10px] text-zinc-400 font-bold uppercase">Year ${y}</div>
+              <div class="text-sm font-extrabold ${probs[idx] >= 65 ? 'text-emerald-700' : (probs[idx] >= 40 ? 'text-amber-700' : 'text-red-700')} mt-0.5">${probs[idx]}%</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="text-[11px] text-zinc-600 font-sans pt-1">
+          <strong class="text-zinc-900 font-mono">Cohort Solvency Takeaway:</strong> ${probs[4] <= 30 ? 'Compounding customer churn and replacement CAC cause severe capital exhaustion past Month 24 without retention expansion.' : 'Cohorts maintain positive cumulative contribution margin through Year 5 under modeled churn boundaries.'}
+        </div>
+      </div>
 
-  const padLeft = 38, padBottom = 26, padTop = 18, padRight = 18;
-  const plotW = w - padLeft - padRight;
-  const plotH = h - padTop - padBottom;
+      <!-- Row 2: CAC Payback Horizon -->
+      <div class="p-4 space-y-2">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-bold text-zinc-950 uppercase">2. CUSTOMER ACQUISITION (CAC) PAYBACK HORIZON</span>
+          <span class="text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded text-[10px] font-bold">${efficiencyVerdict}</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 pt-1 text-center">
+          <div class="p-2.5 bg-white rounded-lg border border-sand-200">
+            <div class="text-[10px] text-zinc-400 uppercase">Best Case (P10)</div>
+            <div class="text-sm font-extrabold text-zinc-900 mt-0.5">${p10P.toFixed(1)} Months</div>
+            <div class="text-[10px] text-zinc-500 mt-0.5">Viral / inbound conversion</div>
+          </div>
+          <div class="p-2.5 bg-white rounded-lg border border-sand-200 border-zinc-400 bg-sand-50/50">
+            <div class="text-[10px] text-zinc-600 uppercase font-bold">Expected Reality (P50)</div>
+            <div class="text-base font-black text-zinc-950 mt-0.5">${p50P.toFixed(1)} Months</div>
+            <div class="text-[10px] text-zinc-600 mt-0.5">Median stochastic breakeven</div>
+          </div>
+          <div class="p-2.5 bg-white rounded-lg border border-sand-200">
+            <div class="text-[10px] text-zinc-400 uppercase">Downside Stress (P90)</div>
+            <div class="text-sm font-extrabold text-zinc-900 mt-0.5">${p90P.toFixed(1)} Months</div>
+            <div class="text-[10px] text-zinc-500 mt-0.5">Ad inflation &amp; sales inertia</div>
+          </div>
+        </div>
+      </div>
 
-  // Background Gridlines & Y-Axis Scale
-  const yTicks = [1.0, 0.75, 0.50, 0.25, 0.0];
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  ctx.font = '9px "IBM Plex Mono", monospace';
-
-  yTicks.forEach(tick => {
-    const y = padTop + (1 - tick) * plotH;
-    ctx.strokeStyle = '#27272a';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padLeft, y);
-    ctx.lineTo(padLeft + plotW, y);
-    ctx.stroke();
-
-    ctx.fillStyle = '#71717a';
-    ctx.fillText(`${Math.round(tick * 100)}%`, padLeft - 6, y);
-  });
-
-  // Bottom baseline
-  ctx.strokeStyle = '#3f3f46';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(padLeft, padTop + plotH);
-  ctx.lineTo(padLeft + plotW, padTop + plotH);
-  ctx.stroke();
-
-  // Area Gradient Fill
-  const gradient = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
-  gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
-  gradient.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
-
-  ctx.beginPath();
-  probs.forEach((pr, idx) => {
-    const x = padLeft + (idx / (years.length - 1)) * plotW;
-    const y = padTop + (1 - pr) * plotH;
-    if (idx === 0) {
-      ctx.moveTo(x, padTop + plotH);
-      ctx.lineTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-  const lastX = padLeft + plotW;
-  ctx.lineTo(lastX, padTop + plotH);
-  ctx.closePath();
-  ctx.fillStyle = gradient;
-  ctx.fill();
-
-  // Trajectory Line
-  ctx.strokeStyle = '#34d399';
-  ctx.lineWidth = 2.5;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  probs.forEach((pr, idx) => {
-    const x = padLeft + (idx / (years.length - 1)) * plotW;
-    const y = padTop + (1 - pr) * plotH;
-    if (idx === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-
-  // Points and Data Percentage Labels
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  probs.forEach((pr, idx) => {
-    const x = padLeft + (idx / (years.length - 1)) * plotW;
-    const y = padTop + (1 - pr) * plotH;
-
-    // Point Dot
-    ctx.fillStyle = '#09090b';
-    ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#34d399';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Percentage Label
-    ctx.fillStyle = '#f4f4f5';
-    ctx.font = 'bold 9px "IBM Plex Mono", monospace';
-    const labelY = y < padTop + 14 ? y + 15 : y - 6;
-    ctx.fillText(`${Math.round(pr * 100)}%`, x, labelY);
-  });
-
-  // X-Axis Labels (Y1, Y2, Y3, Y4, Y5)
-  ctx.fillStyle = '#a1a1aa';
-  ctx.font = '10px "IBM Plex Mono", monospace';
-  ctx.textBaseline = 'top';
-  years.forEach((yr, idx) => {
-    const x = padLeft + (idx / (years.length - 1)) * plotW;
-    ctx.fillText(`Y${yr}`, x, padTop + plotH + 7);
-  });
-}
-
-function renderPaybackChart(mc) {
-  const canvas = document.getElementById('chartPayback');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.parentElement.clientWidth || 300;
-  const h = 160;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  ctx.scale(dpr, dpr);
-
-  ctx.clearRect(0, 0, w, h);
-  const p10 = mc.payback?.p10 ?? 4;
-  const p50 = mc.payback?.p50 ?? 7;
-  const p90 = mc.payback?.p90 ?? 12;
-
-  const padLeft = 36, padRight = 36, padTop = 32, padBottom = 32;
-  const plotW = w - padLeft - padRight;
-  const maxVal = Math.max(16, p90 * 1.3);
-
-  // Line track
-  const y = h / 2;
-  ctx.strokeStyle = '#27272a';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(padLeft, y);
-  ctx.lineTo(padLeft + plotW, y);
-  ctx.stroke();
-
-  // P10 to P90 range bar
-  const x10 = padLeft + (p10 / maxVal) * plotW;
-  const x50 = padLeft + (p50 / maxVal) * plotW;
-  const x90 = padLeft + (p90 / maxVal) * plotW;
-
-  ctx.fillStyle = '#3f3f46';
-  ctx.fillRect(x10, y - 6, Math.max(4, x90 - x10), 12);
-
-  // P50 marker
-  ctx.fillStyle = '#fbbf24';
-  ctx.beginPath();
-  ctx.arc(x50, y, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Center-aligned text to avoid overlap
-  ctx.font = '10px "IBM Plex Mono", monospace';
-  ctx.textAlign = 'center';
-
-  // P50 Top Label
-  ctx.fillStyle = '#fbbf24';
-  ctx.fillText(`P50: ${p50.toFixed(1)}m`, x50, y - 14);
-
-  // P10 & P90 Bottom Labels with collision prevention
-  ctx.fillStyle = '#a1a1aa';
-  const minSpacing = 42;
-  if (Math.abs(x50 - x10) < minSpacing && Math.abs(x90 - x10) < minSpacing) {
-    // When range is very tight, stagger vertically
-    ctx.fillText(`P10: ${p10.toFixed(1)}m`, x10, y + 18);
-    ctx.fillText(`P90: ${p90.toFixed(1)}m`, x90, y + 30);
-  } else {
-    ctx.fillText(`P10: ${p10.toFixed(1)}m`, x10, y + 22);
-    ctx.fillText(`P90: ${p90.toFixed(1)}m`, x90, y + 22);
+      <!-- Row 3: Sensitivity Tornado -->
+      <div class="p-4 space-y-2">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-bold text-zinc-950 uppercase">3. SENSITIVITY VULNERABILITIES (Ranked by Payback Delay Impact)</span>
+          <span class="text-zinc-500 text-[10px]">10% ADVERSE SHIFT IMPACT</span>
+        </div>
+        <div class="space-y-1.5 pt-1">
+          ${tornado.map((item, idx) => `
+            <div class="p-2 bg-white rounded-lg border border-sand-200 flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-5 h-5 rounded bg-sand-100 text-zinc-700 font-bold flex items-center justify-center text-[10px]">${idx + 1}</span>
+                <span class="font-bold text-zinc-900">${escapeHtml(item.driver || '')}</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-zinc-500 font-sans text-[11px]">Delays customer payback by:</span>
+                <span class="px-2 py-0.5 rounded bg-red-100 text-red-900 font-bold font-mono text-[11px]">+${Number(item.swingMonths || 0).toFixed(1)}m</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="text-[11px] text-zinc-500 font-sans pt-1">
+          <strong class="text-zinc-900 font-mono">Executive Action:</strong> Target metric #${tornado.length > 0 ? '1 (' + escapeHtml(tornado[0].driver || '') + ')' : '1'} before scaling spend, as it generates the largest unit-margin variance.
+        </div>
+      </div>
+    `;
   }
-}
-
-function renderTornadoChart(mc) {
-  const canvas = document.getElementById('chartTornado');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.parentElement.clientWidth || 300;
-  const h = 160;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  ctx.scale(dpr, dpr);
-
-  ctx.clearRect(0, 0, w, h);
-  const drivers = mc.tornado || [
-    { driver: "Organic Churn", swingMonths: 4.2 },
-    { driver: "CAC Inflation", swingMonths: 3.1 },
-    { driver: "Infra Cost", swingMonths: 1.4 }
-  ];
-
-  const padLeft = 90, padRight = 44, padTop = 18, padBottom = 18;
-  const plotW = w - padLeft - padRight;
-  const maxSwing = Math.max(...drivers.map(d => d.swingMonths), 5);
-  const rowH = 36;
-
-  ctx.font = '10px "IBM Plex Mono", monospace';
-  drivers.forEach((d, idx) => {
-    const y = padTop + idx * rowH + 12;
-    ctx.fillStyle = '#f4f4f5';
-    ctx.fillText((d.driver || '').slice(0, 12), 8, y + 10);
-
-    const barW = Math.max(8, (d.swingMonths / maxSwing) * plotW);
-    ctx.fillStyle = '#52525b';
-    ctx.fillRect(padLeft, y, barW, 14);
-
-    ctx.fillStyle = '#a1a1aa';
-    ctx.fillText(`+${d.swingMonths.toFixed(1)}m`, padLeft + barW + 6, y + 11);
-  });
 }
 
 // ============================================================
