@@ -425,26 +425,26 @@ function renderDossier(dossier) {
 
   // 6-Agent Swarm Perspectives Grid
   const consensusGrid = document.getElementById('consensusGrid');
-  if (consensusGrid && dossier.agentOpinions) {
-    const rolesOrder = ['founder', 'skeptic', 'architect', 'analyst', 'customer', 'investor'];
-    const roleLabels = {
-      founder: 'Synthesizer',
-      skeptic: 'The Skeptic',
-      architect: 'Architect',
-      analyst: 'Market Recon',
-      customer: 'Customer',
-      investor: 'Financial VC'
-    };
+  const opinions = dossier.roleAssessments || dossier.agentOpinions || {};
+  if (consensusGrid) {
+    const rolesList = [
+      { key: 'synthesizer', alt: 'founder', label: 'Synthesizer' },
+      { key: 'redteam', alt: 'skeptic', label: 'The Skeptic' },
+      { key: 'architect', alt: 'architect', label: 'Architect' },
+      { key: 'analyst', alt: 'analyst', label: 'Market Recon' },
+      { key: 'customer', alt: 'customer', label: 'Customer' },
+      { key: 'investor', alt: 'investor', label: 'Financial VC' }
+    ];
 
-    consensusGrid.innerHTML = rolesOrder.map(rKey => {
-      const op = dossier.agentOpinions[rKey];
+    consensusGrid.innerHTML = rolesList.map(r => {
+      const op = opinions[r.key] || opinions[r.alt];
       if (!op) return '';
       const scoreColor = op.score >= 75 ? 'text-emerald-700' : (op.score >= 50 ? 'text-amber-700' : 'text-red-700');
       const fatalFlawSnippet = op.fatalFlaws && op.fatalFlaws.length > 0 ? op.fatalFlaws[0] : 'None articulated';
 
       return `
         <div class="p-3 bg-white rounded-xl border border-sand-200 space-y-1">
-          <div class="text-[10px] text-zinc-400 uppercase font-bold truncate">${roleLabels[rKey] || rKey}</div>
+          <div class="text-[10px] text-zinc-400 uppercase font-bold truncate">${r.label}</div>
           <div class="text-base font-extrabold ${scoreColor}">${op.score}/100</div>
           <div class="text-[9px] text-zinc-500 leading-tight truncate" title="${escapeHtml(fatalFlawSnippet)}">${escapeHtml(fatalFlawSnippet)}</div>
         </div>
@@ -453,7 +453,7 @@ function renderDossier(dossier) {
   }
 
   // Evidence & Critical Unvalidated Assumption
-  const strongestEv = (dossier.evidenceFeed || []).find(e => e.indicator === 'SUPPORTING') || {
+  const strongestEv = dossier.strongestEvidence || (dossier.evidenceFeed || []).find(e => e.indicator === 'SUPPORTING') || {
     claim: "Statutory frameworks and architectural feasibility confirmed.",
     tier: "VERIFIED_COMPUTATION",
     provenance: "Deterministic Subprocess Sandbox"
@@ -462,10 +462,11 @@ function renderDossier(dossier) {
   document.getElementById('resEvidenceTier').textContent = `TIER: ${strongestEv.tier}`;
   document.getElementById('resEvidenceProv').textContent = `PROV: ${strongestEv.provenance}`;
 
-  const redTeamOp = dossier.agentOpinions ? (dossier.agentOpinions.skeptic || dossier.agentOpinions.redteam) : null;
-  const criticalFlaw = (redTeamOp && redTeamOp.fatalFlaws && redTeamOp.fatalFlaws[0]) 
-    ? redTeamOp.fatalFlaws[0] 
-    : "Purchasing commitment unproven with paying counterparties.";
+  const redTeamOp = opinions.redteam || opinions.skeptic;
+  const criticalFlaw = dossier.weakestAssumption?.fatalRisk 
+    || dossier.weakestAssumption?.statement 
+    || (redTeamOp && redTeamOp.fatalFlaws && redTeamOp.fatalFlaws[0]) 
+    || "Purchasing commitment unproven with paying counterparties.";
   document.getElementById('resAssumptionClaim').textContent = criticalFlaw;
 
   // Commercial Grounding: Razorpay Itch + Loot Drop Graveyard
@@ -495,8 +496,9 @@ function renderDossier(dossier) {
 
   // Falsifiable Kill Conditions & 7-Day Test
   const killList = document.getElementById('resKillConditions');
-  if (killList && dossier.falsifiableKillConditions) {
-    killList.innerHTML = dossier.falsifiableKillConditions.map(kc => `
+  const killConds = dossier.killConditions || dossier.falsifiableKillConditions || [];
+  if (killList) {
+    killList.innerHTML = killConds.map(kc => `
       <div class="p-2 bg-white rounded border border-sand-200 text-xs">
         <span class="font-bold text-red-800">[KILL]</span> ${escapeHtml(kc)}
       </div>
@@ -558,9 +560,9 @@ function renderDossier(dossier) {
 
 // Monte Carlo Canvas Charts Renderer
 function renderMonteCarloPanel(dossier) {
-  const mc = (dossier.pythonUnitEconomics && dossier.pythonUnitEconomics.monteCarlo) 
-    ? dossier.pythonUnitEconomics.monteCarlo 
-    : {
+  const mc = (dossier.simulation && dossier.simulation.monteCarlo)
+    || (dossier.pythonUnitEconomics && dossier.pythonUnitEconomics.monteCarlo)
+    || {
         iterations: 10000,
         survivalProbability5Yr: 0.78,
         p10LtvCacRatio: 1.8,
@@ -790,7 +792,7 @@ Overall Verdict: ${d.overallVerdict}
 ${exp.description}
 
 ## 3. Falsifiable Kill Conditions
-${(d.falsifiableKillConditions || []).map((kc, idx) => `${idx + 1}. ${kc}`).join('\n')}
+${(d.killConditions || d.falsifiableKillConditions || []).map((kc, idx) => `${idx + 1}. ${kc}`).join('\n')}
 
 ---
 Generated by Dossier Adversarial Intelligence Platform.
