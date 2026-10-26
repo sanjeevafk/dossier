@@ -53,3 +53,77 @@ test("Decision Model: Asymmetric loss ratio correctly weights false positives", 
 
   assert.ok(result.loss_ratio >= 70, `Loss ratio should reflect $150k/$2k (~75x), got ${result.loss_ratio}`);
 });
+
+test("Decision Model: Native LiquidAI d1-omni System-One protocol integration", async () => {
+  const http = await import("node:http");
+  
+  // Spin up an ephemeral HTTP server mimicking LiquidAI llama-server /v1/systemone
+  let receivedPayload = null;
+  const server = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      receivedPayload = JSON.parse(body);
+      const mockResponse = {
+        answers: {
+          moat: {
+            choice: "thin_wrapper",
+            probabilities: {
+              thin_wrapper: 0.942,
+              defensible_workflow: 0.058
+            }
+          },
+          regulatory_risk: {
+            choice: "standard_compliance",
+            probabilities: {
+              regulatory_fatal: 0.015,
+              standard_compliance: 0.985
+            }
+          },
+          sales_cycle: {
+            choice: "viable_distribution",
+            probabilities: {
+              procurement_deadlock: 0.12,
+              viable_distribution: 0.88
+            }
+          },
+          monetization: {
+            choice: "viable_economics",
+            probabilities: {
+              monetization_zero: 0.05,
+              viable_economics: 0.95
+            }
+          }
+        }
+      };
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(mockResponse));
+    });
+  });
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(true)));
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : 8080;
+  const mockEndpoint = `http://127.0.0.1:${port}/v1/systemone`;
+
+  try {
+    const result = await runDecisionModel({
+      title: "WrapperApp",
+      summary: "Wrapper over Claude 3.7",
+      targetAudience: "Users",
+      monetization: "$5/mo"
+    }, {
+      env: { LIQUID_D1_ENDPOINT: mockEndpoint }
+    });
+
+    assert.equal(result.engine, "LiquidAI/d1-omni-600M (System-One)");
+    assert.equal(result.verdict, "KILL");
+    assert.ok(result.fatal_flags.some((f) => f.includes("thin wrapper")));
+    assert.equal(result.answers.moat.flagged, true);
+    assert.equal(result.answers.moat.probabilities.thin_wrapper, 0.942);
+    assert.ok(receivedPayload.questions.moat);
+    assert.ok(receivedPayload.state.includes("WrapperApp"));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

@@ -63,11 +63,73 @@ def build_decision_questions():
         }
     }
 
+def synthesize_verdict(engine_name, answers):
+    fatal_flags = []
+    if answers.get("moat", {}).get("flagged"): fatal_flags.append("moat (thin wrapper)")
+    if answers.get("regulatory_risk", {}).get("flagged"): fatal_flags.append("regulatory (uninsurable clinical/legal risk)")
+    if answers.get("monetization", {}).get("flagged"): fatal_flags.append("monetization (zero willingness to pay)")
+
+    refine_flags = []
+    if answers.get("sales_cycle", {}).get("flagged"): refine_flags.append("sales_cycle (procurement deadlock)")
+
+    if fatal_flags:
+        verdict = "KILL"
+    elif refine_flags:
+        verdict = "REFINE"
+    else:
+        verdict = "BUILD"
+
+    return {
+        "engine": engine_name,
+        "answers": answers,
+        "fatal_flags": fatal_flags,
+        "refine_flags": refine_flags,
+        "verdict": verdict,
+        "loss_ratio": round(COST_FALSE_POSITIVE / COST_FALSE_NEGATIVE, 1)
+    }
+
 def evaluate_concept_decision(concept_text):
     """
     Evaluates concept text through calibrated decision model questions.
+    Checks for active LiquidAI d1-omni System-One server (http://127.0.0.1:8080/v1/systemone)
+    or local Julia-1 model; falls back to calibrated semantic decision engine.
     Returns calibrated probabilities, flagged failure gates, and loss-minimized verdict.
     """
+    questions = build_decision_questions()
+    d1_endpoint = os.environ.get("LIQUID_D1_ENDPOINT", "http://127.0.0.1:8080/v1/systemone")
+
+    # Path 1: LiquidAI d1-omni-600M System-One server (via llama-server or vLLM)
+    try:
+        import urllib.request
+        body_obj = {"state": concept_text, "questions": questions}
+        payload = json.dumps(body_obj).encode("utf-8")
+        req = urllib.request.Request(d1_endpoint, data=payload, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if "answers" in data:
+                raw_ans = data["answers"]
+                answers = {}
+                risk_keys = {
+                    "moat": ("thin_wrapper", THRESHOLDS["thin_wrapper"]),
+                    "regulatory_risk": ("regulatory_fatal", THRESHOLDS["regulatory_fatal"]),
+                    "sales_cycle": ("procurement_deadlock", THRESHOLDS["procurement_deadlock"]),
+                    "monetization": ("monetization_zero", THRESHOLDS["monetization_zero"])
+                }
+                for q_name, (risk_choice, threshold) in risk_keys.items():
+                    if q_name in raw_ans:
+                        ans_obj = raw_ans[q_name]
+                        probs = ans_obj.get("probabilities", {})
+                        p_risk = probs.get(risk_choice, 0.0)
+                        answers[q_name] = {
+                            "choice": ans_obj.get("choice", risk_choice if p_risk >= threshold else "safe"),
+                            "probabilities": probs,
+                            "threshold": threshold,
+                            "flagged": p_risk >= threshold
+                        }
+                return synthesize_verdict("LiquidAI/d1-omni-600M (System-One)", answers)
+    except Exception:
+        pass # Liquid server not running, fall back cleanly
+
     lower = concept_text.lower()
     answers = {}
 
@@ -172,28 +234,7 @@ def evaluate_concept_decision(concept_text):
     }
 
     # Fatal Gates: Moat, Regulatory, or Monetization trigger KILL
-    fatal_flags = []
-    if answers["moat"]["flagged"]: fatal_flags.append("moat (thin wrapper)")
-    if answers["regulatory_risk"]["flagged"]: fatal_flags.append("regulatory (uninsurable clinical/legal risk)")
-    if answers["monetization"]["flagged"]: fatal_flags.append("monetization (zero willingness to pay)")
-
-    refine_flags = []
-    if answers["sales_cycle"]["flagged"]: refine_flags.append("sales_cycle (procurement deadlock)")
-
-    if fatal_flags:
-        verdict = "KILL"
-    elif refine_flags:
-        verdict = "REFINE"
-    else:
-        verdict = "BUILD"
-
-    return {
-        "answers": answers,
-        "fatal_flags": fatal_flags,
-        "refine_flags": refine_flags,
-        "verdict": verdict,
-        "loss_ratio": round(COST_FALSE_POSITIVE / COST_FALSE_NEGATIVE, 1)
-    }
+    return synthesize_verdict("CalibratedDecisionEngine (Platt-Scaled)", answers)
 
 if __name__ == "__main__":
     text = sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read()

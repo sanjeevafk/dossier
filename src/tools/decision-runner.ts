@@ -33,7 +33,10 @@ export interface DecisionModelOutput {
  * typed-decisions pattern (compatible with SupersonicLabs/Julia-1).
  * Executes in ~15-25ms.
  */
-export async function runDecisionModel(idea: IdeaInput): Promise<DecisionModelOutput> {
+export async function runDecisionModel(
+  idea: IdeaInput,
+  options?: { env?: NodeJS.ProcessEnv }
+): Promise<DecisionModelOutput> {
   const candidatePaths = [
     path.resolve(import.meta.dirname, "decision_model.py"),
     path.resolve(import.meta.dirname, "..", "..", "src", "tools", "decision_model.py"),
@@ -46,7 +49,8 @@ export async function runDecisionModel(idea: IdeaInput): Promise<DecisionModelOu
   try {
     const { stdout } = await execFileAsync("python3", [scriptPath, conceptText], {
       timeout: 5000,
-      maxBuffer: 1024 * 1024
+      maxBuffer: 1024 * 1024,
+      env: { ...process.env, ...options?.env }
     });
     const parsed = JSON.parse(stdout.trim());
     return {
