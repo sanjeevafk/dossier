@@ -1,7 +1,7 @@
 # Dossier Domain-Aware Adversarial Benchmark Report
 
 **Execution Date:** 2026-10-26T09:16:00.357Z  
-**Agent Harness:** TrueForge Multi-Agent Runtime (File TF-007)  
+**Agent Harness:** Dossier Swarm Runtime  
 **De-Noising:** 1 full runs per concept; Quality Gate 3 evaluates σ of per-concept mean scores  
 **Overall Benchmark Runtime:** 240.90 seconds  
 **Average Latency:** 60225 ms per full 6-agent adversarial evaluation  
