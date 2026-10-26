@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>DOSSIER — Adversarial Idea Intelligence & Epistemic Verification</title>
+  <meta name="description" content="Autonomous consensus from 6 specialized agents. Epistemic verification, isolated Python unit economics simulation, and real-world failure forensics.">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            sand: {
+              50: '#fbfbfa',
+              100: '#f5f5f4',
+              200: '#e7e5e4',
+              300: '#d6d3d1',
+              800: '#292524',
+              900: '#1c1917',
+            },
+            accentGold: '#facc15',
+            accentGoldHover: '#eab308',
+          }
+        }
+      }
+    }
+  </script>
+  <script>
+    (function() {
+      try {
+        const savedTheme = localStorage.getItem('dossier_theme');
+        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="min-h-screen flex flex-col justify-between bg-sand-50 text-zinc-950 selection:bg-accentGold selection:text-black">
+
+  <!-- ============================================================ -->
+  <!-- 1. STICKY EDITORIAL TOP NAVIGATION                           -->
+  <!-- ============================================================ -->
+  <header class="border-b border-sand-200/80 bg-sand-50/90 backdrop-blur-md sticky top-0 z-40 transition-colors">
+    <div class="max-w-7xl mx-auto px-6 md:px-12 py-3.5 flex items-center justify-between">
+      
+      <!-- Brand & Engine Tag -->
+      <a href="#heroSection" class="flex items-center gap-2.5 group">
+        <img src="/brand-logo.png" alt="Dossier" class="w-6 h-6 rounded-md group-hover:scale-105 transition-transform">
+        <span class="font-extrabold text-xl tracking-tight text-zinc-950 group-hover:opacity-85 transition">
+          DOSSIER
+        </span>
+        <span class="text-[10px] font-mono tracking-wider px-2 py-0.5 rounded border border-sand-300 bg-sand-100 text-zinc-600 font-semibold">
+          SYSTEM // V2.0
+        </span>
+      </a>
+
+      <!-- Center Navigation Links -->
+      <nav class="hidden md:flex items-center gap-6 text-xs font-semibold text-zinc-600">
+        <a href="#heroSection" class="hover:text-zinc-950 transition">Terminal</a>
+        <a href="#whySection" class="hover:text-zinc-950 transition">Why Adversarial</a>
+        <a href="#architectureSection" class="hover:text-zinc-950 transition">Swarm Engine</a>
+        <a href="#mcpSection" class="hover:text-zinc-950 transition">MCP Setup</a>
+        <a href="#archiveSection" class="hover:text-zinc-950 transition">Audit Archive</a>
+      </nav>
+
+      <!-- Right Action Items -->
+      <div class="flex items-center gap-3">
+        <!-- Live System Status -->
+        <div class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full border border-sand-200 bg-white text-[11px] font-mono text-zinc-600">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="navSystemStatus">STANDBY</span>
+        </div>
+
+        <!-- Theme Toggle Button -->
+        <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 rounded-lg hover:bg-sand-200 dark:hover:bg-sand-800 transition cursor-pointer" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
+          <!-- Moon Icon (shown in light mode) -->
+          <svg class="w-4 h-4 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <!-- Sun Icon (shown in dark mode) -->
+          <svg class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+
+        <!-- GitHub Link -->
+        <a href="https://github.com/sanjeevafk/dossier" target="_blank" rel="noopener noreferrer" class="p-2 text-zinc-700 hover:text-zinc-950 rounded-lg hover:bg-sand-200 transition" title="View Source on GitHub">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+          </svg>
+        </a>
+
+        <!-- Launch Terminal Trigger -->
+        <a href="#heroSection" class="px-3.5 py-1.5 bg-zinc-950 hover:bg-zinc-800 text-white rounded-lg text-xs font-semibold tracking-tight transition">
+          Run Dossier
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- 2. MAIN CONTENT WRAPPER                                      -->
+  <!-- ============================================================ -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-12 space-y-20">
+
+    <!-- HERO SECTION & ONE-SHOT STATELESS INPUT TERMINAL -->
+    <section id="heroSection" class="space-y-8">
+      
+      <!-- Headline & Pitch -->
+      <div class="max-w-4xl space-y-4">
+        <div class="inline-flex items-center gap-2 font-mono text-xs font-bold tracking-wider uppercase text-zinc-500">
+          <span class="w-2 h-2 rounded-full bg-accentGold"></span>
+          <span>Zero-Sycophancy Idea Intelligence</span>
+        </div>
+
+        <h1 class="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-zinc-950 leading-[1.08]">
+          Interrogate your venture before the market kills it.
+        </h1>
+
+        <p class="text-lg sm:text-xl text-zinc-700 leading-relaxed font-normal max-w-3xl">
+          Six domain-specialized agents interrogate your business model, stress-test unit economics with 10,000 Monte Carlo runs, and cross-reference real-world merchant demand with startup failure forensics.
+        </p>
+      </div>
+
+      <!-- THE ONE-SHOT CONSOLE (2000 CHARACTERS OR LESS) -->
+      <div class="bg-white border border-sand-200 rounded-2xl shadow-sm p-6 md:p-8 space-y-5 transition-all focus-within:border-zinc-500">
+        
+        <!-- Console Header Bar -->
+        <div class="flex items-center justify-between pb-3 border-b border-sand-200/80 font-mono text-xs">
+          <div class="flex items-center gap-2 text-zinc-800 font-bold">
+            <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <span class="tracking-wider">INPUT CONSOLE</span>
+            <span class="text-zinc-400 font-normal">// PLAIN TEXT SPECIFICATION</span>
+          </div>
+          
+          <div class="flex items-center gap-1 font-mono text-xs">
+            <span id="charCount" class="font-bold text-zinc-800">0</span>
+            <span class="text-zinc-400">/ 2,000</span>
+          </div>
+        </div>
+
+        <!-- Stateless Textarea -->
+        <div>
+          <textarea
+            id="ideaInput"
+            rows="5"
+            maxlength="2000"
+            class="w-full bg-transparent border-0 p-0 text-base md:text-lg text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-0 resize-y leading-relaxed font-sans"
+            placeholder="Describe your startup concept, target buyer workflow, unit economics, or hardware/regulatory constraints in 2,000 characters or less...
+
+Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kirana retailers that reconciles distributor invoices via OCR, generates UPI collection links, and charges $15/month per store."
+          ></textarea>
+        </div>
+
+        <!-- Presets & Run Action Toolbar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-sand-200/80">
+          
+          <!-- Sample Presets for Instant 1-Shot Test -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-mono text-zinc-500 shrink-0">Sample ideas:</span>
+            <button onclick="loadSamplePreset('reconcilepay')" type="button" class="px-3 py-1.5 rounded-lg bg-sand-100 hover:bg-sand-200 text-zinc-800 text-xs font-medium transition cursor-pointer">
+              Kirana Invoicing (B2B SaaS)
+            </button>
+            <button onclick="loadSamplePreset('reloot')" type="button" class="px-3 py-1.5 rounded-lg bg-sand-100 hover:bg-sand-200 text-zinc-800 text-xs font-medium transition cursor-pointer">
+              Used Furniture (Marketplace)
+            </button>
+            <button onclick="loadSamplePreset('autosoc2')" type="button" class="px-3 py-1.5 rounded-lg bg-sand-100 hover:bg-sand-200 text-zinc-800 text-xs font-medium transition cursor-pointer">
+              K8s Compliance (DevSecOps)
+            </button>
+          </div>
+
+          <!-- Execution Trigger -->
+          <div class="flex items-center gap-3">
+            <button onclick="openApiKeyModal()" type="button" class="p-2 text-zinc-400 hover:text-zinc-800 rounded-lg hover:bg-sand-100 transition" title="Configure API Key">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+              </svg>
+            </button>
+
+            <button
+              id="runEvaluationBtn"
+              onclick="executeOneShotEvaluation()"
+              class="w-full sm:w-auto px-6 py-3 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold font-mono tracking-wide transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            >
+              <span id="runBtnText">RUN ADVERSARIAL SWARM</span>
+              <svg id="runBtnArrow" class="w-4 h-4 text-accentGold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+              </svg>
+              <span id="runBtnSpinner" class="hidden animate-spin font-mono">/</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- ABOVE-THE-FOLD TANGIBLE SAMPLE VERDICT TEASER               -->
+      <!-- ============================================================ -->
+      <div class="bg-sand-50 border border-sand-200 rounded-2xl p-6 md:p-7 space-y-5 shadow-2xs">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-sand-200 pb-4">
+          <div>
+            <div class="flex items-center gap-2 font-mono text-[11px] text-zinc-500 uppercase tracking-wider font-bold">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              <span>Sample Analysis Output</span>
+              <span class="text-zinc-400">//</span>
+              <span class="text-zinc-600">What a completed dossier looks like</span>
+            </div>
+            <h3 class="text-lg font-extrabold text-zinc-950 mt-1">
+              AutoSOC2: Continuous Compliance Auditor for Kubernetes
+            </h3>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-mono text-xs font-black tracking-wide">
+              BUILD IF VALIDATED • 78/100
+            </span>
+            <button onclick="loadSamplePreset('autosoc2'); executeOneShotEvaluation();" class="px-3 py-1 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-mono font-bold rounded-lg transition cursor-pointer">
+              Inspect Full Dossier
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Flaw 1 -->
+          <div class="p-3.5 bg-white border border-sand-200 rounded-xl space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-red-800 font-bold uppercase">Fatal Risk 01</span>
+              <span class="text-[10px] font-mono text-zinc-400">PROCUREMENT</span>
+            </div>
+            <p class="text-xs text-zinc-800 font-sans leading-relaxed">
+              Enterprise security reviews stall pilots for 4–9 months while incumbents bundle automated compliance for free.
+            </p>
+          </div>
+
+          <!-- Flaw 2 -->
+          <div class="p-3.5 bg-white border border-sand-200 rounded-xl space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-amber-800 font-bold uppercase">Stochastic Economics</span>
+              <span class="text-[10px] font-mono text-zinc-400">MONTE CARLO</span>
+            </div>
+            <p class="text-xs text-zinc-800 font-sans leading-relaxed">
+              P50 payback is <strong>3.0 months</strong> with 7.77x LTV/CAC, but token costs above $0.20/user drag payback out by +3.7 months.
+            </p>
+          </div>
+
+          <!-- 7-Day Test -->
+          <div class="p-3.5 bg-white border border-sand-200 rounded-xl space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-zinc-900 font-bold uppercase">Next Action</span>
+              <span class="text-[10px] font-mono text-emerald-700 font-bold">7-DAY TEST</span>
+            </div>
+            <p class="text-xs text-zinc-800 font-sans leading-relaxed">
+              Interview 10 DevOps leads with a 1-page spec. Pass gate: &gt;= 3 signed Letters of Intent. If &lt;= 1 signed, kill idea immediately.
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 3. REAL-TIME STREAMING HUD (UNFOLDS ON RUN)                  -->
+    <!-- ============================================================ -->
+    <section id="streamContainer" class="hidden bg-white border border-sand-200 rounded-2xl p-6 space-y-5 shadow-xs transition-all">
+      <div class="flex items-center justify-between border-b border-sand-200 pb-4 font-mono text-xs">
+        <div class="flex items-center gap-2.5 text-zinc-900 font-bold">
+          <span class="w-2.5 h-2.5 rounded-full bg-accentGold animate-ping"></span>
+          <span id="streamActiveConceptTitle">RUNNING SWARM EVALUATION</span>
+        </div>
+        <span class="text-zinc-500" id="streamTimerBadge">0.0s ELAPSED</span>
+      </div>
+
+      <!-- Linear Execution Stepper -->
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-2 font-mono text-[11px]">
+        <div id="step-ingest" class="p-2.5 rounded-lg border border-sand-200 bg-sand-50 space-y-1">
+          <div class="text-zinc-400 font-bold">01 INGEST</div>
+          <div class="text-zinc-700 truncate" id="step-ingest-text">Pending...</div>
+        </div>
+        <div id="step-recon" class="p-2.5 rounded-lg border border-sand-200 bg-sand-50 space-y-1">
+          <div class="text-zinc-400 font-bold">02 RECON</div>
+          <div class="text-zinc-700 truncate" id="step-recon-text">Pending...</div>
+        </div>
+        <div id="step-swarm" class="p-2.5 rounded-lg border border-sand-200 bg-sand-50 space-y-1">
+          <div class="text-zinc-400 font-bold">03 SWARM</div>
+          <div class="text-zinc-700 truncate" id="step-swarm-text">Pending...</div>
+        </div>
+        <div id="step-debate" class="p-2.5 rounded-lg border border-sand-200 bg-sand-50 space-y-1">
+          <div class="text-zinc-400 font-bold">04 DEBATE</div>
+          <div class="text-zinc-700 truncate" id="step-debate-text">Pending...</div>
+        </div>
+        <div id="step-verify" class="p-2.5 rounded-lg border border-sand-200 bg-sand-50 space-y-1">
+          <div class="text-zinc-400 font-bold">05 VERIFY</div>
+          <div class="text-zinc-700 truncate" id="step-verify-text">Pending...</div>
+        </div>
+        <div id="step-compile" class="p-2.5 rounded-lg border border-sand-200 bg-sand-50 space-y-1">
+          <div class="text-zinc-400 font-bold">06 COMPILE</div>
+          <div class="text-zinc-700 truncate" id="step-compile-text">Pending...</div>
+        </div>
+      </div>
+
+      <!-- Live Stream Console Ticker -->
+      <div class="p-4 bg-zinc-950 rounded-xl text-zinc-300 font-mono text-xs space-y-2 overflow-hidden">
+        <div class="flex items-center justify-between text-[10px] text-zinc-500 uppercase tracking-wider pb-2 border-b border-zinc-800">
+          <span>REAL-TIME AUDIT LOG</span>
+          <span id="streamPhaseLabel">INITIALIZING</span>
+        </div>
+        <div id="streamLiveLog" class="space-y-1 max-h-36 overflow-y-auto pr-2 text-[11px] leading-relaxed text-zinc-400">
+          <div>[0.0s] Dispatched request to orchestrator...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 4. RENDERED DOSSIER REPORT (OUTPUT & EXPORT)                 -->
+    <!-- ============================================================ -->
+    <section id="resultsSection" class="hidden bg-white border border-sand-200 rounded-2xl p-6 md:p-8 space-y-8 shadow-sm">
+      
+      <!-- Report Header Bar -->
+      <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-sand-200 pb-6">
+        <div class="space-y-2">
+          <div class="flex items-center gap-3 font-mono text-xs">
+            <span class="px-2 py-0.5 bg-zinc-900 text-white font-bold rounded text-[10px] tracking-wider uppercase">
+              EVIDENCE-FIRST DOSSIER
+            </span>
+            <span class="text-zinc-500" id="resDossierCode">DOSSIER // AUDITED</span>
+            <span class="text-emerald-700 font-bold" id="resDossierStatus">STATUS: COMPILED</span>
+          </div>
+
+          <h2 id="resSubjectTitle" class="text-2xl sm:text-3xl font-extrabold text-zinc-950 tracking-tight">
+            AI STUDY COMPANION
+          </h2>
+
+          <div id="resDomainBanner" class="inline-flex flex-wrap items-center gap-2 font-mono text-xs p-2 bg-sand-50 rounded-lg border border-sand-200">
+            <span class="text-zinc-900 font-bold" id="resDomainArchetype">DOMAIN: CONSUMER AI</span>
+            <span class="text-sand-300">•</span>
+            <span class="text-zinc-600" id="resDomainCustomer">CUSTOMER: PARENTS &amp; STUDENTS</span>
+            <span class="text-sand-300">•</span>
+            <span class="text-zinc-600" id="resDomainCycle">CYCLE: B2C MONTHLY</span>
+          </div>
+
+          <p id="resExecutiveSummary" class="text-sm text-zinc-700 mt-2 max-w-3xl leading-relaxed"></p>
+
+          <!-- Export Action Buttons (Zero Emojis, Pure SVG/Clean Text) -->
+          <div class="flex flex-wrap items-center gap-2 pt-3 no-print">
+            <button onclick="exportDossierPdf()" class="px-3.5 py-1.5 bg-zinc-950 hover:bg-zinc-800 text-white rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs">
+              <svg class="w-3.5 h-3.5 text-accentGold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+              </svg>
+              <span>Export PDF</span>
+            </button>
+            <button onclick="downloadDossierExport('markdown')" class="px-3.5 py-1.5 bg-white hover:bg-sand-50 border border-sand-300 text-zinc-900 rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs">
+              <svg class="w-3.5 h-3.5 text-zinc-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              <span>Export Markdown</span>
+            </button>
+            <button onclick="downloadDossierExport('json')" class="px-3.5 py-1.5 bg-white hover:bg-sand-50 border border-sand-300 text-zinc-900 rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs">
+              <span>Export JSON</span>
+            </button>
+            <button onclick="downloadExperimentKit()" class="px-3.5 py-1.5 bg-sand-100 hover:bg-sand-200 border border-sand-300 text-zinc-950 rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs">
+              <span>Validation Kit</span>
+            </button>
+            <span id="resModeBadge" class="text-[10px] font-mono text-zinc-500 ml-1"></span>
+          </div>
+        </div>
+
+        <!-- Verdict Score Block -->
+        <div class="flex sm:flex-row md:flex-col gap-3 shrink-0">
+          <div class="bg-sand-50 border border-sand-200 p-4 rounded-xl text-center md:text-right min-w-[170px] shadow-2xs">
+            <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">OVERALL VERDICT</span>
+            <span id="resVerdictBadge" class="font-mono text-2xl font-black text-emerald-700 mt-0.5 block">BUILD</span>
+          </div>
+          <div class="bg-sand-50 border border-sand-200 p-3.5 rounded-xl text-center md:text-right min-w-[170px] font-mono text-xs shadow-2xs space-y-1">
+            <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500" id="resScoreLabel">RESILIENCE SCORE:</span><span id="resScoreVal" class="text-zinc-900 font-bold">78/100</span></div>
+            <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">CONFIDENCE:</span><span id="resConfidence" class="text-zinc-900 font-bold">84%</span></div>
+            <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RISK:</span><span id="resRiskLevel" class="text-amber-700 font-bold">MEDIUM</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5-Dimensional Resilience Breakdown -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+            Resilience Score Breakdown
+          </h3>
+          <span class="text-[10px] font-mono text-zinc-500">5 AUDITED PILLARS</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono text-xs" id="resilienceGrid"></div>
+      </div>
+
+      <!-- Core Decision Factors: Fatal Flaw Trap & 7-Day Test -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+        <!-- Fatal Flaw & Kill Conditions -->
+        <div class="p-5 bg-sand-50 border border-sand-200 rounded-xl flex flex-col justify-between space-y-3">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-red-900 uppercase tracking-wider">Primary Fatal Flaw Trap</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 bg-red-100 text-red-800 rounded font-bold">KILL CONDITION</span>
+            </div>
+            <div id="resAssumptionClaim" class="text-xs text-zinc-800 font-sans leading-relaxed"></div>
+          </div>
+          <div class="pt-2 border-t border-sand-200">
+            <div class="text-[10px] font-mono text-zinc-500 uppercase font-semibold mb-1.5">Falsifiable Stop Criteria:</div>
+            <div id="resKillConditions" class="text-xs text-zinc-700 font-sans space-y-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Cheapest 7-Day Validation Experiment -->
+        <div class="p-5 bg-sand-50 border border-sand-200 rounded-xl flex flex-col justify-between space-y-3">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-zinc-900 uppercase tracking-wider">Recommended 7-Day Test</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 bg-zinc-200 text-zinc-800 rounded font-bold">NEXT ACTION</span>
+            </div>
+            <div id="resValidationExp" class="text-xs text-zinc-800 font-sans leading-relaxed space-y-2.5"></div>
+          </div>
+          <div id="resValidationSignals" class="pt-2 border-t border-sand-200 font-mono text-[11px] space-y-1.5"></div>
+        </div>
+      </div>
+
+      <!-- Verified Grounding & Failure Graveyard Forensics -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
+        <div class="p-4 bg-sand-50 border border-sand-200 rounded-xl space-y-2 shadow-2xs">
+          <div class="flex items-center justify-between text-emerald-800 font-bold">
+            <span>VERIFIED FIELD EVIDENCE</span>
+            <span class="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">GROUNDED FACT</span>
+          </div>
+          <div id="resEvidenceClaim" class="text-zinc-800 font-sans leading-relaxed text-xs"></div>
+          <div class="flex items-center justify-between text-[10px] text-zinc-500 pt-1 border-t border-sand-200">
+            <span id="resEvidenceTier">TIER: VERIFIED_COMPUTATION</span>
+            <span id="resEvidenceProv" class="truncate max-w-[200px]">PROV: PYTHON SANDBOX</span>
+          </div>
+        </div>
+
+        <div class="p-4 bg-sand-50 border border-sand-200 rounded-xl space-y-2 shadow-2xs">
+          <div class="flex items-center justify-between text-zinc-900 font-bold">
+            <span>STARTUP GRAVEYARD FORENSICS</span>
+            <span class="text-[10px] px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded">LOOT DROP / ITCH</span>
+          </div>
+          <div id="resCommercialGrounding" class="text-zinc-800 font-sans leading-relaxed text-xs">
+            Comparing concept against verified merchant demand friction and past startup mortalities.
+          </div>
+        </div>
+      </div>
+
+      <!-- Sandboxed Python Monte Carlo Economics (10,000 Runs) -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+            Sandboxed Stochastic Unit Economics
+          </h3>
+          <span class="text-[10px] font-mono text-zinc-500">10,000 RUNS // DETERMINISTIC PYTHON3</span>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs" id="mcSummaryCards"></div>
+
+        <!-- Editorial Stochastic Financial Ledger (Print & Screen Friendly Text) -->
+        <div class="bg-sand-50 border border-sand-200 rounded-xl divide-y divide-sand-200 font-mono text-xs shadow-2xs overflow-hidden" id="mcFinancialLedger"></div>
+
+        <!-- Global Sensitivity — Sobol Indices -->
+        <div id="sobolCard" class="p-4 bg-sand-50 rounded-xl border border-sand-200 hidden font-mono text-xs">
+          <div class="text-[10px] text-zinc-500 uppercase font-bold mb-2">Global Sensitivity — Sobol Indices <span class="text-zinc-400">// variance shares, log-space (Saltelli)</span></div>
+          <div id="sobolList" class="space-y-3"></div>
+          <div id="sobolNotes" class="text-[9px] text-zinc-400 mt-3 font-mono leading-relaxed"></div>
+        </div>
+
+        <!-- Validation Priority ranked by Expected Value of Information -->
+        <div id="validationPrioritySection" class="hidden space-y-2">
+          <div class="flex items-center justify-between">
+            <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+              Validation Priority <span class="text-zinc-400">// ranked by expected value of information (EVPI)</span>
+            </h3>
+          </div>
+          <p class="text-[10px] text-zinc-500 font-sans">Empirical decision analysis over Monte Carlo draws: resolving each uncertain assumption is worth a measurable share of the decision value at stake.</p>
+          <div id="validationPriorityList" class="space-y-2 font-mono text-xs"></div>
+        </div>
+      </div>
+
+      <!-- Strategic Mutation Proposals Panel (If Resilience < 55) -->
+      <div id="resMutationSection" class="hidden p-5 bg-sand-50 border border-sand-200 rounded-xl space-y-3 font-mono text-xs">
+        <div class="flex items-center justify-between border-b border-sand-200 pb-2">
+          <span class="font-bold text-zinc-900 uppercase">STRATEGIC MUTATION ENGINE ACTIVATED</span>
+          <span class="text-[10px] text-zinc-500">SCORE UNDER 55 // THREE PIVOT TRAJECTORIES</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="resMutationGrid"></div>
+      </div>
+
+      <!-- Progressive Deep Dive: 6-Agent Perspectives & Invariant Audit -->
+      <div class="pt-2 border-t border-sand-200 space-y-3">
+        <!-- 6-Agent Swarm Deliberations Collapsible -->
+        <details class="group bg-sand-50 border border-sand-200 rounded-xl overflow-hidden text-xs">
+          <summary class="p-4 flex items-center justify-between cursor-pointer font-mono font-bold text-zinc-800 select-none hover:bg-sand-100 transition">
+            <span class="flex items-center gap-2">
+              <span class="text-zinc-500 font-normal">[+]</span>
+              <span>6-Agent Swarm Deliberations &amp; Risk Hypotheses</span>
+            </span>
+            <span class="text-[10px] font-normal text-zinc-500">6 SPECIALIZED ROLES</span>
+          </summary>
+          <div class="p-4 pt-0">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs mt-3" id="consensusGrid"></div>
+          </div>
+        </details>
+
+        <!-- Epistemic Robustness Verification Audit Trail Collapsible -->
+        <details class="group bg-sand-50 border border-sand-200 rounded-xl overflow-hidden text-xs">
+          <summary class="p-4 flex items-center justify-between cursor-pointer font-mono font-bold text-zinc-800 select-none hover:bg-sand-100 transition">
+            <span class="flex items-center gap-2">
+              <span class="text-zinc-500 font-normal">[+]</span>
+              <span>Epistemic Robustness Invariant Audit Trail</span>
+            </span>
+            <span class="text-[10px] font-normal text-zinc-500" id="resAuditStats">AUDITED: 5 CLAIMS</span>
+          </summary>
+          <div class="p-4 pt-0">
+            <div class="border border-sand-200 rounded-xl overflow-hidden divide-y divide-sand-100 bg-white mt-3" id="resAuditTable"></div>
+          </div>
+        </details>
+      </div>
+
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 5. WHY DOSSIER: THE PROBLEM WITH CONVENTIONAL AI            -->
+    <!-- ============================================================ -->
+    <section id="whySection" class="pt-12 border-t border-sand-200 space-y-8">
+      <div class="max-w-2xl space-y-2">
+        <div class="font-mono text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Design Philosophy</div>
+        <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950">
+          Why traditional LLMs hallucinate viable startups.
+        </h2>
+        <p class="text-sm text-zinc-600 leading-relaxed">
+          Standard frontier models are RLHF-tuned for agreeable sycophancy. When you ask them about an idea, they flatter your assumptions instead of stress-testing fatal operational hazards.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
+        <div class="p-5 bg-white border border-sand-200 rounded-xl space-y-3">
+          <div class="text-[10px] text-zinc-400 font-bold uppercase">Standard Frontier LLM</div>
+          <div class="font-sans font-bold text-zinc-950 text-sm">Sycophantic Validation</div>
+          <p class="font-sans text-xs text-zinc-600 leading-relaxed">
+            Praises every feature request, assumes linear market adoption, and quotes generic TAM numbers without verifying procurement or statutory friction.
+          </p>
+        </div>
+
+        <div class="p-5 bg-white border border-sand-200 rounded-xl space-y-3">
+          <div class="text-[10px] text-zinc-400 font-bold uppercase">Static Financial Models</div>
+          <div class="font-sans font-bold text-zinc-950 text-sm">Deterministic Illusions</div>
+          <p class="font-sans text-xs text-zinc-600 leading-relaxed">
+            Spreadsheets calculate uniform payback periods using static assumptions, ignoring tail churn events, CAC inflation, and insolvent downside distributions.
+          </p>
+        </div>
+
+        <div class="p-5 bg-sand-100 border border-sand-200 rounded-xl space-y-3">
+          <div class="text-[10px] text-zinc-800 font-bold uppercase">Dossier Adversarial Swarm</div>
+          <div class="font-sans font-bold text-zinc-950 text-sm">Empirical Invariance &amp; Proof</div>
+          <p class="font-sans text-xs text-zinc-600 leading-relaxed">
+            Deterministic Python sandbox Monte Carlo, Razorpay merchant demand grounding, Loot Drop failure traps, and Epistemic DAG verification with anti-sycophancy caps.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 6. 6-AGENT SWARM ARCHITECTURE                                -->
+    <!-- ============================================================ -->
+    <section id="architectureSection" class="pt-12 border-t border-sand-200 space-y-8">
+      <div class="max-w-2xl space-y-2">
+        <div class="font-mono text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Agent Specifications</div>
+        <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950">
+          Six specialized adversarial agents.
+        </h2>
+        <p class="text-sm text-zinc-600 leading-relaxed">
+          Each agent operates under a strict mathematical and operational charter, probing distinct failure vectors before reaching final consensus.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 font-mono text-xs">
+        <div class="p-4 bg-white border border-sand-200 rounded-xl space-y-2">
+          <div class="flex items-center justify-between text-zinc-500 text-[10px]">
+            <span>AGENT 00</span>
+            <span>SYNTHESIZER</span>
+          </div>
+          <div class="font-sans font-bold text-zinc-950 text-sm">Executive Synthesizer</div>
+          <p class="font-sans text-xs text-zinc-600 leading-relaxed">
+            Establishes domain priors, identifies procurement cycles, and synthesizes crossfire arguments into actionable strategic verdicts.
+          </p>
+        </div>
+
+        <div class="p-4 bg-white border border-sand-200 rounded-xl space-y-2">
+          <div class="flex items-center justify-between text-zinc-500 text-[10px]">
+            <span>AGENT 01</span>
+            <span>CONTRARIAN</span>
+          </div>
+          <div class="font-sans font-bold text-zinc-950 text-sm">The Skeptic (Red Team)</div>
+          <p class="font-sans text-xs text-zinc-600 leading-relaxed">
+            Probes existential distribution risks, enterprise sales deadlocks, incumbent bundling traps, and uncompensated tail risks.
+          </p>
+        </div>
+
+        <div class="p-4 bg-white border border-sand-200 rounded-xl space-y-2">
+          <div class="flex items-center justify-between text-zinc-500 text-[10px]">
+            <span>AGENT 02</span>
+            <span>ENGINEERING</span>
+          </div>
+          <div class="font-sans font-bold text-zinc-950 text-sm">Technical Architect</div>
+          <p class="font-sans text-xs text-zinc-600 leading-relaxed">
+            Analyzes latency, workflow integration, model inference costs, API dependency moats, and data residency constraints.
+          </p>
+        </div>
+
+        <div class="p-4 bg-white border border-sand-200 rounded-xl space-y-2">
+          <div class="flex items-center justify-between text-zinc-500 text-[10px]">
+            <span>AGENT 03</span>
+            <span>ORACLE &amp; RECON</span>
+          </div>
+          <div class="font-sans font-bold text-zinc-950 text-sm">Market Recon</div>
+          <p class="font-sans text-xs text-zinc-600 leading-relaxed">
+            Queries Polymarket betting volumes, live news headlines, developer traction signals, and competitor displacement friction.
+          </p>
+        </div>
+
+        <div class="p-4 bg-white border border-sand-200 rounded-xl space-y-2">
+          <div class="flex items-center justify-between text-zinc-500 text-[10px]">
+            <span>AGENT 04</span>
+            <span>REALITY CHECK</span>
+          </div>
+          <div class="font-sans font-bold text-zinc-950 text-sm">Customer Advocate</div>
+          <p class="font-sans text-xs text-zinc-600 leading-relaxed">
+            Matches propositions against real merchant problem catalogs (Razorpay Fix My Itch) and validates daily workflow switching friction.
+          </p>
+        </div>
+
+        <div class="p-4 bg-white border border-sand-200 rounded-xl space-y-2">
+          <div class="flex items-center justify-between text-zinc-500 text-[10px]">
+            <span>AGENT 05</span>
+            <span>VENTURE CAPITAL</span>
+          </div>
+          <div class="font-sans font-bold text-zinc-950 text-sm">Financial Analyst</div>
+          <p class="font-sans text-xs text-zinc-600 leading-relaxed">
+            Calibrates CAC payback bounds, gross margin thresholds, and verifies scores against isolated Python Monte Carlo output.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 7. DEVELOPER & MCP PROTOCOL INTEGRATION (DECOUPLED DRAWER)    -->
+    <!-- ============================================================ -->
+    <section id="mcpSection" class="pt-8 border-t border-sand-200">
+      <details class="group bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden font-mono text-xs">
+        <summary class="p-6 md:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none hover:bg-zinc-900 transition">
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2 text-accentGold text-[11px] font-bold uppercase tracking-wider">
+              <span>[+] DEVELOPER &amp; MCP PROTOCOL INTEGRATION</span>
+            </div>
+            <h3 class="text-xl font-extrabold text-white font-sans tracking-tight">
+              Connect Dossier Adversarial Swarm to Claude Desktop, Cursor, &amp; CLI
+            </h3>
+            <p class="text-zinc-400 font-sans text-xs max-w-2xl leading-relaxed">
+              Expose the 6-agent swarm, isolated Python Monte Carlo runner, and epistemic verification engine over standard MCP stdio JSON-RPC.
+            </p>
+          </div>
+          <span class="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 font-mono text-xs font-semibold shrink-0">
+            View Stdio JSON Config
+          </span>
+        </summary>
+
+        <div class="p-6 md:p-8 pt-0 space-y-5 border-t border-zinc-900">
+          
+          <!-- Tab Bar -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-b border-zinc-800 text-[11px]">
+            <div class="flex items-center gap-2">
+              <button onclick="setMcpTab('claude')" id="mcpTab-claude" class="px-3 py-1 rounded bg-zinc-800 text-white font-bold transition">
+                Claude Desktop
+              </button>
+              <button onclick="setMcpTab('cursor')" id="mcpTab-cursor" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
+                Cursor
+              </button>
+              <button onclick="setMcpTab('windsurf')" id="mcpTab-windsurf" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
+                Windsurf / Antigravity
+              </button>
+              <button onclick="setMcpTab('cli')" id="mcpTab-cli" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
+                CLI / Stdio
+              </button>
+            </div>
+
+            <button onclick="copyMcpCode()" class="flex items-center gap-1.5 px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-[11px] font-semibold transition cursor-pointer">
+              <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+              <span id="copyMcpText">Copy Config</span>
+            </button>
+          </div>
+
+          <!-- Code Content -->
+          <div class="overflow-x-auto text-zinc-300">
+            <pre id="mcpCodeBlock" class="leading-relaxed"><code>{
+  "mcpServers": {
+    "dossier": {
+      "command": "node",
+      "args": ["/home/sanjeev/projects/products/dossier/dist/mcp-server.js"]
+    }
+  }
+}</code></pre>
+          </div>
+
+          <!-- Exposed MCP Tools Summary Footer -->
+          <div class="p-4 bg-zinc-900/60 rounded-xl border border-zinc-800 text-[11px] text-zinc-400 flex flex-wrap gap-4 font-mono">
+            <div><span class="text-zinc-200 font-bold">evaluate_idea</span> — Full 6-agent swarm intelligence &amp; dossier synthesis</div>
+            <div><span class="text-zinc-200 font-bold">run_sandbox_economics</span> — Isolated Python3 deterministic unit economics</div>
+            <div><span class="text-zinc-200 font-bold">verify_claims_epistemics</span> — 7-tier epistemic hierarchy claim audit</div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 8. RECENT AUDITED DOSSIERS ARCHIVE                          -->
+    <!-- ============================================================ -->
+    <section id="archiveSection" class="pt-12 border-t border-sand-200 space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="font-mono text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Audit Trail</div>
+          <h2 class="text-2xl font-extrabold tracking-tight text-zinc-950">
+            Recent Verified Dossiers
+          </h2>
+        </div>
+      </div>
+
+      <!-- Dossier List -->
+      <div id="recentDossiersList" class="border border-sand-200 rounded-xl bg-white divide-y divide-sand-100 shadow-xs overflow-hidden">
+        <div class="p-4 text-xs font-mono text-zinc-400">Loading audit archive...</div>
+      </div>
+
+      <!-- Calibration Track Record (from /api/calibration) -->
+      <div id="calibrationCard" class="hidden border border-sand-200 rounded-xl bg-sand-50 p-4 space-y-3 font-mono text-xs shadow-2xs">
+        <div class="flex items-center justify-between">
+          <h3 class="font-mono text-xs font-bold text-zinc-900 uppercase tracking-wider">Calibration Track Record</h3>
+          <span id="calibrationBadge" class="text-[9px] font-mono px-2 py-0.5 rounded bg-sand-200 text-zinc-600">LIVE LEDGER</span>
+        </div>
+        <div id="calibrationTotals" class="grid grid-cols-3 gap-2 text-center"></div>
+        <div id="calibrationBrier" class="text-[11px] font-mono text-zinc-600"></div>
+        <div id="calibrationReliability" class="space-y-1.5"></div>
+        <div id="calibrationDomains" class="space-y-1"></div>
+        <p id="calibrationNote" class="text-[9px] text-zinc-400 font-mono leading-relaxed"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- 9. MINIMAL EDITORIAL FOOTER                                  -->
+  <!-- ============================================================ -->
+  <footer class="border-t border-sand-200/90 bg-white py-6">
+    <div class="max-w-7xl mx-auto px-6 md:px-12 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-zinc-500">
+      <div class="flex items-center gap-2.5">
+        <span class="font-bold text-zinc-950 tracking-tight">DOSSIER</span>
+        <span>•</span>
+        <span>Adversarial Idea Intelligence</span>
+      </div>
+
+      <div class="flex items-center gap-6">
+        <a href="https://github.com/sanjeevafk/dossier" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-900 transition flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-zinc-600" fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================ -->
+  <!-- 10. MODALS: API KEY CONFIGURATION (ZERO EMOJIS)              -->
+  <!-- ============================================================ -->
+  <div id="apiKeyModal" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-sand-200 shadow-xl max-w-sm w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-sand-200 pb-3">
+        <h3 class="font-bold text-sm text-zinc-950">Server API Key</h3>
+        <button onclick="closeApiKeyModal()" class="text-zinc-400 hover:text-zinc-800 font-mono text-sm cursor-pointer">✕</button>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed font-sans">
+        Stored only in your browser's localStorage. Required only when DOSSIER_API_KEY is enforced in production.
+      </p>
+      <form onsubmit="submitApiKey(event)" class="space-y-3 font-mono text-xs">
+        <input id="apiKeyInput" type="password" autocomplete="off" placeholder="Bearer key" class="w-full border border-sand-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-zinc-500">
+        <div class="flex gap-2">
+          <button type="submit" class="flex-1 py-2 bg-zinc-950 hover:bg-zinc-800 text-white font-bold rounded-lg cursor-pointer">Save Key</button>
+          <button type="button" onclick="clearApiKey()" class="px-3 py-2 bg-sand-100 hover:bg-sand-200 text-zinc-700 font-bold rounded-lg cursor-pointer">Clear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
