@@ -1,0 +1,15 @@
+[config]
+disable_auto_feedback = true
+handle_pr_actions = []
+
+[pr_reviewer]
+enable_review = false
+
+[pr_description]
+enable_auto_description = false
+
+[pr_questions]
+enable_auto_questions = false
+
+[pr_code_suggestions]
+enable_code_suggestions = false
