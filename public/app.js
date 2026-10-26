@@ -908,6 +908,12 @@ function exportDossierPdf() {
     alert("No active dossier report is loaded to export.");
     return;
   }
+
+  // Ensure all collapsible sections are open for printing
+  const detailsList = document.querySelectorAll('#resultsSection details');
+  detailsList.forEach(d => d.setAttribute('open', ''));
+
+  // Trigger print dialog
   window.print();
 }
 
@@ -1060,6 +1066,15 @@ async function loadDossierById(id) {
     alert("Failed to load dossier: " + err.message);
   }
 }
+
+// Auto-load dossier if URL specifies #dossier=<id> or #print=<id>
+window.addEventListener('DOMContentLoaded', async () => {
+  const hash = window.location.hash || '';
+  const match = hash.match(/#(?:dossier|print)=([^&]+)/);
+  if (match && match[1]) {
+    await loadDossierById(match[1]);
+  }
+});
 
 // ============================================================
 // 7. API KEY MODAL HELPERS & SECURITY
