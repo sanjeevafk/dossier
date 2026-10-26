@@ -45,15 +45,23 @@ test("Sandbox Economics Simulation runs successfully", async () => {
 
 test("Dossier Orchestrator evaluates idea and generates complete intelligence dossier", async () => {
   const orchestrator = new IdeaSwarmOrchestrator();
+  const events = [];
   const dossier = await orchestrator.evaluateIdea({
     title: "AI Compliance Auditor",
     summary: "Scans cloud infra for SOC2/HIPAA violations and creates remediation PRs.",
     targetAudience: "B2B SaaS CTOs",
     monetization: "$499/mo per company"
-  }, { useLiveLLM: false });
+  }, {
+    useLiveLLM: false,
+    onEvent: (e) => events.push(e)
+  });
 
   assert.ok(dossier.id, "Dossier must have an ID");
   assert.equal(dossier.evaluationMode, "HEURISTIC_ENGINE", "Offline evaluation must be labeled as heuristic engine");
+  assert.ok(dossier.decisionEvaluation, "Dossier must carry the fast decision model evaluation");
+  assert.ok(["BUILD", "REFINE", "KILL"].includes(dossier.decisionEvaluation.verdict), "Decision model must issue a valid verdict");
+  assert.ok(dossier.decisionEvaluation.answers.moat, "Decision model must have moat evaluation");
+  assert.ok(events.some((e) => e.type === "decision_gate"), "Orchestrator must emit a decision_gate event");
   assert.ok(dossier.killScore >= 0 && dossier.killScore <= 100, "Kill score must be between 0 and 100");
   assert.ok(dossier.roleAssessments.redteam, "Red Team assessment must be present");
   assert.ok(dossier.roleAssessments.investor, "Investor assessment must be present");
@@ -88,6 +96,8 @@ test("Dossier Orchestrator evaluates idea and generates complete intelligence do
     const t = op.telemetryMetadata || {};
     assert.equal(typeof t.latencyMs, "number", "Agent latency must be measured, not random");
     assert.ok(t.latencyMs >= 0 && t.latencyMs < 120000, "Agent latency must be plausible");
+    assert.ok(t.modelId, "Every agent opinion must pin the model/backend that produced it");
+    assert.equal(t.modelId, "deterministic-heuristics", "Heuristic-mode opinions must carry the deterministic-heuristics model id");
   }
   // Debate trail must cite the red team's actual fatal flaw, not a fixed narrative.
   const rtClash = dossier.debateTrail.find((c) => c.challenger === "redteam");
@@ -116,6 +126,18 @@ test("Dossier Orchestrator evaluates idea and generates complete intelligence do
   assert.ok(Array.isArray(dossier.claimDag) && dossier.claimDag.length > 0, "Claim DAG must be populated");
   const downstream = dossier.claimDag.find((n) => n.id === "EV-06");
   assert.ok(downstream && downstream.dependencies.includes("EV-01"), "Inference claim must depend on verified computation");
+
+  // Honest swarm-agreement signal (dissent-as-signal, replaces cosmetic confidence)
+  assert.ok(dossier.swarmDissent, "swarmDissent must be present");
+  const sd = dossier.swarmDissent;
+  const agentScores = ["analyst", "customer", "architect", "investor", "redteam", "expert"]
+    .map((r) => dossier.roleAssessments[r].score);
+  assert.equal(sd.scoreSpread, Math.max(...agentScores) - Math.min(...agentScores), "scoreSpread must equal real agent spread");
+  assert.equal(sd.killGradeAgents, agentScores.filter((s) => s < 40).length, "killGradeAgents must count real kill-grade scores");
+  assert.equal(sd.avgAgentScore, Math.round(agentScores.reduce((a, b) => a + b, 0) / agentScores.length), "avgAgentScore must be the real mean");
+  assert.equal(typeof sd.verdictContested, "boolean");
+  assert.equal(sd.verdictContested, sd.killGradeAgents >= 2 && dossier.killScore >= 50, "verdictContested must follow its definition");
+  assert.ok(dossier.confidenceScore >= 25 && dossier.confidenceScore <= 92, "Agreement score must stay in the honest band");
 
   // Phase 2: crossfire round 2 with tool traces
   if (dossier.debateRoundsExecuted === 2) {

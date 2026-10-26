@@ -1,17 +1,17 @@
 # Dossier
 
-[![Live Service](https://img.shields.io/badge/Azure%20App%20Service-dossier--ai-0078D4?logo=microsoftazure&logoColor=white)](https://dossier-ai.azurewebsites.net)
-[![Health Check](https://img.shields.io/badge/Health-200%20OK-brightgreen)](https://dossier-ai.azurewebsites.net/health)
-[![UptimeRobot](https://img.shields.io/badge/UptimeRobot-Monitored-blue)](https://dossier-ai.azurewebsites.net/health)
+[![Live Service](https://img.shields.io/badge/Production-dossier.sanjeevkumar.me-0078D4?logo=cloudflare&logoColor=white)](https://dossier.sanjeevkumar.me)
+[![Health Check](https://img.shields.io/badge/Health-200%20OK-brightgreen)](https://dossier.sanjeevkumar.me/health)
+[![UptimeRobot](https://img.shields.io/badge/UptimeRobot-Monitored-blue)](https://dossier.sanjeevkumar.me/health)
 
 Adversarial multi-agent platform that stress-tests startup ideas, product features, and technical proposals before capital or engineering effort is spent.
 
 ---
 
 ## 🚀 Live Deployment
-- **Web Dashboard:** [https://dossier-ai.azurewebsites.net](https://dossier-ai.azurewebsites.net)
-- **Health Check:** [https://dossier-ai.azurewebsites.net/health](https://dossier-ai.azurewebsites.net/health)
-- **Hosting Tier:** Azure App Service (`B1` Basic, Central India — co-hosted with SwaraSetu at zero marginal cost)
+- **Web Dashboard:** [https://dossier.sanjeevkumar.me](https://dossier.sanjeevkumar.me) (Backup: [https://dossier-ai.azurewebsites.net](https://dossier-ai.azurewebsites.net))
+- **Health Check:** [https://dossier.sanjeevkumar.me/health](https://dossier.sanjeevkumar.me/health)
+- **Hosting Tier:** Azure App Service (`B1` Basic, Central India) with Cloudflare Edge SSL
 - **Keep-Alive:** Continuous 300s synthetic health polling via UptimeRobot
 
 ---
@@ -78,6 +78,41 @@ Dossier stress-tests startup concepts, product features, and technical proposals
 - **Tool Protocol:** Leverages Model Context Protocol (MCP) for market intelligence and competitor discovery.
 - **Sandboxed Execution:** Executes financial modeling and compute cost calculations inside an isolated Python subprocess.
 - **Human Approval Checkpoints:** Pauses turn execution before external outreach (cold validation emails, landing page deployment) until approved by an operator.
+
+---
+
+## 🔍 Intelligence Sources & Capabilities
+
+Dossier grounds every evaluation in empirical data and live market telemetry across three distinct layers:
+
+| Layer | Source / Provider | Scope & Role | Setup Required |
+|:---|:---|:---|:---|
+| **Community Sentiment** | **Hacker News (Algolia API)** | Real developer discussions, Show HN launches, negative sentiment threads | Zero-config (Open API) |
+| **Neural Web Recon** | **Exa AI (`api.exa.ai`)** | Real-time web search, competitor analysis, indexed Twitter/X tech updates | `EXA_API_KEY` in `.env` |
+| **Prediction Odds** | **Polymarket (Gamma API)** | Live real-money betting odds and macro sentiment trends | Zero-config (Public API) |
+| **Web Fallback** | **DuckDuckGo HTML Recon** | Free-form competitor search and live URL discovery | Zero-config |
+| **Social Updates** | **Twitter / X Bridge** | Curated tech handle timelines (`@sama`, `@ycombinator`, etc.) and feeds | Local `twitter` CLI or X API Bearer Token |
+| **Outside View Priors** | **Census BFS, PitchBook, Stanford AI Index, HBS, CB Insights** | 16 empirical reference classes with 24-month survival ranges and root failure causes | Built-in (Deterministic data table) |
+| **Unit Economics** | **NumPy Vectorized Sandbox** | 10,000-run Monte Carlo simulation for cash runway, LTV/CAC, and payback percentiles | Python 3 + `numpy` (built-in) |
+
+---
+
+## ⚠️ Limitations & Honesty Contract
+
+Dossier enforces a strict zero-hallucination contract across all subagents:
+
+1. **Zero-Fabrication Fallback**:
+   - If an external intelligence source (Exa, Polymarket, Twitter) is unconfigured, unreachable, or rate-limited, Dossier **never fabricates plausible-sounding discussions or URLs**.
+   - It explicitly returns `discussions: []`, marks `provider: "none"`, and surfaces the absence to the reviewer rather than inventing synthetic citations.
+2. **Twitter/X Platform Constraints**:
+   - Cookie-based Twitter scraping is fragile due to frequent upstream GraphQL endpoint rotations.
+   - For real-time Twitter/X sentiment, Dossier relies on **Exa neural search** (which indexes X posts cleanly over HTTP without cookie overhead). Self-hosters can optionally connect official X API access via `TWITTER_BEARER_TOKEN`.
+3. **Prediction Market Specificity**:
+   - Polymarket odds only exist for broad macro or public-market events. Specific niche B2B tools or early-stage ideas will have zero liquid prediction markets; Dossier explicitly reports zero markets rather than forcing loose fuzzy matches.
+4. **Reference-Class Guidance**:
+   - Outside-view base rates (e.g. 21% 24-month survival for B2B Enterprise SaaS) represent industry-wide historical distributions, not individual company verdicts. They counteract subjective founder optimism, but do not replace user interviews.
+5. **Human Approval Gates**:
+   - Dossier will never auto-dispatch external outreach, landing pages, or cold emails without explicit operator sign-off via its Dual-Key Approval Gates.
 
 ---
 

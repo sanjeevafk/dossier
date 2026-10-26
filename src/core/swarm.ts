@@ -27,13 +27,18 @@ import {
   SwarmEvent,
   IdeaDomainArchetype,
   SandboxStressStats,
-  Contradiction as ContradictionEntry
+  Contradiction as ContradictionEntry,
+  SwarmDissent,
+  DecisionModelOutput
 } from "../types/index.js";
 import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
 import { EpistemicRobustVerifier } from "./verifier.js";
 import { buildMutationProposals } from "./mutator.js";
 import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
+import { buildOutsideViewPanel } from "./outside-view.js";
+import { runDecisionModel } from "../tools/decision-runner.js";
+import { forecastLedger } from "../services/ledger.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryUnifiedPredictionMarkets } from "../tools/markets/index.js";
@@ -261,7 +266,8 @@ Market & Prediction Signals: ${marketContext}`;
           rationale: parsed.rationale || `Evaluated through ${domain.archetypeLabel} domain lens.`,
           telemetryMetadata: {
             latencyMs: turnLatencyMs,
-            threatSeverity: score < 50 ? "HIGH" : "MODERATE"
+            threatSeverity: score < 50 ? "HIGH" : "MODERATE",
+            modelId: getLLMStatus().activeModel || "live-llm"
           }
         }
       };
@@ -762,6 +768,12 @@ Market & Prediction Signals: ${marketContext}`;
     notify("01 CLASSIFY", `Classified concept as [${domain.archetypeLabel}] — Target: ${domain.primaryCustomer}`);
     emit({ type: "domain", domain });
 
+    const decisionEvaluation = await runDecisionModel(idea);
+    emit({ type: "decision_gate", evaluation: decisionEvaluation });
+    if (decisionEvaluation.fatal_flags.length > 0) {
+      notify("01 GATED", `Decision Model flagged fatal gate(s): ${decisionEvaluation.fatal_flags.join(", ")}`);
+    }
+
     // 02 DECOMPOSE & RECON
     notify("02 DECOMPOSE", `Decomposing variables under ${domain.procurementCycle} framework...`);
     emit({ type: "stage", stage: "02 DECOMPOSE", detail: `Decomposing variables under ${domain.procurementCycle} framework...`, timestamp: new Date().toISOString() });
@@ -946,7 +958,8 @@ Market & Prediction Signals: ${marketContext}`;
         }
         opinion.telemetryMetadata = {
           latencyMs: Date.now() - roleStart,
-          threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE"
+          threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE",
+          modelId: evaluationMode === "LIVE_LLM" ? (getLLMStatus().activeModel || "live-llm") : "deterministic-heuristics"
         };
         emit({
           type: "agent_opinion",
@@ -1689,6 +1702,7 @@ Market & Prediction Signals: ${marketContext}`;
       mustTestBeforeBuilding: [cheapestValidationExperiment.title],
       rationale: `Swarm consensus for [${domain.archetypeLabel}]: Concept has strong technical grounding (${technicalFeasibility}/100) and regulatory fit (${defensibilityAndMoat}/100), but must resolve commercial procurement and habit inertia (${demandAndAdoption}/100) before committing full MVP engineering.`,
       telemetryMetadata: {
+        modelId: evaluationMode === "LIVE_LLM" ? (getLLMStatus().activeModel || "live-llm") : "deterministic-heuristics",
         latencyMs: Date.now() - synthesisStart,
         claimsVerified: evidenceFeed.length,
         threatSeverity: riskLevel
@@ -1739,6 +1753,14 @@ Market & Prediction Signals: ${marketContext}`;
       ...graveyardMatches.map(g => ({ title: `[Loot Drop Graveyard] ${g.companyName} (${g.burnedCapitalUsd} burned): ${g.fatalFlaw.slice(0, 80)}`, url: g.sourceUrl, provider: "loot-drop-graveyard" }))
     ];
 
+    const outsideView = buildOutsideViewPanel(idea, compositeScore);
+    const swarmDissent: SwarmDissent = {
+      scoreSpread: Math.max(...agentScores) - Math.min(...agentScores),
+      killGradeAgents: agentScores.filter(s => s < 40).length,
+      avgAgentScore: Math.round(agentScores.reduce((a, b) => a + b, 0) / agentScores.length),
+      verdictContested: agentScores.filter(s => s < 40).length >= 2 && compositeScore >= 50
+    };
+
     const dossier: IdeaDossier = {
       id: `DOSSIER-${Date.now().toString().slice(-6)}`,
       dossierCode: `DOS-${domain.archetype.toUpperCase().slice(0, 3)}`,
@@ -1749,12 +1771,16 @@ Market & Prediction Signals: ${marketContext}`;
       fatalsResolved: fatalUntestedCount === 0,
       costUsd: evaluationMode === "LIVE_LLM" ? 0.3 : 0.0,
       externalEvidenceSources,
+      identifiedCompetitors: marketResearch.identifiedCompetitors,
       idea,
       domainClassification: domain,
       epistemicSummary,
       verificationAudit: audit,
       killScore: compositeScore,
       confidenceScore,
+      swarmDissent,
+      outsideView,
+      decisionEvaluation,
       overallVerdict,
       riskLevel,
       executiveSummary: executiveSynthesizerOpinion.rationale,
@@ -1845,6 +1871,15 @@ Market & Prediction Signals: ${marketContext}`;
       });
       dossier.mutationProposals = mutationProposals;
       emit({ type: "mutation_proposals", proposals: mutationProposals });
+    }
+
+    // Calibration ledger: persist dated falsifiable forecasts (kill conditions,
+    // weakest assumption, validation experiment) into the forecast registry.
+    try {
+      const forecasts = await forecastLedger.persistDossierForecasts(dossier);
+      dossier.forecastIds = forecasts.map((f) => f.id);
+    } catch {
+      // non-blocking
     }
 
     // Persist dossier asynchronously for historical retrieval and export

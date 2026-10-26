@@ -43,6 +43,11 @@ dist/
 .next/
 out/
 
+# Models & large checkpoints
+models/
+*.safetensors
+*.onnx
+
 # Local evaluation runs & generated dossiers
 reports/
 scripts/evaluate_*.ts
@@ -50,7 +55,7 @@ docs/local/
 local/
 local
 
-# TrueForge / Runtime Local State
+# Runtime Local State
 *.db
 *.sqlite
 *.sqlite3
@@ -68,3 +73,4 @@ logs/
 .DS_Store
 Thumbs.db
 BLOG_POST_LOCAL.md
+package-lock.json

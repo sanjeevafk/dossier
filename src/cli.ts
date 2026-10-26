@@ -15,12 +15,13 @@ import { dossierStorage } from "./services/storage.js";
 import { getLLMStatus } from "./services/llm.js";
 import { runStressTestSuite } from "./stress-test.js";
 import { runEconomicsSimulation } from "./tools/sandbox.js";
+import { forecastLedger, ForecastRecord } from "./services/ledger.js";
 
 const program = new Command();
 
 program
   .name("dossier")
-  .description("Domain-Aware Adversarial Multi-Agent Idea Intelligence Platform on TrueForge harness")
+  .description("Domain-Aware Adversarial Multi-Agent Idea Intelligence Platform")
   .version("0.2.0");
 
 program
@@ -39,7 +40,7 @@ program
     if (!options.json) {
       console.log(pc.cyan("\n======================================================="));
       console.log(pc.bold(pc.yellow("  ⚡ DOSSIER — EVIDENCE-FIRST ADVERSARIAL SWARM")));
-      console.log(pc.dim("  TrueForge Harness (File TF-007) • Zero Sycophancy"));
+      console.log(pc.dim("  Dossier Swarm Runtime (File TF-007) • Zero Sycophancy"));
       console.log(pc.cyan("=======================================================\n"));
     }
 
@@ -62,6 +63,7 @@ program
     const dossier = await orchestrator.evaluateIdea(ideaInput, {
       pricingMonthlyUsd: parseFloat(options.pricing),
       estimatedCacUsd: parseFloat(options.cac),
+      useLiveLLM: !options.offline,
       onProgress: options.json ? undefined : (stage, detail) => {
         console.log(`[${pc.magenta(stage)}] ${detail}`);
       }
@@ -84,8 +86,36 @@ program
     console.log(pc.bold(pc.cyan("📊 SWARM VERDICT & RESILIENCE BREAKDOWN:")));
     const verdictColor = dossier.overallVerdict === "BUILD" ? pc.green : (dossier.overallVerdict === "BUILD_IF_VALIDATED" ? pc.green : (dossier.overallVerdict === "REFINE" ? pc.yellow : pc.red));
     console.log(`  Overall Verdict    : ${verdictColor(pc.bold(dossier.overallVerdict))}`);
-    console.log(`  Composite Resilience: ${verdictColor(pc.bold(`${dossier.killScore}/100`))} (Confidence: ${dossier.confidenceScore}%, Risk: ${dossier.riskLevel === "LOW" ? pc.green(dossier.riskLevel) : pc.yellow(dossier.riskLevel)})`);
-    
+    console.log(`  Composite Resilience: ${verdictColor(pc.bold(`${dossier.killScore}/100`))} (Swarm Agreement: ${dossier.confidenceScore}%, Risk: ${dossier.riskLevel === "LOW" ? pc.green(dossier.riskLevel) : pc.yellow(dossier.riskLevel)})`);
+
+    if (dossier.swarmDissent) {
+      const sd = dossier.swarmDissent;
+      console.log(`  Swarm Dissent      : spread ${sd.scoreSpread}pts | kill-grade agents ${sd.killGradeAgents}/6 | avg score ${sd.avgAgentScore}/100`);
+      if (sd.verdictContested) {
+        console.log(pc.yellow(`  ⚠️  Verdict Contested: ${sd.killGradeAgents} agents issue kill-grade scores while the composite clears 50 — human judgment required.`));
+      }
+    }
+
+    if (dossier.outsideView) {
+      const ov = dossier.outsideView;
+      const classes = ov.matchedClasses.map((c: { label: string; survival24moLow: number; survival24moHigh: number }) => `${c.label} (${Math.round(c.survival24moLow * 100)}–${Math.round(c.survival24moHigh * 100)}%)`).join(" + ");
+      console.log(pc.bold(pc.magenta("  🔭 Outside View    : ") + `${classes}`));
+      console.log(`     Swarm implies ${Math.round(ov.impliedSurvival * 100)}% survival vs base midpoint ${Math.round(ov.baseSurvivalMidpoint * 100)}% → optimism delta ${ov.optimismDelta >= 0 ? "+" : ""}${Math.round(ov.optimismDelta * 100)}pts`);
+      console.log(pc.dim(`     ${ov.guidance}`));
+      console.log(pc.dim(`     Dominant class failure causes: ${ov.topFailureCauses.join("; ")}`));
+    }
+
+    if (dossier.decisionEvaluation) {
+      const de = dossier.decisionEvaluation;
+      const deColor = de.verdict === "BUILD" ? pc.green : (de.verdict === "REFINE" ? pc.yellow : pc.red);
+      console.log(pc.bold(pc.blue("  ⚡ Fast Gatekeeper : ")) + deColor(pc.bold(de.verdict)) + pc.dim(` (${de.engine || "Julia-1"}, ${de.runtimeMs ?? 25}ms, Loss Ratio ${de.loss_ratio}x)`));
+      console.log(`     Moat: P(wrap)=${de.answers.moat.probabilities.thin_wrapper} [${de.answers.moat.flagged ? pc.red("FLAGGED") : pc.green("OK")}] | Reg: P(fatal)=${de.answers.regulatory_risk.probabilities.regulatory_fatal} [${de.answers.regulatory_risk.flagged ? pc.red("FLAGGED") : pc.green("OK")}]`);
+      console.log(`     Sales: P(deadlock)=${de.answers.sales_cycle.probabilities.procurement_deadlock} [${de.answers.sales_cycle.flagged ? pc.yellow("FLAGGED") : pc.green("OK")}] | Mon: P(zero)=${de.answers.monetization.probabilities.monetization_zero} [${de.answers.monetization.flagged ? pc.red("FLAGGED") : pc.green("OK")}]`);
+      if (de.fatal_flags.length > 0) {
+        console.log(pc.red(`     ⚠️  FATAL GATE TRIGGERED: ${de.fatal_flags.join("; ")}`));
+      }
+    }
+
     if (dossier.epistemicSummary) {
       const es = dossier.epistemicSummary;
       console.log(`  Epistemic Balance  : ${pc.cyan(`${es.verifiedFactsCount} Facts`)} | ${pc.green(`${es.verifiedComputationsCount} Computations`)} | ${pc.magenta(`${es.externalEvidenceCount} External Evidence`)} | ${pc.yellow(`${es.modelledAssumptionsCount} Hypotheses`)} | ${pc.blue(`${es.inferencesCount} Inferences`)} | ${pc.red(`${es.unknownsCount} Unknowns`)} | ${pc.red(`${es.contradictionsCount} Contradictions`)}`);
@@ -209,7 +239,7 @@ program
     console.log(`  • Sandbox Proof  : ${pc.dim(dossier.simulation.sandboxExecutionProof.runtime)} (exit ${dossier.simulation.sandboxExecutionProof.exitCode})`);
 
     // Human Approval Gates
-    console.log(pc.bold("\n🛑 HUMAN-IN-THE-LOOP APPROVAL GATES (TrueForge Dual-Key Safety):"));
+    console.log(pc.bold("\n🛑 HUMAN-IN-THE-LOOP APPROVAL GATES (Dual-Key Safety):"));
     for (const gate of dossier.approvalGates) {
       console.log(`  • [${pc.yellow(gate.status)}] ${gate.summary}`);
       console.log(`    Action Type: ${gate.actionType}`);
@@ -321,6 +351,71 @@ program
     console.log(pc.bold(pc.yellow("\n🔥 EXECUTING DOSSIER 5-INVARIANT ADVERSARIAL STRESS TEST SUITE...\n")));
     await runStressTestSuite();
     console.log(pc.green("\n✔ Stress test execution completed.\n"));
+  });
+
+program
+  .command("forecast-list")
+  .description("List calibration-ledger forecasts (the dated falsifiable claims behind verdicts)")
+  .option("-s, --status <status>", "Filter by status: PENDING | HIT | MISS")
+  .option("-l, --limit <number>", "Max records to show", "30")
+  .action(async (options) => {
+    const status = options.status ? String(options.status).toUpperCase() as ForecastRecord["status"] : undefined;
+    const forecasts = await forecastLedger.listForecasts(parseInt(options.limit, 10) || 30, status);
+    console.log(pc.bold(pc.cyan(`\n📆 FORECAST LEDGER (${status || "ALL"}):\n`)));
+    if (forecasts.length === 0) {
+      console.log(pc.dim("  No forecasts yet. Run 'dossier evaluate' to register some.\n"));
+      return;
+    }
+    for (const f of forecasts) {
+      const color = f.status === "PENDING" ? pc.yellow : f.status === "HIT" ? pc.green : pc.red;
+      console.log(`  ${color(f.status.padEnd(7))} ${pc.cyan(f.id)}  due ${f.dueDate.slice(0, 10)}  P=${(f.probability * 100).toFixed(0)}%  ${pc.dim(f.kind)}`);
+      console.log(`    ${pc.dim(`[${f.domainArchetype}${f.modelId ? ` · ${f.modelId}` : ""}]`)} ${f.statement.slice(0, 110)}`);
+    }
+    console.log();
+  });
+
+program
+  .command("forecast-resolve <forecastId> <outcome>")
+  .description("Resolve a forecast: outcome is HIT (event happened) or MISS (it did not)")
+  .option("-n, --notes <notes>", "Resolution notes (how you observed the outcome)")
+  .action(async (forecastId, outcome, options) => {
+    const normalized = String(outcome).toUpperCase();
+    if (normalized !== "HIT" && normalized !== "MISS") {
+      console.error(pc.red("Outcome must be HIT or MISS."));
+      process.exit(1);
+    }
+    const record = await forecastLedger.resolveForecast(forecastId, normalized as "HIT" | "MISS", options.notes);
+    if (!record) {
+      console.error(pc.red(`Forecast '${forecastId}' not found or already resolved.`));
+      process.exit(1);
+    }
+    console.log(pc.green(`✔ Forecast ${forecastId} resolved as ${normalized}. Run 'dossier forecast-score' to update calibration.`));
+  });
+
+program
+  .command("forecast-score")
+  .description("Brier-score resolved forecasts (overall, by domain, by model, calibration bins)")
+  .action(async () => {
+    const score = await forecastLedger.scoreForecasts();
+    console.log(pc.bold(pc.cyan("\n🎯 FORECAST CALIBRATION (Brier — lower is better, 0.25 = coin flip):\n")));
+    if (score.resolvedCount === 0) {
+      console.log(pc.dim(`  No resolved forecasts yet (${score.pendingCount} pending). Resolve some with 'dossier forecast-resolve'.\n`));
+      return;
+    }
+    console.log(`  Overall Brier  : ${pc.bold(String(score.overallBrier))} over ${score.resolvedCount} resolved forecasts`);
+    for (const [domain, b] of Object.entries(score.byDomain)) {
+      console.log(`  • ${domain.padEnd(42)} ${b}`);
+    }
+    for (const [model, b] of Object.entries(score.byModel)) {
+      console.log(`  • model ${String(model).padEnd(36)} ${b}`);
+    }
+    console.log(pc.dim("  Calibration bins (P band → observed hit rate):"));
+    for (const bin of score.calibrationBins) {
+      if (bin.count > 0) {
+        console.log(`    ${bin.bin.padEnd(8)} n=${String(bin.count).padEnd(4)} meanP=${bin.meanProbability} hitRate=${bin.hitRate}%`);
+      }
+    }
+    console.log();
   });
 
 program.parse(process.argv);

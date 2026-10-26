@@ -1,15 +1,8 @@
 import { performLiveWebRecon, ReconSourceResult } from "./recon.js";
 import { queryCommunitySentiment, CommunityDiscussion } from "./community.js";
 import { rerank } from "./rerank.js";
+import { MarketCompetitor } from "../types/index.js";
 import nlp from "compromise";
-
-export interface MarketCompetitor {
-  name: string;
-  url?: string;
-  category: "direct" | "indirect" | "incumbent";
-  strengths: string;
-  vulnerability: string;
-}
 
 export interface ResearchFindings {
   query: string;
