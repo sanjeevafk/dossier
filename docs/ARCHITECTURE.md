@@ -52,9 +52,9 @@ A core innovation in Dossier is the **Contradiction Surface**. In typical AI arc
 
 ---
 
-## 4. Stanford CS329A Robust Verifier & Test-Time Self-Correction (`src/core/verifier.ts`)
+## 4. Epistemic Robust Verifier & Test-Time Self-Correction (`src/core/verifier.ts`)
 
-Inspired by **Stanford University's CS329A (Self-Improving AI Agents)** and **Azalia Mirhoseini's *LLM-as-a-Verifier*** research, Dossier implements an autonomous **Robust Verification Gate** before synthesizing any dossier:
+Dossier implements an autonomous, deterministic **Epistemic Robust Verification Gate** before synthesizing any dossier:
 
 1. **Mathematical Invariance Check:** Verifies that agent financial scores match Python3 isolated sandbox simulation metrics (LTV/CAC, payback, token burn).
 2. **Anti-Sycophancy Gate:** Cites empirical field evidence before permitting scores $\ge 90/100$, preventing uncalibrated AI optimism.

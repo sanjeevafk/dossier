@@ -256,7 +256,7 @@ export interface VerificationAuditItem {
 }
 
 export interface VerificationAudit {
-  verifierProtocol: "STANFORD_CS329A_ROBUST_VERIFIER";
+  verifierProtocol: "EPISTEMIC_ROBUST_VERIFIER" | "STANFORD_CS329A_ROBUST_VERIFIER";
   totalClaimsAudited: number;
   hallucinationsBlocked: number;
   testTimeSelfCorrections: number;

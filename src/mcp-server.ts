@@ -8,7 +8,7 @@ import {
   McpError
 } from "@modelcontextprotocol/sdk/types.js";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
-import { StanfordRobustVerifier } from "./core/verifier.js";
+import { EpistemicRobustVerifier } from "./core/verifier.js";
 import { runEconomicsSimulation } from "./tools/sandbox.js";
 import { runStressTestSuite } from "./stress-test.js";
 import { dossierStorage } from "./services/storage.js";
@@ -16,12 +16,12 @@ import { IdeaInput, AgentOpinion, DebateChallenge, ApprovalAction, EvidenceItem 
 
 /**
  * Dossier Model Context Protocol (MCP) Server
- * Exposes Dossier's adversarial multi-agent swarm, Stanford CS329A epistemic verification,
+ * Exposes Dossier's adversarial multi-agent swarm, epistemic verification,
  * Python unit economics sandbox, and stress testing capabilities to any AI agent harness.
  */
 class DossierMCPServer {
   private server: Server;
-  private verifier: StanfordRobustVerifier;
+  private verifier: EpistemicRobustVerifier;
 
   constructor() {
     this.server = new Server(
@@ -36,7 +36,7 @@ class DossierMCPServer {
       }
     );
 
-    this.verifier = new StanfordRobustVerifier();
+    this.verifier = new EpistemicRobustVerifier();
 
     this.setupHandlers();
     this.setupErrorHandling();
@@ -61,7 +61,7 @@ class DossierMCPServer {
           {
             name: "evaluate_idea",
             description:
-              "Evaluates a startup concept, product feature, or technical proposal using a 6-agent domain-aware adversarial swarm. Performs Stanford CS329A epistemic verification, isolated Python unit economics simulation, multi-round Red Team debate, and outputs actionable kill conditions and human approval checkpoints.",
+              "Evaluates a startup concept, product feature, or technical proposal using a 6-agent domain-aware adversarial swarm. Performs epistemic robustness verification, isolated Python unit economics simulation, multi-round Red Team debate, and outputs actionable kill conditions and human approval checkpoints.",
             inputSchema: {
               type: "object",
               properties: {
@@ -145,7 +145,7 @@ class DossierMCPServer {
           {
             name: "verify_claims_epistemics",
             description:
-              "Audits an array of factual or technical claims against Stanford CS329A Epistemic Verification standards. Classifies each claim into 7 distinct evidence states (VERIFIED_FACT, VERIFIED_COMPUTATION, EXTERNAL_EVIDENCE, MODELLED_ASSUMPTION, INFERENCE, UNKNOWN, CONTRADICTED).",
+              "Audits an array of factual or technical claims against Epistemic Verification standards. Classifies each claim into 7 distinct evidence states (VERIFIED_FACT, VERIFIED_COMPUTATION, EXTERNAL_EVIDENCE, MODELLED_ASSUMPTION, INFERENCE, UNKNOWN, CONTRADICTED).",
             inputSchema: {
               type: "object",
               properties: {
@@ -398,7 +398,7 @@ class DossierMCPServer {
                     {
                       totalClaimsAudited: audited.length,
                       claims: audited,
-                      ruleNote: "Per Stanford CS329A: Unvalidated assumptions and model agreements can never be labelled VERIFIED."
+                      ruleNote: "Epistemic Hierarchy: Unvalidated assumptions and model agreements can never be labelled VERIFIED."
                     },
                     null,
                     2

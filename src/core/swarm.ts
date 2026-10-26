@@ -31,7 +31,7 @@ import {
 } from "../types/index.js";
 import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
-import { StanfordRobustVerifier } from "./verifier.js";
+import { EpistemicRobustVerifier } from "./verifier.js";
 import { buildMutationProposals } from "./mutator.js";
 import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
@@ -990,8 +990,8 @@ Market & Prediction Signals: ${marketContext}`;
       emit({ type: "crossfire_clash", challenger: clash.challenger, target: clash.target, challengePoint: clash.challengePoint, rebuttal: clash.rebuttal || "", status: clash.status });
     }
 
-    // 05 VERIFY (Sandboxed Python Subprocess & Stanford CS329A Robust Verifier)
-    notify("05 VERIFY", "Verifying sandboxed Python metrics & executing Stanford CS329A Robust Verifier...");
+    // 05 VERIFY (Sandboxed Python Subprocess & Epistemic Robust Verifier)
+    notify("05 VERIFY", "Verifying sandboxed Python metrics & executing Epistemic Robust Verifier...");
 
     // External evidence items are included ONLY when real sources were actually
     // retrieved. When nothing was retrieved, an explicit UNKNOWN item records
@@ -1269,7 +1269,7 @@ Market & Prediction Signals: ${marketContext}`;
       }
     ];
 
-    const verifier = new StanfordRobustVerifier();
+    const verifier = new EpistemicRobustVerifier();
     const { verifiedOpinions, audit, claimDag } = verifier.verifySwarmOpinions(
       idea,
       domain,
@@ -1299,10 +1299,10 @@ Market & Prediction Signals: ${marketContext}`;
     );
 
     if (audit.testTimeSelfCorrections > 0) {
-      notify("05 VERIFY [SELF-CORRECTION]", `Stanford CS329A Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`);
+      notify("05 VERIFY [SELF-CORRECTION]", `Epistemic Robust Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`);
       emit({
         type: "audit_correction",
-        detail: `Stanford CS329A Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`,
+        detail: `Epistemic Robust Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`,
         hallucinationsBlocked: audit.hallucinationsBlocked
       });
     }

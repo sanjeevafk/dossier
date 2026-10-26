@@ -4,7 +4,7 @@
     "dossier": {
       "command": "node",
       "args": ["dist/mcp-server.js"],
-      "description": "Dossier Adversarial Multi-Agent Idea Intelligence & Stanford CS329A Epistemic Verification Engine"
+      "description": "Dossier Adversarial Multi-Agent Idea Intelligence & Epistemic Robust Verification Engine"
     },
     "agent-reach": {
       "command": "agent-reach",

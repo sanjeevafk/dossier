@@ -419,7 +419,7 @@ export class DossierStorageService {
 
     return `# ⚡ DOSSIER REPORT: ${d.idea.title.toUpperCase()}
 > **Dossier Code:** \`${d.dossierCode}\` | **ID:** \`${d.id}\` | **Date:** \`${d.timestamp.slice(0, 10)}\`  
-> **Status:** \`COMPILED\` | **Harness:** \`TrueForge (File TF-007)\` | **Protocol:** \`Stanford CS329A\`
+> **Status:** \`COMPILED\` | **Harness:** \`TrueForge (File TF-007)\` | **Protocol:** \`Epistemic Robust Verifier\`
 
 ---
 

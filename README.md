@@ -145,10 +145,10 @@ Add Dossier to your Claude Desktop config (`claude_desktop_config.json`) or harn
 ```
 
 #### Exposed MCP Tools:
-- **`evaluate_idea`**: Deploys the 6-agent domain swarm, runs Stanford CS329A epistemic verification, isolated Python unit economics simulation, and compiles full intelligence dossiers.
+- **`evaluate_idea`**: Deploys the 6-agent domain swarm, runs epistemic robustness verification, isolated Python unit economics simulation, and compiles full intelligence dossiers.
 - **`stress_test_concept`**: Evaluates prompt injection defense, impossible physics detection, and sandbox isolation.
 - **`run_sandbox_economics`**: Executes isolated Python 3 subprocesses to deterministically compute LTV, CAC, and payback bounds.
-- **`verify_claims_epistemics`**: Classifies claims into the 7 Stanford epistemic states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
+- **`verify_claims_epistemics`**: Classifies claims into the 7 epistemic states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
 
 ### 2. Installing the Agent Skill
 

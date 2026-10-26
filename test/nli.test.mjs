@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { contradictionScore, getNli } from "../dist/tools/nli.js";
 import { extractCompetitors } from "../dist/tools/search.js";
-import { StanfordRobustVerifier } from "../dist/core/verifier.js";
+import { EpistemicRobustVerifier } from "../dist/core/verifier.js";
 
 test("NLI returns null offline so tiers stay unchanged", async () => {
   const nli = await getNli();
@@ -12,7 +12,7 @@ test("NLI returns null offline so tiers stay unchanged", async () => {
 });
 
 test("NLI demote pass is a no-op without cited external evidence", async () => {
-  const verifier = new StanfordRobustVerifier();
+  const verifier = new EpistemicRobustVerifier();
   const feed = [
     { id: "EV-01", claim: "math holds", tier: "VERIFIED_COMPUTATION", claimType: "VERIFIED_COMPUTATION", provenance: "sandbox", indicator: "SUPPORTING", confidencePercent: 99 }
   ];

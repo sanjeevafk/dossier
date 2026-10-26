@@ -39,7 +39,7 @@ function tierToClaimStatus(tier: EvidenceItem["tier"]): ClaimStatus {
 }
 
 /**
- * Stanford CS329A: Robust Verification & Test-Time Self-Correction Engine
+ * Epistemic Robust Verification & Test-Time Self-Correction Engine
  *
  * CORE RULE: A verifier must verify evidence or execution — not agree with the model.
  *
@@ -52,7 +52,7 @@ function tierToClaimStatus(tier: EvidenceItem["tier"]): ClaimStatus {
  * 6. UNKNOWN: Unquantified black-box risk or missing parameter.
  * 7. CONTRADICTED: Disproved or conflicting claims.
  */
-export class StanfordRobustVerifier {
+export class EpistemicRobustVerifier {
   /**
    * Build the epistemic claim DAG and propagate lineage: a disputed/contradicted
    * root cascades CONTRADICTED/UNKNOWN status to every dependent downstream claim.
@@ -154,7 +154,7 @@ export class StanfordRobustVerifier {
           id: "VERIFY-MATH-01",
           claimOrOpinion: `Investor assigned ${investorOpinion.score}/100 with MC P50 LTV/CAC of ${p50LtvCacRatio.toFixed(2)}x`,
           verdict: "CORRECTED",
-          rationale: "Stanford CS329A Invariant: Mathematical unit economics did not justify unconstrained venture score. Triggered test-time self-correction.",
+          rationale: "Epistemic Robustness Invariant: Mathematical unit economics did not justify unconstrained venture score. Triggered test-time self-correction.",
           confidencePercent: 96
         });
       } else {
@@ -181,7 +181,7 @@ export class StanfordRobustVerifier {
           id: `VERIFY-SYCOPHANCY-${role.toUpperCase()}`,
           claimOrOpinion: `${op.roleTitle} scored ${op.score}/100 without empirical field validation`,
           verdict: "CORRECTED",
-          rationale: "Stanford CS329A Invariant: Blocked score inflation. A verifier must verify execution/evidence, not agree with the model.",
+          rationale: "Epistemic Robustness Invariant: Blocked score inflation. A verifier must verify execution/evidence, not agree with the model.",
           confidencePercent: 92
         });
       }
@@ -214,7 +214,7 @@ export class StanfordRobustVerifier {
           id: "VERIFY-REDTEAM-01",
           claimOrOpinion: "Red Team returned empty fatal flaw list",
           verdict: "CORRECTED",
-          rationale: "Stanford CS329A Invariant: Adversarial agent must explicitly articulate the primary mode of project failure.",
+          rationale: "Epistemic Robustness Invariant: Adversarial agent must explicitly articulate the primary mode of project failure.",
           confidencePercent: 98
         });
       } else {
@@ -272,7 +272,7 @@ export class StanfordRobustVerifier {
             id: `VERIFY-EPISTEMIC-${item.id}`,
             claimOrOpinion: `Reclassified "${item.claim}" to ${item.tier}`,
             verdict: "CORRECTED",
-            rationale: "Stanford CS329A Invariant: Never mark an assumption, inference, or external prediction as VERIFIED.",
+            rationale: "Epistemic Robustness Invariant: Never mark an assumption, inference, or external prediction as VERIFIED.",
             confidencePercent: 99
           });
         }
@@ -284,7 +284,7 @@ export class StanfordRobustVerifier {
     const verificationConfidencePercent = Math.round((passedCount / totalClaimsAudited) * 100);
 
     const audit: VerificationAudit = {
-      verifierProtocol: "STANFORD_CS329A_ROBUST_VERIFIER",
+      verifierProtocol: "EPISTEMIC_ROBUST_VERIFIER",
       totalClaimsAudited,
       hallucinationsBlocked,
       testTimeSelfCorrections,
@@ -342,3 +342,10 @@ export class StanfordRobustVerifier {
     return { demotions, auditItems };
   }
 }
+
+/**
+ * Backward compatibility alias: formerly branded as StanfordRobustVerifier.
+ */
+export const StanfordRobustVerifier = EpistemicRobustVerifier;
+export type StanfordRobustVerifier = EpistemicRobustVerifier;
+
