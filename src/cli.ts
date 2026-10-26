@@ -56,6 +56,7 @@ program
     const dossier = await orchestrator.evaluateIdea(ideaInput, {
       pricingMonthlyUsd: parseFloat(options.pricing),
       estimatedCacUsd: parseFloat(options.cac),
+      useLiveLLM: !options.offline,
       onProgress: options.json ? undefined : (stage, detail) => {
         console.log(`[${pc.magenta(stage)}] ${detail}`);
       }
@@ -95,6 +96,17 @@ program
       console.log(`     Swarm implies ${Math.round(ov.impliedSurvival * 100)}% survival vs base midpoint ${Math.round(ov.baseSurvivalMidpoint * 100)}% → optimism delta ${ov.optimismDelta >= 0 ? "+" : ""}${Math.round(ov.optimismDelta * 100)}pts`);
       console.log(pc.dim(`     ${ov.guidance}`));
       console.log(pc.dim(`     Dominant class failure causes: ${ov.topFailureCauses.join("; ")}`));
+    }
+
+    if (dossier.decisionEvaluation) {
+      const de = dossier.decisionEvaluation;
+      const deColor = de.verdict === "BUILD" ? pc.green : (de.verdict === "REFINE" ? pc.yellow : pc.red);
+      console.log(pc.bold(pc.blue("  ⚡ Fast Gatekeeper : ")) + deColor(pc.bold(de.verdict)) + pc.dim(` (${de.engine || "Julia-1"}, ${de.runtimeMs ?? 25}ms, Loss Ratio ${de.loss_ratio}x)`));
+      console.log(`     Moat: P(wrap)=${de.answers.moat.probabilities.thin_wrapper} [${de.answers.moat.flagged ? pc.red("FLAGGED") : pc.green("OK")}] | Reg: P(fatal)=${de.answers.regulatory_risk.probabilities.regulatory_fatal} [${de.answers.regulatory_risk.flagged ? pc.red("FLAGGED") : pc.green("OK")}]`);
+      console.log(`     Sales: P(deadlock)=${de.answers.sales_cycle.probabilities.procurement_deadlock} [${de.answers.sales_cycle.flagged ? pc.yellow("FLAGGED") : pc.green("OK")}] | Mon: P(zero)=${de.answers.monetization.probabilities.monetization_zero} [${de.answers.monetization.flagged ? pc.red("FLAGGED") : pc.green("OK")}]`);
+      if (de.fatal_flags.length > 0) {
+        console.log(pc.red(`     ⚠️  FATAL GATE TRIGGERED: ${de.fatal_flags.join("; ")}`));
+      }
     }
 
     if (dossier.epistemicSummary) {

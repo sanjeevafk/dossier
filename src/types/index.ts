@@ -279,6 +279,28 @@ export interface MarketCompetitor {
   pricingEstimate?: string;
 }
 
+export interface DecisionChoice {
+  choice: string;
+  probabilities: Record<string, number>;
+  threshold: number;
+  flagged: boolean;
+}
+
+export interface DecisionModelOutput {
+  engine?: string;
+  answers: {
+    moat: DecisionChoice;
+    regulatory_risk: DecisionChoice;
+    sales_cycle: DecisionChoice;
+    monetization: DecisionChoice;
+  };
+  fatal_flags: string[];
+  refine_flags: string[];
+  verdict: "BUILD" | "REFINE" | "KILL";
+  loss_ratio: number;
+  runtimeMs?: number;
+}
+
 /** Honest inter-agent disagreement signal — replaces cosmetic confidence scores. */
 export interface SwarmDissent {
   /** max - min of the six verified agent scores. */
@@ -311,6 +333,8 @@ export interface IdeaDossier {
   forecastIds?: string[];
   /** Outside view: reference-class base rates vs the swarm verdict (optimism premium). */
   outsideView?: import("../core/outside-view.js").OutsideViewPanel;
+  /** Fast decision model gate evaluation (Hamel Husain Oct 2026 pattern). */
+  decisionEvaluation?: DecisionModelOutput;
   overallVerdict: ValidationVerdict;
   riskLevel: RiskLevel;
   executiveSummary: string;
@@ -357,6 +381,7 @@ export interface IdeaDossier {
 export type SwarmEvent =
   | { type: "stage"; stage: string; detail: string; timestamp: string }
   | { type: "domain"; domain: DomainClassification }
+  | { type: "decision_gate"; evaluation: DecisionModelOutput }
   | { type: "agent_start"; role: SwarmRole; roleTitle: string }
   | { type: "agent_opinion"; role: SwarmRole; roleTitle: string; verdict: Verdict; score: number; fatalFlaw?: string }
   | { type: "parse_fallback"; role: SwarmRole; reason: string }

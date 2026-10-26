@@ -2,31 +2,11 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { IdeaInput } from "../types/index.js";
+import { IdeaInput, DecisionChoice, DecisionModelOutput } from "../types/index.js";
 
 const execFileAsync = promisify(execFile);
 
-export interface DecisionChoice {
-  choice: string;
-  probabilities: Record<string, number>;
-  threshold: number;
-  flagged: boolean;
-}
-
-export interface DecisionModelOutput {
-  engine?: string;
-  answers: {
-    moat: DecisionChoice;
-    regulatory_risk: DecisionChoice;
-    sales_cycle: DecisionChoice;
-    monetization: DecisionChoice;
-  };
-  fatal_flags: string[];
-  refine_flags: string[];
-  verdict: "BUILD" | "REFINE" | "KILL";
-  loss_ratio: number;
-  runtimeMs?: number;
-}
+export type { DecisionChoice, DecisionModelOutput };
 
 /**
  * Execute local Python Decision Model runner implementing the Hamel Husain

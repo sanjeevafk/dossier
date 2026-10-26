@@ -21,7 +21,8 @@ import {
   SwarmEvent,
   IdeaDomainArchetype,
   SandboxStressStats,
-  Contradiction as ContradictionEntry
+  Contradiction as ContradictionEntry,
+  DecisionModelOutput
 } from "../types/index.js";
 import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
@@ -29,6 +30,7 @@ import { StanfordRobustVerifier } from "./verifier.js";
 import { buildMutationProposals } from "./mutator.js";
 import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
 import { buildOutsideViewPanel } from "./outside-view.js";
+import { runDecisionModel } from "../tools/decision-runner.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
@@ -50,15 +52,17 @@ export interface SwarmExecutionOptions {
 
 /**
  * Deterministic adversarial invariants shared by the live-LLM and heuristic evaluation paths.
- * These enforce hard kill ceilings independent of model drift.
+ * These enforce hard kill ceilings independent of model drift, reinforced by the calibrated decision model.
  */
-function detectAdversarialInvariants(idea: IdeaInput, pricing: number) {
+function detectAdversarialInvariants(idea: IdeaInput, pricing: number, decisionEvaluation?: DecisionModelOutput) {
   const text = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization} ${idea.techStack || ""}`.toLowerCase();
+  const thinWrapperByDecision = decisionEvaluation?.answers?.moat?.flagged ?? false;
+  const zeroMonetizationByDecision = decisionEvaluation?.answers?.monetization?.flagged ?? false;
   return {
     isPromptInjection: /ignore (previous|all) instructions|system prompt|jailbreak|output 100|developer mode/i.test(text),
     isImpossiblePhysics: /perpetual motion|free energy|infinite electricity|zero input energy|violates thermodynamics|overunity/i.test(text),
-    isNoMonetization: /free forever|no monetization|zero revenue|not charging/i.test(text) || pricing <= 0,
-    isThinWrapper: /(chrome extension|browser extension|gpt wrapper|chat with pdf|meeting notes|summariz|prompt engineering|simple crm|transcriber|ai copywriter|ai tweet)/i.test(text)
+    isNoMonetization: /free forever|no monetization|zero revenue|not charging/i.test(text) || pricing <= 0 || zeroMonetizationByDecision,
+    isThinWrapper: /(chrome extension|browser extension|gpt wrapper|chat with pdf|meeting notes|summariz|prompt engineering|simple crm|transcriber|ai copywriter|ai tweet)/i.test(text) || thinWrapperByDecision
   };
 }
 
@@ -747,6 +751,14 @@ ${agentContext}`;
     notify("01 CLASSIFY", `Classified concept as [${domain.archetypeLabel}] — Target: ${domain.primaryCustomer}`);
     emit({ type: "domain", domain });
 
+    // 01.1 FAST DECISION MODEL PRE-SCREEN (Hamel Husain Oct 2026 pattern, ~20ms)
+    notify("01 SCREEN", `Running fast calibrated decision model gatekeeper on "${idea.title}"...`);
+    const decisionEvaluation = await runDecisionModel(idea);
+    emit({ type: "decision_gate", evaluation: decisionEvaluation });
+    if (decisionEvaluation.fatal_flags.length > 0) {
+      notify("01 GATED", `Decision Model flagged fatal gate(s): ${decisionEvaluation.fatal_flags.join(", ")}`);
+    }
+
     // 02 DECOMPOSE & RECON
     notify("02 DECOMPOSE", `Decomposing variables under ${domain.procurementCycle} framework...`);
     emit({ type: "stage", stage: "02 DECOMPOSE", detail: `Decomposing variables under ${domain.procurementCycle} framework...`, timestamp: new Date().toISOString() });
@@ -763,7 +775,7 @@ ${agentContext}`;
     };
     const pricing = options.pricingMonthlyUsd ?? pricingOrder[domain.archetype];
     const cac = options.estimatedCacUsd ?? (domain.archetype === "hardware_robotics" ? 2500 : domain.archetype === "b2b_saas" ? 1200 : (domain.archetype === "deeptech_research" ? 5000 : 350));
-    const invariants = detectAdversarialInvariants(idea, pricing);
+    const invariants = detectAdversarialInvariants(idea, pricing, decisionEvaluation);
     const churn = options.expectedChurnMonthly ?? (invariants.isThinWrapper ? 0.28 : (domain.archetype === "consumer_social" ? 0.12 : 0.04));
 
     emit({ type: "sandbox_simulating", iterationCount: 10000 });
@@ -817,14 +829,22 @@ ${agentContext}`;
       : `No correlated prediction-market data is available.`;
     const econContext = `Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
 
+    const decisionLine = decisionEvaluation
+      ? `Calibrated Decision Gatekeeper (${decisionEvaluation.engine || "Julia-1"}): Verdict=${decisionEvaluation.verdict}, LossRatio=${decisionEvaluation.loss_ratio}x. ` +
+        `Moat P(wrapper)=${decisionEvaluation.answers?.moat?.probabilities?.thin_wrapper ?? "n/a"} [Flagged=${decisionEvaluation.answers?.moat?.flagged}], ` +
+        `Regulatory P(fatal)=${decisionEvaluation.answers?.regulatory_risk?.probabilities?.regulatory_fatal ?? "n/a"} [Flagged=${decisionEvaluation.answers?.regulatory_risk?.flagged}], ` +
+        `Procurement P(deadlock)=${decisionEvaluation.answers?.sales_cycle?.probabilities?.procurement_deadlock ?? "n/a"} [Flagged=${decisionEvaluation.answers?.sales_cycle?.flagged}], ` +
+        `Monetization P(zero)=${decisionEvaluation.answers?.monetization?.probabilities?.monetization_zero ?? "n/a"} [Flagged=${decisionEvaluation.answers?.monetization?.flagged}]. ` +
+        (decisionEvaluation.fatal_flags.length > 0 ? `TRIGGERED FATAL FAILURE MODES: ${decisionEvaluation.fatal_flags.join(", ")}. ` : "")
+      : "";
+
     const agentContextFor = (role: SwarmRole): string => {
       const lines: string[] = [];
-      if (role === "analyst") lines.push(competitiveLine, marketLine);
-      else if (role === "redteam") lines.push(sentimentLine, communityLine);
-      else if (role === "customer") lines.push(communityLine);
-      else if (role === "investor") lines.push(marketLine);
-      // architect & expert: their evidence is the sandbox computation and domain
-      // regulatory priors, both already in the system prompt.
+      if (role === "analyst") lines.push(competitiveLine, marketLine, decisionLine);
+      else if (role === "redteam") lines.push(sentimentLine, communityLine, decisionLine);
+      else if (role === "customer") lines.push(communityLine, decisionLine);
+      else if (role === "investor") lines.push(marketLine, decisionLine);
+      else if (role === "architect" || role === "expert") lines.push(decisionLine);
       lines.push(econContext);
       return lines.join(" ");
     };
@@ -1557,6 +1577,7 @@ ${agentContext}`;
       confidenceScore,
       swarmDissent,
       outsideView,
+      decisionEvaluation,
       overallVerdict,
       riskLevel,
       executiveSummary: executiveSynthesizerOpinion.rationale,

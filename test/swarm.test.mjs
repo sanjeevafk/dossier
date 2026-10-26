@@ -45,15 +45,23 @@ test("Sandbox Economics Simulation runs successfully", async () => {
 
 test("Dossier Orchestrator evaluates idea and generates complete intelligence dossier", async () => {
   const orchestrator = new IdeaSwarmOrchestrator();
+  const events = [];
   const dossier = await orchestrator.evaluateIdea({
     title: "AI Compliance Auditor",
     summary: "Scans cloud infra for SOC2/HIPAA violations and creates remediation PRs.",
     targetAudience: "B2B SaaS CTOs",
     monetization: "$499/mo per company"
-  }, { useLiveLLM: false });
+  }, {
+    useLiveLLM: false,
+    onEvent: (e) => events.push(e)
+  });
 
   assert.ok(dossier.id, "Dossier must have an ID");
   assert.equal(dossier.evaluationMode, "HEURISTIC_ENGINE", "Offline evaluation must be labeled as heuristic engine");
+  assert.ok(dossier.decisionEvaluation, "Dossier must carry the fast decision model evaluation");
+  assert.ok(["BUILD", "REFINE", "KILL"].includes(dossier.decisionEvaluation.verdict), "Decision model must issue a valid verdict");
+  assert.ok(dossier.decisionEvaluation.answers.moat, "Decision model must have moat evaluation");
+  assert.ok(events.some((e) => e.type === "decision_gate"), "Orchestrator must emit a decision_gate event");
   assert.ok(dossier.killScore >= 0 && dossier.killScore <= 100, "Kill score must be between 0 and 100");
   assert.ok(dossier.roleAssessments.redteam, "Red Team assessment must be present");
   assert.ok(dossier.roleAssessments.investor, "Investor assessment must be present");
