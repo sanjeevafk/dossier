@@ -8,6 +8,7 @@ import { queryKalshiMarkets } from "./kalshi.js";
 import { queryPolymarketUnified } from "./polymarket.js";
 import { queryManifoldUnified } from "./manifold.js";
 import { deduplicateAndClusterMarkets } from "./dedupe.js";
+import { dossierStorage } from "../../services/storage.js";
 
 /**
  * Unified Prediction Markets Information Retrieval Router.
@@ -15,6 +16,7 @@ import { deduplicateAndClusterMarkets } from "./dedupe.js";
  * Simultaneously queries Polymarket, Kalshi, and Manifold, normalizes all signals
  * into the UnifiedMarketSignal schema, clusters and deduplicates equivalent questions,
  * and derives cross-market consensus probabilities and divergence spreads.
+ * Caches responses in SQLite with 7-day TTL.
  */
 export async function queryUnifiedPredictionMarkets(
   keyword: string,
@@ -37,6 +39,23 @@ export async function queryUnifiedPredictionMarkets(
 
   if (!cleanKeyword) {
     return emptyResult("Empty query — no prediction markets queried.");
+  }
+
+  // 1. Check SQLite cache
+  const cacheKey = `market:unified:${cleanKeyword.toLowerCase()}`;
+  try {
+    const cached = dossierStorage.getReconCache(cacheKey);
+    if (cached && typeof cached.response === "object" && cached.response !== null) {
+      const parsed = cached.response as UnifiedMarketResult;
+      if (Array.isArray(parsed.signals) && parsed.signals.length > 0) {
+        return {
+          ...parsed,
+          keyTakeaway: `${parsed.keyTakeaway} (cached, $0 marginal)`
+        };
+      }
+    }
+  } catch {
+    // Non-blocking cache lookup
   }
 
   // Execute all connectors concurrently with isolated failure boundaries
@@ -96,7 +115,7 @@ export async function queryUnifiedPredictionMarkets(
   const sourceLabels = activeSources.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(", ");
   const keyTakeaway = `Unified prediction consensus across ${sourceLabels}: ${averageProb}% volume-weighted probability across ${allSignals.length} market(s) ($${totalVolume.toLocaleString()} total volume).${divergenceNote}`;
 
-  return {
+  const result: UnifiedMarketResult = {
     query: cleanKeyword,
     sourcesQueried,
     activeSources,
@@ -107,4 +126,12 @@ export async function queryUnifiedPredictionMarkets(
     macroSentiment: sentiment,
     keyTakeaway
   };
+
+  try {
+    dossierStorage.setReconCache(cacheKey, "unified-markets", result);
+  } catch {
+    // Non-blocking cache write
+  }
+
+  return result;
 }

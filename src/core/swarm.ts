@@ -37,6 +37,7 @@ import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryUnifiedPredictionMarkets } from "../tools/markets/index.js";
+import { queryNewsHeadlines } from "../tools/news.js";
 import { queryOpenAlex } from "../tools/openalex.js";
 import { queryEdgarFormD } from "../tools/edgar.js";
 import { queryHuggingFace } from "../tools/huggingface.js";
@@ -779,13 +780,14 @@ Market & Prediction Signals: ${marketContext}`;
     emit({ type: "sandbox_simulating", iterationCount: 10000 });
 
     const isHealthcare = domain.archetype === "healthcare_clinical";
-    const [marketResearch, unifiedMarkets, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
+    const [marketResearch, unifiedMarkets, newsSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
       performMarketResearch(idea.title, [
         idea.targetAudience,
         idea.monetization,
         domain.regulatoryEnvironment
       ], { exaKey: options.exaKey, tavilyKey: options.tavilyKey }),
       queryUnifiedPredictionMarkets(idea.title),
+      queryNewsHeadlines(idea.title),
       queryOpenAlex(`${idea.title} ${domain.archetypeLabel}`),
       queryEdgarFormD(idea.title),
       queryHuggingFace(idea.title),
@@ -838,6 +840,11 @@ Market & Prediction Signals: ${marketContext}`;
       );
     } else {
       reconSourceParts.push(unifiedMarkets.keyTakeaway);
+    }
+    if (newsSignals.articles.length > 0) {
+      reconSourceParts.push(
+        `Media coverage (${newsSignals.source}): ${newsSignals.articles.slice(0, 2).map(a => `"${a.title.slice(0, 60)}" [${a.source}]`).join("; ")}.`
+      );
     }
     if (openAlexSignals.papers.length > 0) {
       reconSourceParts.push(
@@ -1002,6 +1009,19 @@ Market & Prediction Signals: ${marketContext}`;
       });
       retrievedExternalCount++;
     });
+    for (let i = 0; i < Math.min(newsSignals.articles.length, 2); i++) {
+      const art = newsSignals.articles[i];
+      externalEvidenceItems.push({
+        id: `EV-04N${i + 1}`,
+        claim: `Factual media reporting (${art.source}): "${art.title}"`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: art.url,
+        indicator: "SUPPORTING",
+        confidencePercent: 85
+      });
+      retrievedExternalCount++;
+    }
     for (const p of openAlexSignals.papers.slice(0, 2)) {
       externalEvidenceItems.push({
         id: `EV-03A${openAlexSignals.papers.indexOf(p) + 1}`,
@@ -1596,7 +1616,8 @@ Market & Prediction Signals: ${marketContext}`;
       ...openAlexSignals.papers.slice(0, 3).map(p => ({ title: p.title.slice(0, 120), url: p.openAccessUrl || "https://openalex.org", provider: "openalex" })),
       ...edgarSignals.filings.map(f => ({ title: `Form D: ${f.company}`, url: f.filingUrl, provider: "sec-edgar" })),
       ...hfSignals.models.map(m => ({ title: `Hub: ${m.id}`, url: m.modelUrl, provider: "huggingface" })),
-      ...clinicalSignals.studies.map(s => ({ title: `${s.nctId}: ${s.title.slice(0, 100)}`, url: s.studyUrl, provider: "clinicaltrials" }))
+      ...clinicalSignals.studies.map(s => ({ title: `${s.nctId}: ${s.title.slice(0, 100)}`, url: s.studyUrl, provider: "clinicaltrials" })),
+      ...newsSignals.articles.map(a => ({ title: `[NEWS] ${a.title.slice(0, 120)}`, url: a.url, provider: a.source }))
     ];
 
     const dossier: IdeaDossier = {

@@ -1039,6 +1039,61 @@
         document.getElementById('weakestAssumptionDisproof').textContent = `Disproof Trigger: ${dossier.weakestAssumption.disproofThreshold}`;
       }
 
+      // Render Unified Prediction Market Oracle Consensus
+      const pmSection = document.getElementById('predictionMarketsSection');
+      if (pmSection) {
+        const pm = dossier.predictionMarkets;
+        if (pm && Array.isArray(pm.marketsFound) && pm.marketsFound.length > 0) {
+          pmSection.classList.remove('hidden');
+          const badge = document.getElementById('marketConsensusBadge');
+          const sent = pm.macroSentiment || 'NEUTRAL';
+          const sentColor = sent === 'BULLISH' ? 'bg-emerald-100 text-emerald-800' : (sent === 'BEARISH' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800');
+          if (badge) {
+            badge.className = `text-[10px] px-2 py-0.5 rounded font-bold uppercase ${sentColor}`;
+            badge.textContent = `${sent} • ${pm.marketsFound.length} MARKETS`;
+          }
+          const sourcesEl = document.getElementById('marketOracleSources');
+          if (sourcesEl) sourcesEl.textContent = pm.source || 'Unified Prediction Oracle';
+
+          const summaryEl = document.getElementById('marketSummaryText');
+          if (summaryEl) summaryEl.textContent = pm.keyTakeaway;
+
+          const grid = document.getElementById('marketsListGrid');
+          if (grid) {
+            grid.innerHTML = '';
+            pm.marketsFound.forEach(m => {
+              const platformMatch = m.title.match(/^\[([A-Z]+)\]/);
+              const platform = platformMatch ? platformMatch[1] : 'MARKET';
+              const cleanTitle = m.title.replace(/^\[[A-Z]+\]\s*/, '');
+              const probColor = m.probabilityYesPercent >= 60 ? 'text-emerald-600' : (m.probabilityYesPercent <= 40 ? 'text-red-600' : 'text-amber-600');
+              const platformColor = platform === 'KALSHI' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : (platform === 'POLYMARKET' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-cyan-50 text-cyan-700 border-cyan-200');
+
+              const card = document.createElement('a');
+              card.href = m.marketUrl;
+              card.target = '_blank';
+              card.rel = 'noopener noreferrer';
+              card.className = 'p-3 bg-zinc-50/70 hover:bg-zinc-100/90 rounded-lg border border-zinc-200 transition-all flex flex-col justify-between block cursor-pointer group';
+              card.innerHTML = `
+                <div>
+                  <div class="flex items-center justify-between gap-1 mb-1.5">
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${platformColor}">${platform}</span>
+                    <span class="text-[10px] text-zinc-500 font-mono">$${(m.volumeUsd || 0).toLocaleString()} vol</span>
+                  </div>
+                  <div class="text-xs font-sans text-zinc-800 group-hover:text-zinc-950 font-semibold line-clamp-2">${cleanTitle}</div>
+                </div>
+                <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-200/60">
+                  <span class="text-[10px] text-zinc-500 uppercase">Implied Probability</span>
+                  <span class="text-sm font-extrabold font-mono ${probColor}">${m.probabilityYesPercent}%</span>
+                </div>
+              `;
+              grid.appendChild(card);
+            });
+          }
+        } else {
+          pmSection.classList.add('hidden');
+        }
+      }
+
       // Render Kill Conditions
       const killList = document.getElementById('killConditionsList');
       if (killList && dossier.killConditions) {

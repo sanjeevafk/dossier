@@ -489,6 +489,20 @@ ${d.evidenceFeed.map(e => `| \`${e.id}\` | \`${e.tier}\` | ${e.claim.replace(/\|
 
 ---
 
+## 5b. Unified Prediction Market Oracle Consensus
+
+${d.predictionMarkets && d.predictionMarkets.marketsFound.length > 0 ? `
+> **Oracle Source:** ${d.predictionMarkets.source}  
+> **Consensus Takeaway:** ${d.predictionMarkets.keyTakeaway}  
+> **Macro Sentiment:** \`${d.predictionMarkets.macroSentiment}\`
+
+| Platform | Market Question | Probability | Volume | Link |
+|:---|:---|:---:|:---:|:---|
+${d.predictionMarkets.marketsFound.map(m => `| \`${m.title.match(/\[([A-Z]+)\]/)?.[1] || "MARKET"}\` | ${m.title.replace(/\[[A-Z]+\]\s*/, "").replace(/\|/g, "/")} | **${m.probabilityYesPercent}%** | $${m.volumeUsd.toLocaleString()} | [View Market](${m.marketUrl}) |`).join("\n")}
+` : `*No correlated prediction markets found.*`}
+
+---
+
 ## 6. Sandboxed Unit Economics (Python3 Subprocess Exit 0)
 
 - **Modeled LTV / CAC Ratio:** \`${d.simulation.ltvCacRatio}x\`
