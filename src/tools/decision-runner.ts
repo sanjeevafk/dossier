@@ -38,9 +38,9 @@ export async function runDecisionModel(
   options?: { env?: NodeJS.ProcessEnv }
 ): Promise<DecisionModelOutput> {
   const candidatePaths = [
+    path.resolve(process.cwd(), "src", "tools", "decision_model.py"),
     path.resolve(import.meta.dirname, "decision_model.py"),
-    path.resolve(import.meta.dirname, "..", "..", "src", "tools", "decision_model.py"),
-    path.resolve(process.cwd(), "src", "tools", "decision_model.py")
+    path.resolve(import.meta.dirname, "..", "..", "src", "tools", "decision_model.py")
   ];
   const scriptPath = candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
   const conceptText = `${idea.title}. ${idea.summary}. Target Audience: ${idea.targetAudience}. Monetization: ${idea.monetization}. Tech Stack: ${idea.techStack || "Standard"}`;

@@ -96,39 +96,40 @@ def evaluate_concept_decision(concept_text):
     Returns calibrated probabilities, flagged failure gates, and loss-minimized verdict.
     """
     questions = build_decision_questions()
-    d1_endpoint = os.environ.get("LIQUID_D1_ENDPOINT", "http://127.0.0.1:8080/v1/systemone")
+    d1_endpoint = os.environ.get("LIQUID_D1_ENDPOINT")
 
-    # Path 1: LiquidAI d1-omni-600M System-One server (via llama-server or vLLM)
-    try:
-        import urllib.request
-        body_obj = {"state": concept_text, "questions": questions}
-        payload = json.dumps(body_obj).encode("utf-8")
-        req = urllib.request.Request(d1_endpoint, data=payload, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=1.5) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            if "answers" in data:
-                raw_ans = data["answers"]
-                answers = {}
-                risk_keys = {
-                    "moat": ("thin_wrapper", THRESHOLDS["thin_wrapper"]),
-                    "regulatory_risk": ("regulatory_fatal", THRESHOLDS["regulatory_fatal"]),
-                    "sales_cycle": ("procurement_deadlock", THRESHOLDS["procurement_deadlock"]),
-                    "monetization": ("monetization_zero", THRESHOLDS["monetization_zero"])
-                }
-                for q_name, (risk_choice, threshold) in risk_keys.items():
-                    if q_name in raw_ans:
-                        ans_obj = raw_ans[q_name]
-                        probs = ans_obj.get("probabilities", {})
-                        p_risk = probs.get(risk_choice, 0.0)
-                        answers[q_name] = {
-                            "choice": ans_obj.get("choice", risk_choice if p_risk >= threshold else "safe"),
-                            "probabilities": probs,
-                            "threshold": threshold,
-                            "flagged": p_risk >= threshold
-                        }
-                return synthesize_verdict("LiquidAI/d1-omni-600M (System-One)", answers)
-    except Exception:
-        pass # Liquid server not running, fall back cleanly
+    # Path 1: LiquidAI d1-omni-600M System-One server (when explicitly configured)
+    if d1_endpoint:
+        try:
+            import urllib.request
+            body_obj = {"state": concept_text, "questions": questions}
+            payload = json.dumps(body_obj).encode("utf-8")
+            req = urllib.request.Request(d1_endpoint, data=payload, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if "answers" in data:
+                    raw_ans = data["answers"]
+                    answers = {}
+                    risk_keys = {
+                        "moat": ("thin_wrapper", THRESHOLDS["thin_wrapper"]),
+                        "regulatory_risk": ("regulatory_fatal", THRESHOLDS["regulatory_fatal"]),
+                        "sales_cycle": ("procurement_deadlock", THRESHOLDS["procurement_deadlock"]),
+                        "monetization": ("monetization_zero", THRESHOLDS["monetization_zero"])
+                    }
+                    for q_name, (risk_choice, threshold) in risk_keys.items():
+                        if q_name in raw_ans:
+                            ans_obj = raw_ans[q_name]
+                            probs = ans_obj.get("probabilities", {})
+                            p_risk = probs.get(risk_choice, 0.0)
+                            answers[q_name] = {
+                                "choice": ans_obj.get("choice", risk_choice if p_risk >= threshold else "safe"),
+                                "probabilities": probs,
+                                "threshold": threshold,
+                                "flagged": p_risk >= threshold
+                            }
+                    return synthesize_verdict("LiquidAI/d1-omni-600M (System-One)", answers)
+        except Exception:
+            pass # Liquid server unreachable, fall back cleanly
 
     lower = concept_text.lower()
     answers = {}
