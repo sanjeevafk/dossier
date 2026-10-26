@@ -1,5 +1,7 @@
 import {
   AgentOpinion,
+  ClaimNode,
+  ClaimStatus,
   DomainClassification,
   EvidenceItem,
   IdeaInput,
@@ -9,11 +11,37 @@ import {
   VerificationAuditItem
 } from "../types/index.js";
 
+// Inference lineage: which evidence claims are logical descendants of which roots.
+// MODELLED_ASSUMPTION (EV-05) and UNKNOWN (EV-07) are the volatile roots; the
+// inference (EV-06) and cross-examined contradiction (EV-08) depend on them.
+const DAG_DEPENDENCIES: Record<string, string[]> = {
+  "EV-06": ["EV-01", "EV-07"],
+  "EV-08": ["EV-05", "EV-07"]
+};
+
+function tierToClaimStatus(tier: EvidenceItem["tier"]): ClaimStatus {
+  switch (tier) {
+    case "VERIFIED_FACT":
+    case "VERIFIED_COMPUTATION":
+      return "VERIFIED";
+    case "MODELLED_ASSUMPTION":
+    case "EXTERNAL_EVIDENCE":
+    case "INFERENCE":
+      return "DISPUTED";
+    case "UNKNOWN":
+      return "UNKNOWN";
+    case "CONTRADICTED":
+      return "CONTRADICTED";
+    default:
+      return "DISPUTED";
+  }
+}
+
 /**
  * Stanford CS329A: Robust Verification & Test-Time Self-Correction Engine
- * 
+ *
  * CORE RULE: A verifier must verify evidence or execution — not agree with the model.
- * 
+ *
  * Epistemic Hierarchy:
  * 1. VERIFIED_FACT: Canonical external ground-truth (e.g. published statutes, DGCA/WHO regulations).
  * 2. VERIFIED_COMPUTATION: Code/math executed without error (Exit 0) — its input assumptions remain separately labelled.
@@ -24,6 +52,53 @@ import {
  * 7. CONTRADICTED: Disproved or conflicting claims.
  */
 export class StanfordRobustVerifier {
+  /**
+   * Build the epistemic claim DAG and propagate lineage: a disputed/contradicted
+   * root cascades CONTRADICTED/UNKNOWN status to every dependent downstream claim.
+   */
+  public buildClaimDag(evidenceFeed: EvidenceItem[]): ClaimNode[] {
+    const nodes: ClaimNode[] = evidenceFeed.map((item) => ({
+      id: item.id,
+      claim: item.claim,
+      tier: item.tier,
+      dependencies: DAG_DEPENDENCIES[item.id] ?? [],
+      status: tierToClaimStatus(item.tier),
+      provenance: item.provenance
+    }));
+
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+
+    // Propagate lineage until stable: any claim depending (transitively) on a
+    // CONTRADICTED root is CONTRADICTED; UNKNOWN roots cascade UNKNOWN unless
+    // the claim is already outright contradicted.
+    let changed = true;
+    let guard = 0;
+    while (changed && guard < nodes.length * nodes.length + 10) {
+      changed = false;
+      guard += 1;
+      for (const node of nodes) {
+        let nextStatus: ClaimStatus | undefined;
+        for (const depId of node.dependencies) {
+          const dep = byId.get(depId);
+          if (!dep) continue;
+          if (dep.status === "CONTRADICTED") {
+            nextStatus = "CONTRADICTED";
+            break;
+          }
+          if (dep.status === "UNKNOWN" && node.status !== "CONTRADICTED" && node.status !== "VERIFIED") {
+            nextStatus = "UNKNOWN";
+          }
+        }
+        if (nextStatus && nextStatus !== node.status) {
+          node.status = nextStatus;
+          changed = true;
+        }
+      }
+    }
+
+    return nodes;
+  }
+
   /**
    * Execute comprehensive epistemic verification audit across all subagent opinions and evidence feed.
    */
@@ -36,19 +111,21 @@ export class StanfordRobustVerifier {
   ): {
     verifiedOpinions: Record<SwarmRole, AgentOpinion>;
     audit: VerificationAudit;
+    claimDag: ClaimNode[];
   } {
     const auditItems: VerificationAuditItem[] = [];
     let hallucinationsBlocked = 0;
     let testTimeSelfCorrections = 0;
 
     const verifiedOpinions: Record<SwarmRole, AgentOpinion> = { ...opinions };
+    const claimDag = this.buildClaimDag(evidenceFeed);
 
     // Invariant 1: Mathematical Invariance & Input Assumption Separation
-    const ltvCacRatio = sandboxSim.ltvCacRatio;
+    const p50LtvCacRatio = sandboxSim.monteCarlo?.ltvCacPercentiles.p50 ?? sandboxSim.ltvCacRatio;
     const investorOpinion = verifiedOpinions.investor;
 
     if (investorOpinion) {
-      if (investorOpinion.score > 85 && ltvCacRatio < 3.0) {
+      if (investorOpinion.score > 85 && p50LtvCacRatio < 3.0) {
         // Flag mathematical inconsistency: high investor score with poor LTV/CAC
         hallucinationsBlocked++;
         testTimeSelfCorrections++;
@@ -58,7 +135,7 @@ export class StanfordRobustVerifier {
 
         auditItems.push({
           id: "VERIFY-MATH-01",
-          claimOrOpinion: `Investor assigned ${investorOpinion.score}/100 with sandbox LTV/CAC of ${ltvCacRatio.toFixed(2)}x`,
+          claimOrOpinion: `Investor assigned ${investorOpinion.score}/100 with MC P50 LTV/CAC of ${p50LtvCacRatio.toFixed(2)}x`,
           verdict: "CORRECTED",
           rationale: "Stanford CS329A Invariant: Mathematical unit economics did not justify unconstrained venture score. Triggered test-time self-correction.",
           confidencePercent: 96
@@ -66,7 +143,7 @@ export class StanfordRobustVerifier {
       } else {
         auditItems.push({
           id: "VERIFY-MATH-01",
-          claimOrOpinion: `Isolated Python3 simulation verified (Exit 0, ${ltvCacRatio.toFixed(2)}x LTV/CAC). Input assumptions remain separately labelled as MODELLED_ASSUMPTION.`,
+          claimOrOpinion: `Isolated Python3 simulation verified (Exit 0, P50 LTV/CAC ${p50LtvCacRatio.toFixed(2)}x across ${sandboxSim.monteCarlo?.iterations ?? 1} stochastic runs). Input assumptions remain separately labelled as MODELLED_ASSUMPTION.`,
           verdict: "VERIFIED_PASS",
           rationale: "Deterministic calculation verified. Does not validate input pricing or CAC assumptions.",
           confidencePercent: 99
@@ -153,15 +230,15 @@ export class StanfordRobustVerifier {
       // If an assumption or inference was incorrectly labeled as fact or computation
       if (item.tier === "VERIFIED_FACT" || item.tier === "VERIFIED_COMPUTATION") {
         if (
-          text.includes("will readily switch") || 
-          text.includes("adoption rate") || 
+          text.includes("will readily switch") ||
+          text.includes("adoption rate") ||
           text.includes("founder assumption") ||
           text.includes("willingness to pay") ||
           text.includes("market sentiment")
         ) {
           hallucinationsBlocked++;
           testTimeSelfCorrections++;
-          
+
           if (text.includes("market sentiment") || text.includes("oracle")) {
             item.tier = "EXTERNAL_EVIDENCE";
             item.claimType = "EXTERNAL_EVIDENCE";
@@ -199,7 +276,8 @@ export class StanfordRobustVerifier {
 
     return {
       verifiedOpinions,
-      audit
+      audit,
+      claimDag
     };
   }
 }

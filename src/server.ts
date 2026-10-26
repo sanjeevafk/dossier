@@ -5,15 +5,44 @@ import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
 import { generateAgentTurn, getLLMStatus } from "./services/llm.js";
 import { dossierStorage } from "./services/storage.js";
+import { forecastLedger } from "./services/ledger.js";
 import { SWARM_ROLES } from "./config/prompts.js";
 import { IdeaInput, SwarmRole } from "./types/index.js";
 
 const app: Application = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
+  : ["http://localhost:3000", "http://127.0.0.1:3000"];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== "production") {
+        callback(null, true);
+      } else {
+        callback(new Error("Blocked by CORS policy"));
+      }
+    },
+    credentials: true
+  })
+);
 app.use(express.json());
 app.use(express.static(path.join(process.cwd(), "public")));
+
+function requireAuth(req: Request, res: Response, next: () => void) {
+  const secret = process.env.DOSSIER_API_KEY;
+  const isLoopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.hostname === "localhost";
+  if (!secret && process.env.NODE_ENV !== "production" && isLoopback) {
+    return next();
+  }
+  const authHeader = req.headers.authorization;
+  if (secret && authHeader === `Bearer ${secret}`) {
+    return next();
+  }
+  return res.status(401).json({ error: "Unauthorized: valid Bearer token required for action gates" });
+}
 
 const orchestrator = new IdeaSwarmOrchestrator();
 
@@ -22,7 +51,7 @@ app.get("/health", (req: Request, res: Response) => {
   const llmStatus = getLLMStatus();
   res.json({
     status: "ok",
-    service: "dossier-trueforge",
+    service: "dossier-core",
     timestamp: new Date().toISOString(),
     llm: llmStatus,
     sandbox: { provider: process.env.SANDBOX_PROVIDER || "local", runtime: "python3-subprocess" }
@@ -110,8 +139,68 @@ app.post("/api/evaluate", async (req: Request, res: Response) => {
   }
 });
 
+// Evaluate with Real-Time Server-Sent Events (SSE) Stream
+app.post("/api/evaluate/stream", async (req: Request, res: Response) => {
+  const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
+
+  if (!title || !summary) {
+    res.status(400).json({ error: "Missing required fields: 'title' and 'summary'" });
+    return;
+  }
+
+  // Set SSE response headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  let isClientConnected = true;
+  res.on("close", () => {
+    isClientConnected = false;
+  });
+
+  const sendSSE = (event: string, data: any) => {
+    if (!isClientConnected) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    if (typeof (res as any).flush === "function") {
+      (res as any).flush();
+    }
+  };
+
+  const ideaInput: IdeaInput = {
+    title,
+    summary,
+    targetAudience: targetAudience || "General Founders / Businesses",
+    monetization: monetization || "$49/month SaaS"
+  };
+
+  try {
+    sendSSE("init", { service: "dossier-stream", timestamp: new Date().toISOString() });
+
+    const dossier = await orchestrator.evaluateIdea(ideaInput, {
+      pricingMonthlyUsd: pricingMonthlyUsd ? parseFloat(pricingMonthlyUsd) : undefined,
+      estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined,
+      useLiveLLM: useLiveLLM !== false,
+      onProgress: (stage, detail) => {
+        sendSSE("progress", { stage, detail, timestamp: new Date().toISOString() });
+      },
+      onEvent: (event) => {
+        sendSSE(event.type, event);
+      }
+    });
+
+    sendSSE("done", { success: true, dossierId: dossier.id });
+    res.end();
+  } catch (error: any) {
+    console.error("evaluateIdea stream error:", error);
+    sendSSE("error", { error: error.message || "Evaluation stream failed" });
+    res.end();
+  }
+});
+
 // Approval action gate endpoint (Persistent Human-in-the-loop)
-app.post("/api/approval/:actionId", async (req: Request, res: Response) => {
+app.post("/api/approval/:actionId", requireAuth, async (req: Request, res: Response) => {
   const actionId = String(req.params.actionId);
   const { decision } = req.body; // 'APPROVE' | 'REJECT'
 
@@ -132,6 +221,43 @@ app.post("/api/approval/:actionId", async (req: Request, res: Response) => {
     persisted: result.updated,
     dossierId: result.dossierId,
     message: `Action ${actionId} has been successfully ${decision === "APPROVE" ? "approved" : "rejected"} by human operator.`
+  });
+});
+
+// Calibration ledger: list forecasts behind verdicts
+app.get("/api/forecasts", async (req: Request, res: Response) => {
+  try {
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+    const status = req.query.status ? String(req.query.status).toUpperCase() as "PENDING" | "HIT" | "MISS" : undefined;
+    const forecasts = await forecastLedger.listForecasts(limit, status);
+    res.json({ success: true, count: forecasts.length, forecasts });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Calibration ledger: resolve a forecast with an observed field outcome (auth-gated write)
+app.post("/api/forecasts/:id/outcome", requireAuth, async (req: Request, res: Response) => {
+  const forecastId = String(req.params.id);
+  const { outcome, notes } = req.body;
+
+  if (!["HIT", "MISS"].includes(outcome)) {
+    res.status(400).json({ error: "Outcome must be 'HIT' (event happened) or 'MISS' (it did not)" });
+    return;
+  }
+
+  const record = await forecastLedger.resolveForecast(forecastId, outcome, notes);
+  if (!record) {
+    res.status(404).json({ success: false, error: `Forecast '${forecastId}' not found or already resolved` });
+    return;
+  }
+
+  res.json({
+    success: true,
+    forecastId,
+    status: record.status,
+    resolvedAt: record.resolvedAt,
+    message: `Forecast resolved as ${outcome}. Brier scores update via 'dossier forecast-score'.`
   });
 });
 
@@ -163,7 +289,7 @@ app.post("/api/chat", async (req: Request, res: Response) => {
         ? "Consensus of 6 adversarial agents (Skeptic, Investor, Architect, Market, Customer, Founder)"
         : `Agent ${role.toUpperCase()}`;
         
-      const systemPrompt = `You are part of the Dossier Adversarial Intelligence Swarm built on TrueForge.
+      const systemPrompt = `You are part of the Dossier Adversarial Intelligence Swarm.
 Role: ${rolePrompt}
 Domain Archetype: ${domain.archetypeLabel}
 Idea: "${ideaTitle}" — ${ideaSummary}

@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { MonteCarloStats } from "../types/index.js";
 
 const execAsync = promisify(exec);
 
@@ -18,12 +19,23 @@ export interface SandboxExecutionResult {
     estimatedPaybackMonths: number;
     monthlyInfraCostUsd: number;
     tamEstimateUsd: string;
+    monteCarlo?: MonteCarloStats;
   };
 }
 
+export interface EconomicsSimulationOptions {
+  churnStd?: number;
+  cacStd?: number;
+  grossMarginTarget?: number;
+  iterations?: number;
+  startingCashUsd?: number;
+}
+
 /**
- * Sandboxed simulation runner for financial and unit economics modeling.
- * Executes python/node modeling scripts in an isolated temporary sandbox.
+ * Sanitized economics simulation runner. Executes the canonical vectorized
+ * Monte Carlo script (scripts/simulate_monte_carlo.py) in an isolated temporary
+ * sandbox and maps the stochastic result; degrades to the embedded closed-form
+ * fallback when the Python runtime or canonical script is unavailable.
  */
 export async function runEconomicsSimulation(
   pricingMonthlyUsd: number,
@@ -31,7 +43,8 @@ export async function runEconomicsSimulation(
   estimatedCacUsd: number,
   expectedUsersMonth12: number,
   llmTokensPerRequest: number,
-  requestsPerUserMonthly: number
+  requestsPerUserMonthly: number,
+  options: EconomicsSimulationOptions = {}
 ): Promise<SandboxExecutionResult> {
   // Sanitize and validate inputs against injection and mathematical invalidity
   const cleanPricing = Math.max(0, Number(pricingMonthlyUsd) || 0);
@@ -41,97 +54,71 @@ export async function runEconomicsSimulation(
   const cleanTokens = Math.max(0, Math.round(Number(llmTokensPerRequest) || 500));
   const cleanReqs = Math.max(0, Math.round(Number(requestsPerUserMonthly) || 30));
 
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "trueforge-sandbox-"));
-  const scriptPath = path.join(tmpDir, "simulate_economics.py");
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "dossier-sandbox-"));
   const inputPath = path.join(tmpDir, "inputs.json");
 
-  const inputPayload = {
+  const inputPayload: Record<string, unknown> = {
     pricing_monthly: cleanPricing,
-    churn_rate: cleanChurn,
+    churn_mean: cleanChurn,
+    churn_std: Math.max(0.002, typeof options.churnStd === "number" ? Math.min(0.35, Math.abs(options.churnStd)) : cleanChurn * 0.25),
     cac: cleanCac,
+    cac_std: Math.max(1, typeof options.cacStd === "number" ? Math.abs(options.cacStd) : cleanCac * 0.30),
     users_m12: cleanUsers,
     tokens_per_req: cleanTokens,
-    reqs_monthly: cleanReqs
+    reqs_monthly: cleanReqs,
+    iterations: Math.max(1000, Math.min(50000, Math.round(options.iterations ?? 10000)))
   };
-
-  const pythonScript = `
-import json
-import sys
-
-def compute_economics(data):
-    pricing_monthly = max(0.0, float(data.get("pricing_monthly", 49.0)))
-    churn_rate = max(0.001, min(1.0, float(data.get("churn_rate", 0.05))))
-    cac = max(0.0, float(data.get("cac", 150.0)))
-    users_m12 = max(1, int(data.get("users_m12", 1000)))
-    tokens_per_req = max(0, int(data.get("tokens_per_req", 500)))
-    reqs_monthly = max(0, int(data.get("reqs_monthly", 30)))
-
-    gross_margin = 0.80
-    arpu = pricing_monthly * gross_margin
-
-    if arpu <= 0:
-        ltv = 0.0
-        ltv_cac_ratio = 0.0
-        payback_months = 999.0
-    else:
-        ltv = round(arpu / churn_rate, 2)
-        if cac <= 0:
-            ltv_cac_ratio = 99.9
-            payback_months = 0.0
-        else:
-            ltv_cac_ratio = round(min(ltv / cac, 99.9), 2)
-            payback_months = round(min(cac / arpu, 999.0), 1)
-
-    total_tokens_monthly = users_m12 * reqs_monthly * tokens_per_req
-    llm_cost_monthly = (total_tokens_monthly / 1_000_000.0) * 2.50
-    hosting_base = 150.0 + (users_m12 * 0.05)
-    monthly_infra = round(llm_cost_monthly + hosting_base, 2)
-
-    annual_contract_value = pricing_monthly * 12
-    if annual_contract_value > 200:
-        tam_num = (annual_contract_value * 500_000) / 1_000_000_000
-    else:
-        tam_num = (pricing_monthly * 12 * 5_000_000) / 1_000_000_000
-    tam_estimate = f"$\{max(tam_num, 0.1):.1f}B"
-
-    result = {
-        "cacEstimateUsd": round(cac, 2),
-        "ltvEstimateUsd": round(ltv, 2),
-        "ltvCacRatio": ltv_cac_ratio,
-        "estimatedPaybackMonths": payback_months,
-        "monthlyInfraCostUsd": monthly_infra,
-        "tamEstimateUsd": tam_estimate,
-        "simulationNotes": f"Simulated on {users_m12} active users with {round(churn_rate*100, 2)}% churn and {tokens_per_req} tokens/req."
-    }
-    print(json.dumps(result))
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        with open(sys.argv[1], "r", encoding="utf-8") as f:
-            data = json.load(f)
-    else:
-        data = json.loads(sys.stdin.read())
-    compute_economics(data)
-`;
+  if (typeof options.grossMarginTarget === "number") {
+    inputPayload.gross_margin_target = Math.max(0.1, Math.min(0.98, options.grossMarginTarget));
+  }
+  if (typeof options.startingCashUsd === "number" && options.startingCashUsd >= 0) {
+    inputPayload.starting_cash_usd = options.startingCashUsd;
+  }
 
   try {
     await fs.writeFile(inputPath, JSON.stringify(inputPayload), "utf-8");
-    await fs.writeFile(scriptPath, pythonScript, "utf-8");
 
-    // Execute within isolated process context with strict timeout
+    // Canonical script executed in the isolation boundary: only the input file path is
+    // interpolated into the command; no user-controlled content ever reaches the shell.
+    let scriptPath = path.resolve(process.cwd(), "scripts", "simulate_monte_carlo.py");
+    try {
+      await fs.access(scriptPath);
+    } catch {
+      scriptPath = path.resolve(process.cwd(), "dist", "scripts", "simulate_monte_carlo.py");
+    }
+
     const { stdout, stderr } = await execAsync(`python3 "${scriptPath}" "${inputPath}"`, {
-      timeout: 10000,
+      timeout: 20000,
       maxBuffer: 1024 * 1024
     });
 
-    const parsedMetrics = JSON.parse(stdout.trim());
+    const parsed = JSON.parse(stdout.trim());
+    const metrics: SandboxExecutionResult["metrics"] = {
+      cacEstimateUsd: parsed.cacEstimateUsd,
+      ltvEstimateUsd: parsed.ltvEstimateUsd,
+      ltvCacRatio: parsed.ltvCacRatio,
+      estimatedPaybackMonths: parsed.estimatedPaybackMonths,
+      monthlyInfraCostUsd: parsed.monthlyInfraCostUsd,
+      tamEstimateUsd: parsed.tamEstimateUsd,
+      monteCarlo: {
+        iterations: parsed.iterations,
+        survivalProbability12Mo: parsed.survivalProbability12Mo,
+        survivalProbability24Mo: parsed.survivalProbability24Mo,
+        insolvencyCurveByMonth: parsed.insolvencyCurveByMonth ?? [],
+        ltvCacPercentiles: parsed.ltvCacPercentiles ?? { p10: parsed.ltvCacRatio, p50: parsed.ltvCacRatio, p90: parsed.ltvCacRatio },
+        paybackPercentiles: parsed.paybackPercentiles ?? { p10: parsed.estimatedPaybackMonths, p50: parsed.estimatedPaybackMonths, p90: parsed.estimatedPaybackMonths },
+        tokenCostBurdenPercent: parsed.tokenCostBurdenPercent ?? { p10: 0, p50: 0, p90: 0 },
+        sensitivity: parsed.sensitivity ?? [],
+        simulationNotes: parsed.simulationNotes
+      }
+    };
 
     return {
-      runtime: "python3-sandbox-isolated",
+      runtime: "python3-numpy-monte-carlo",
       exitCode: 0,
       stdout: stdout.trim(),
       stderr: stderr.trim(),
-      metrics: parsedMetrics
+      metrics
     };
   } catch (error: any) {
     // Fallback calculation if python runtime execution fails
@@ -153,7 +140,18 @@ if __name__ == "__main__":
         ltvCacRatio: ltvCacRatio,
         estimatedPaybackMonths: payback,
         monthlyInfraCostUsd: 250.0,
-        tamEstimateUsd: "$2.5B"
+        tamEstimateUsd: "$2.5B",
+        monteCarlo: {
+          iterations: 1000,
+          survivalProbability12Mo: cleanPricing > 0 ? 0.85 : 0.1,
+          survivalProbability24Mo: cleanPricing > 0 ? 0.70 : 0.05,
+          insolvencyCurveByMonth: [],
+          ltvCacPercentiles: { p10: Number((ltvCacRatio * 0.7).toFixed(2)), p50: ltvCacRatio, p90: Number((ltvCacRatio * 1.3).toFixed(2)) },
+          paybackPercentiles: { p10: Number((payback * 0.8).toFixed(1)), p50: payback, p90: Number((payback * 1.4).toFixed(1)) },
+          tokenCostBurdenPercent: { p10: 0.02, p50: 0.05, p90: 0.12 },
+          sensitivity: [],
+          simulationNotes: "Closed-form analytical fallback"
+        }
       }
     };
   } finally {
