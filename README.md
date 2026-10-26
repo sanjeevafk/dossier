@@ -1,17 +1,17 @@
 # Dossier
 
-[![Live Service](https://img.shields.io/badge/Azure%20App%20Service-dossier--ai-0078D4?logo=microsoftazure&logoColor=white)](https://dossier-ai.azurewebsites.net)
-[![Health Check](https://img.shields.io/badge/Health-200%20OK-brightgreen)](https://dossier-ai.azurewebsites.net/health)
-[![UptimeRobot](https://img.shields.io/badge/UptimeRobot-Monitored-blue)](https://dossier-ai.azurewebsites.net/health)
+[![Live Service](https://img.shields.io/badge/Production-dossier.sanjeevkumar.me-0078D4?logo=cloudflare&logoColor=white)](https://dossier.sanjeevkumar.me)
+[![Health Check](https://img.shields.io/badge/Health-200%20OK-brightgreen)](https://dossier.sanjeevkumar.me/health)
+[![UptimeRobot](https://img.shields.io/badge/UptimeRobot-Monitored-blue)](https://dossier.sanjeevkumar.me/health)
 
 Adversarial multi-agent platform that stress-tests startup ideas, product features, and technical proposals before capital or engineering effort is spent.
 
 ---
 
 ## 🚀 Live Deployment
-- **Web Dashboard:** [https://dossier-ai.azurewebsites.net](https://dossier-ai.azurewebsites.net)
-- **Health Check:** [https://dossier-ai.azurewebsites.net/health](https://dossier-ai.azurewebsites.net/health)
-- **Hosting Tier:** Azure App Service (`B1` Basic, Central India — co-hosted with SwaraSetu at zero marginal cost)
+- **Web Dashboard:** [https://dossier.sanjeevkumar.me](https://dossier.sanjeevkumar.me) (Backup: [https://dossier-ai.azurewebsites.net](https://dossier-ai.azurewebsites.net))
+- **Health Check:** [https://dossier.sanjeevkumar.me/health](https://dossier.sanjeevkumar.me/health)
+- **Hosting Tier:** Azure App Service (`B1` Basic, Central India) with Cloudflare Edge SSL
 - **Keep-Alive:** Continuous 300s synthetic health polling via UptimeRobot
 
 ---
