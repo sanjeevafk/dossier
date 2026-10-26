@@ -230,9 +230,13 @@ export async function runDossierBenchmark(options: { replay?: boolean } = {}): P
   const replay = options.replay === true;
   const RUNS = replay ? 1 : Math.max(1, Math.min(5, Number.parseInt(process.env.BENCHMARK_RUNS || "3", 10) || 3));
 
+  const suite = process.env.BENCHMARK_LIMIT
+    ? BENCHMARK_SUITE.slice(0, Number.parseInt(process.env.BENCHMARK_LIMIT, 10))
+    : BENCHMARK_SUITE;
+
   console.log("\n=======================================================");
   console.log("  ⚡ DOSSIER DOMAIN-AWARE BENCHMARK SUITE");
-  console.log(`  ${BENCHMARK_SUITE.length} Diverse-Merit Concepts × ${RUNS} Runs (de-noised dispersion)`);
+  console.log(`  ${suite.length} Diverse-Merit Concepts × ${RUNS} Runs (de-noised dispersion)`);
   console.log("=======================================================\n");
 
   const orchestrator = new IdeaSwarmOrchestrator();
@@ -250,7 +254,7 @@ export async function runDossierBenchmark(options: { replay?: boolean } = {}): P
     console.log(`\n──────── Run ${run}/${RUNS} ────────`);
     const runScores: number[] = [];
 
-    for (const item of BENCHMARK_SUITE) {
+    for (const item of suite) {
       console.log(`[run ${run}] Evaluating ${item.id}: "${item.idea.title}" (${item.category})...`);
 
       try {
@@ -297,7 +301,7 @@ export async function runDossierBenchmark(options: { replay?: boolean } = {}): P
   }
 
   // De-noised aggregation: per-concept means across runs define gate and table.
-  const results = BENCHMARK_SUITE
+  const results = suite
     .filter((item) => (scoresById.get(item.id)?.length ?? 0) > 0)
     .map((item) => {
       const scores = scoresById.get(item.id)!;
@@ -365,7 +369,7 @@ export async function runDossierBenchmark(options: { replay?: boolean } = {}): P
 
   console.log("==========================================================================================================");
   console.log(`📈 OVERALL DOMAIN-AWARE BENCHMARK METRICS (de-noised over ${RUNS} runs):`);
-  console.log(`  • Concepts Aggregated     : ${results.length}/${BENCHMARK_SUITE.length}`);
+  console.log(`  • Concepts Aggregated     : ${results.length}/${suite.length}`);
   console.log(`  • Average Latency per Idea: ${avgLatency} ms`);
   console.log(`  • Total Benchmark Runtime : ${totalTimeSec} seconds`);
   console.log(`  • Sandboxed Subprocess    : ${sandboxPassRate}% Isolated Exit Code 0`);
