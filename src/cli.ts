@@ -14,7 +14,7 @@ const program = new Command();
 
 program
   .name("dossier")
-  .description("Domain-Aware Adversarial Multi-Agent Idea Intelligence Platform on TrueForge harness")
+  .description("Domain-Aware Adversarial Multi-Agent Idea Intelligence Platform")
   .version("0.2.0");
 
 program
@@ -33,7 +33,7 @@ program
     if (!options.json) {
       console.log(pc.cyan("\n======================================================="));
       console.log(pc.bold(pc.yellow("  ⚡ DOSSIER — EVIDENCE-FIRST ADVERSARIAL SWARM")));
-      console.log(pc.dim("  TrueForge Harness (File TF-007) • Zero Sycophancy"));
+      console.log(pc.dim("  Dossier Swarm Runtime (File TF-007) • Zero Sycophancy"));
       console.log(pc.cyan("=======================================================\n"));
     }
 
@@ -220,7 +220,7 @@ program
     console.log(`  • Sandbox Proof  : ${pc.dim(dossier.simulation.sandboxExecutionProof.runtime)} (exit ${dossier.simulation.sandboxExecutionProof.exitCode})`);
 
     // Human Approval Gates
-    console.log(pc.bold("\n🛑 HUMAN-IN-THE-LOOP APPROVAL GATES (TrueForge Dual-Key Safety):"));
+    console.log(pc.bold("\n🛑 HUMAN-IN-THE-LOOP APPROVAL GATES (Dual-Key Safety):"));
     for (const gate of dossier.approvalGates) {
       console.log(`  • [${pc.yellow(gate.status)}] ${gate.summary}`);
       console.log(`    Action Type: ${gate.actionType}`);

@@ -1,7 +1,7 @@
 {
   "name": "dossier-ai",
   "version": "0.1.0",
-  "description": "Adversarial Multi-Agent Idea Intelligence Platform built on TrueForge",
+  "description": "Adversarial Multi-Agent Idea Intelligence Platform",
   "main": "dist/index.js",
   "bin": {
     "dossier": "./dist/cli.js",
@@ -29,7 +29,6 @@
   },
   "keywords": [
     "ai-agent",
-    "trueforge",
     "mcp",
     "idea-validation",
     "multi-agent",
@@ -39,7 +38,6 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@truefoundry/trueforge-sdk": "^0.1.3",
     "commander": "^13.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

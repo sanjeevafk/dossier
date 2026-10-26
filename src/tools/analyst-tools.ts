@@ -102,7 +102,7 @@ export async function runAnalystWithTools(
   options: { model?: string } = {}
 ): Promise<AnalystToolResult> {
   // Step 1: Formulate targeted queries
-  const queryGenPrompt = `You are Agent 01 // MARKET ANALYST in the TrueForge Intelligence Swarm.
+  const queryGenPrompt = `You are Agent 01 // MARKET ANALYST in the Dossier Intelligence Swarm.
 Your mandate is to stress-test target market feasibility and discover real incumbents.
 Target Idea: "${idea.title}"
 Summary: ${idea.summary}
@@ -150,7 +150,7 @@ Return strictly JSON:
   ].join("\n");
 
   // Step 3: Synthesis & Calibrated Evaluation Turn
-  const synthesisSystemPrompt = `You are Agent 01 // MARKET ANALYST in the TrueForge Adversarial Swarm.
+  const synthesisSystemPrompt = `You are Agent 01 // MARKET ANALYST in the Dossier Adversarial Swarm.
 Domain: ${domain.archetypeLabel}
 Mandate: Identify real market competitors, extract pricing benchmarks, and rigorously evaluate commercial viability.
 

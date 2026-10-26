@@ -470,7 +470,7 @@ export async function runDossierBenchmark(options: { replay?: boolean } = {}): P
   const mdReport = `# Dossier Domain-Aware Adversarial Benchmark Report
 
 **Execution Date:** ${new Date().toISOString()}  
-**Agent Harness:** TrueForge Multi-Agent Runtime (File TF-007)  
+**Agent Harness:** Dossier Multi-Agent Runtime (File TF-007)  
 **De-Noising:** ${RUNS} full runs per concept; Quality Gate 3 evaluates σ of per-concept mean scores  
 **Overall Benchmark Runtime:** ${totalTimeSec} seconds  
 **Average Latency:** ${avgLatency} ms per full 6-agent adversarial evaluation  

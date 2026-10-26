@@ -54,7 +54,7 @@ export async function runEconomicsSimulation(
   const cleanTokens = Math.max(0, Math.round(Number(llmTokensPerRequest) || 500));
   const cleanReqs = Math.max(0, Math.round(Number(requestsPerUserMonthly) || 30));
 
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "trueforge-sandbox-"));
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "dossier-sandbox-"));
   const inputPath = path.join(tmpDir, "inputs.json");
 
   const inputPayload: Record<string, unknown> = {
