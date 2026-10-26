@@ -30,6 +30,12 @@ import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
+import { queryManifoldMarkets } from "../tools/manifold.js";
+import { queryOpenAlex } from "../tools/openalex.js";
+import { queryEdgarFormD } from "../tools/edgar.js";
+import { queryHuggingFace } from "../tools/huggingface.js";
+import { queryClinicalEvidence } from "../tools/clinical.js";
+import { queryMacroData } from "../tools/macro.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
 import { getBaseRate, shrinkTowardBaseRate } from "./baseRates.js";
@@ -766,13 +772,20 @@ Market & Prediction Signals: ${marketContext}`;
 
     emit({ type: "sandbox_simulating", iterationCount: 10000 });
 
-    const [marketResearch, polymarketSignals, sandboxSim, stressSim] = await Promise.all([
+    const isHealthcare = domain.archetype === "healthcare_clinical";
+    const [marketResearch, polymarketSignals, manifoldSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
       performMarketResearch(idea.title, [
         idea.targetAudience,
         idea.monetization,
         domain.regulatoryEnvironment
       ], { exaKey: options.exaKey, tavilyKey: options.tavilyKey }),
       queryPolymarketMarkets(idea.title),
+      queryManifoldMarkets(idea.title),
+      queryOpenAlex(`${idea.title} ${domain.archetypeLabel}`),
+      queryEdgarFormD(idea.title),
+      queryHuggingFace(idea.title),
+      queryClinicalEvidence(idea.title, isHealthcare),
+      queryMacroData(idea.targetAudience),
       runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30),
       // Pessimistic stress run feeding the crossfire tool traces (plan 2.2 ReAct evidence)
       runEconomicsSimulation(pricing * 0.85, Math.min(1, churn * 1.6), cac * 1.6, 500, 1500, 30)
@@ -816,10 +829,40 @@ Market & Prediction Signals: ${marketContext}`;
     }
     if (polymarketSignals.marketsFound.length > 0) {
       reconSourceParts.push(
-        `Prediction markets: ${polymarketSignals.marketsFound.map(m => `"${m.title}" @ ${m.probabilityYesPercent}% [${m.marketUrl}]`).join("; ")}. ${polymarketSignals.keyTakeaway}`
+        `Prediction markets (Polymarket): ${polymarketSignals.marketsFound.map(m => `"${m.title}" @ ${m.probabilityYesPercent}% [${m.marketUrl}]`).join("; ")}. ${polymarketSignals.keyTakeaway}`
       );
     } else {
       reconSourceParts.push(polymarketSignals.keyTakeaway);
+    }
+    if (manifoldSignals.marketsFound.length > 0) {
+      reconSourceParts.push(
+        `Prediction markets (Manifold): ${manifoldSignals.marketsFound.map(m => `"${m.question.slice(0, 80)}" @ ${m.probabilityPercent}% [${m.marketUrl}]`).join("; ")}.`
+      );
+    }
+    if (openAlexSignals.papers.length > 0) {
+      reconSourceParts.push(
+        `Academic grounding (OpenAlex, ${openAlexSignals.totalWorks.toLocaleString()} works): ${openAlexSignals.papers.slice(0, 2).map(p => `"${p.title.slice(0, 80)}" (${p.year}, ${p.citations} cites)`).join("; ")}.`
+      );
+    }
+    if (edgarSignals.filings.length > 0) {
+      reconSourceParts.push(
+        `Fundraising evidence (SEC Form D): ${edgarSignals.filings.map(f => `${f.company} filed ${f.filedDate}`).join("; ")}.`
+      );
+    }
+    if (hfSignals.models.length > 0) {
+      reconSourceParts.push(
+        `Open-source alternatives (HF Hub): ${hfSignals.models.map(m => `"${m.id}" (${m.likes} likes, ${m.downloads} downloads)`).join("; ")}.`
+      );
+    }
+    if (clinicalSignals.studies.length > 0 || clinicalSignals.clearances.length > 0) {
+      reconSourceParts.push(
+        `Clinical evidence: ${clinicalSignals.studies.map(s => `${s.nctId} (${s.status})`).join("; ")}${clinicalSignals.clearances.length > 0 ? `; 510(k): ${clinicalSignals.clearances.map(c => c.deviceName.slice(0, 50)).join("; ")}` : ""}.`
+      );
+    }
+    if (macroSignals.indicators.length > 0) {
+      reconSourceParts.push(
+        `Macro grounding (World Bank): ${macroSignals.keyTakeaway}`
+      );
     }
 
     const marketContext = `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
@@ -943,6 +986,78 @@ Market & Prediction Signals: ${marketContext}`;
       });
       retrievedExternalCount++;
     });
+    for (const m of manifoldSignals.marketsFound.slice(0, 2)) {
+      externalEvidenceItems.push({
+        id: `EV-03M${manifoldSignals.marketsFound.indexOf(m) + 1}`,
+        claim: `Manifold prediction market: "${m.question}" at ${m.probabilityPercent}% (${m.bettors} bettors, $${m.volumeUsd} volume).`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: m.marketUrl,
+        indicator: m.probabilityPercent >= 60 ? "SUPPORTING" : m.probabilityPercent <= 40 ? "CONTRADICTING" : "NEUTRAL",
+        confidencePercent: 70
+      });
+      retrievedExternalCount++;
+    }
+    for (const p of openAlexSignals.papers.slice(0, 2)) {
+      externalEvidenceItems.push({
+        id: `EV-03A${openAlexSignals.papers.indexOf(p) + 1}`,
+        claim: `Peer-reviewed grounding: "${p.title}" (${p.year}, ${p.citations} citations, ${p.venue}) — ${p.authors.join(", ")}.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: p.openAccessUrl || "OpenAlex",
+        indicator: "SUPPORTING",
+        confidencePercent: 80
+      });
+      retrievedExternalCount++;
+    }
+    for (const f of edgarSignals.filings.slice(0, 2)) {
+      externalEvidenceItems.push({
+        id: `EV-03E${edgarSignals.filings.indexOf(f) + 1}`,
+        claim: `SEC Form D fundraising: ${f.company} (CIK ${f.cik}) filed ${f.filedDate} — real capital formation in this space.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: f.filingUrl,
+        indicator: "SUPPORTING",
+        confidencePercent: 90
+      });
+      retrievedExternalCount++;
+    }
+    for (const m of hfSignals.models.slice(0, 2)) {
+      externalEvidenceItems.push({
+        id: `EV-03H${hfSignals.models.indexOf(m) + 1}`,
+        claim: `Open-source alternative on HF Hub: "${m.id}" (${m.likes} likes, ${m.downloads} downloads) — commoditization pressure.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: m.modelUrl,
+        indicator: "CONTRADICTING",
+        confidencePercent: 75
+      });
+      retrievedExternalCount++;
+    }
+    for (const s of clinicalSignals.studies.slice(0, 2)) {
+      externalEvidenceItems.push({
+        id: `EV-03C${clinicalSignals.studies.indexOf(s) + 1}`,
+        claim: `Registered trial ${s.nctId}: "${s.title}" — ${s.status}, ${s.phase}, sponsored by ${s.sponsor}.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: s.studyUrl,
+        indicator: "NEUTRAL",
+        confidencePercent: 85
+      });
+      retrievedExternalCount++;
+    }
+    if (macroSignals.indicators.length > 0) {
+      externalEvidenceItems.push({
+        id: "EV-03W",
+        claim: `Macro grounding (World Bank): ${macroSignals.keyTakeaway}`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: "https://api.worldbank.org/v2",
+        indicator: "NEUTRAL",
+        confidencePercent: 85
+      });
+      retrievedExternalCount++;
+    }
     if (retrievedExternalCount === 0) {
       const reasons = [
         marketResearch.dataSource !== "live-web-recon" ? marketResearch.reconError || "no web recon results" : null,
@@ -1473,7 +1588,12 @@ Market & Prediction Signals: ${marketContext}`;
     const externalEvidenceSources: ExternalEvidenceSource[] = [
       ...marketResearch.rawResults.map(r => ({ title: r.title, url: r.url, provider: marketResearch.reconProvider })),
       ...marketResearch.community.discussions.map(d => ({ title: d.title, url: d.url, provider: d.platform })),
-      ...polymarketSignals.marketsFound.map(m => ({ title: m.title, url: m.marketUrl, provider: "polymarket" }))
+      ...polymarketSignals.marketsFound.map(m => ({ title: m.title, url: m.marketUrl, provider: "polymarket" })),
+      ...manifoldSignals.marketsFound.map(m => ({ title: m.question.slice(0, 120), url: m.marketUrl, provider: "manifold" })),
+      ...openAlexSignals.papers.slice(0, 3).map(p => ({ title: p.title.slice(0, 120), url: p.openAccessUrl || "https://openalex.org", provider: "openalex" })),
+      ...edgarSignals.filings.map(f => ({ title: `Form D: ${f.company}`, url: f.filingUrl, provider: "sec-edgar" })),
+      ...hfSignals.models.map(m => ({ title: `Hub: ${m.id}`, url: m.modelUrl, provider: "huggingface" })),
+      ...clinicalSignals.studies.map(s => ({ title: `${s.nctId}: ${s.title.slice(0, 100)}`, url: s.studyUrl, provider: "clinicaltrials" }))
     ];
 
     const dossier: IdeaDossier = {

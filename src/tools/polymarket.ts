@@ -20,8 +20,10 @@ type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>;
 
 /**
  * Query Polymarket's live Gamma API for prediction-market odds correlated with
- * the concept. Returns ONLY markets actually returned by the API — when the
- * API is unreachable or no correlated markets exist, `marketsFound` is empty
+ * the concept. Uses /public-search (genuine full-text search — /events?q=
+ * ignores the query string and returns trending events regardless).
+ * Returns ONLY markets actually returned by the API — when the API is
+ * unreachable or no correlated markets exist, `marketsFound` is empty
  * and the takeaway says so. No synthetic fallback markets, ever.
  */
 export async function queryPolymarketMarkets(
@@ -30,9 +32,9 @@ export async function queryPolymarketMarkets(
 ): Promise<PolymarketReconResult> {
   const cleanKeyword = keyword.trim();
   // Only markets whose title shares a significant token with the query count as
-  // correlated evidence; Gamma's fuzzy search otherwise returns unrelated events.
+  // correlated evidence; search otherwise returns adjacent-domain events.
   const queryTokens = cleanKeyword.toLowerCase().split(/\s+/).filter((t) => t.replace(/[^a-z0-9]/g, "").length >= 4);
-  const url = `https://gamma-api.polymarket.com/events?limit=4&active=true&closed=false&q=${encodeURIComponent(cleanKeyword || "AI")}`;
+  const url = `https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(cleanKeyword || "AI")}`;
 
   try {
     const controller = new AbortController();
@@ -46,10 +48,11 @@ export async function queryPolymarketMarkets(
 
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      const events = Array.isArray(data) ? data : data?.events;
+      if (Array.isArray(events) && events.length > 0) {
         const signals: PredictionMarketSignal[] = [];
 
-        for (const event of data.slice(0, 3)) {
+        for (const event of events.slice(0, 3)) {
           const titleLower = String(event.title || "").toLowerCase();
           if (queryTokens.length > 0 && !queryTokens.some((t) => titleLower.includes(t.replace(/[^a-z0-9]/g, "")))) {
             continue; // Title shares no significant token with the concept — not correlated evidence.
