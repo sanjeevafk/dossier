@@ -1,9 +1,15 @@
 import OpenAI from "openai";
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
+import path from "node:path";
+import fs from "node:fs";
 import dotenv from "dotenv";
 
 dotenv.config();
+const packageEnv = path.resolve(import.meta.dirname, "..", "..", ".env");
+if (fs.existsSync(packageEnv)) {
+  dotenv.config({ path: packageEnv, override: false });
+}
 
 const execFileAsync = promisify(execFile);
 

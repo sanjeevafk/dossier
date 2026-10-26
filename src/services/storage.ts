@@ -1,8 +1,15 @@
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import { IdeaDossier, ApprovalAction } from "../types/index.js";
 
-const STORAGE_DIR = path.resolve(process.cwd(), "reports");
+const candidateStorageDirs = [
+  process.env.DOSSIER_DATA_DIR,
+  path.resolve(import.meta.dirname, "..", "..", "reports"),
+  path.resolve(process.cwd(), "reports")
+].filter(Boolean) as string[];
+
+const STORAGE_DIR = candidateStorageDirs.find((d) => fsSync.existsSync(d)) || candidateStorageDirs[0];
 
 export interface DossierSummary {
   id: string;

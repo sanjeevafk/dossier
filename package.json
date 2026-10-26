@@ -13,7 +13,7 @@
   },
   "scripts": {
     "compile": "tsc",
-    "build": "tsc && cp src/tools/decision_model.py dist/tools/",
+    "build": "tsc && cp src/tools/decision_model.py dist/tools/ && mkdir -p dist/scripts && cp scripts/simulate_monte_carlo.py dist/scripts/",
     "start": "node dist/server.js",
     "dev": "tsx src/server.ts",
     "start:prod": "node dist/server.js",

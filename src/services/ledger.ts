@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import { IdeaDossier } from "../types/index.js";
 
@@ -15,7 +16,13 @@ import { IdeaDossier } from "../types/index.js";
  * meaningful once resolved forecasts accumulate.
  */
 
-const LEDGER_DIR = path.resolve(process.cwd(), "reports", "forecasts");
+const candidateLedgerDirs = [
+  process.env.DOSSIER_DATA_DIR ? path.resolve(process.env.DOSSIER_DATA_DIR, "forecasts") : undefined,
+  path.resolve(import.meta.dirname, "..", "..", "reports", "forecasts"),
+  path.resolve(process.cwd(), "reports", "forecasts")
+].filter(Boolean) as string[];
+
+const LEDGER_DIR = candidateLedgerDirs.find((d) => fsSync.existsSync(d)) || candidateLedgerDirs[0];
 
 export type ForecastKind = "KILL_CONDITION" | "WEAKEST_ASSUMPTION" | "VALIDATION_EXPERIMENT";
 export type ForecastOutcome = "HIT" | "MISS";

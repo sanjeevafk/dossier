@@ -1,6 +1,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { MonteCarloStats } from "../types/index.js";
@@ -80,12 +81,20 @@ export async function runEconomicsSimulation(
 
     // Canonical script executed in the isolation boundary: only the input file path is
     // interpolated into the command; no user-controlled content ever reaches the shell.
-    let scriptPath = path.resolve(process.cwd(), "scripts", "simulate_monte_carlo.py");
-    try {
-      await fs.access(scriptPath);
-    } catch {
-      scriptPath = path.resolve(process.cwd(), "dist", "scripts", "simulate_monte_carlo.py");
-    }
+    let candidatePaths = [
+      path.resolve(import.meta.dirname, "..", "..", "scripts", "simulate_monte_carlo.py"),
+      path.resolve(import.meta.dirname, "..", "scripts", "simulate_monte_carlo.py"),
+      path.resolve(import.meta.dirname, "simulate_monte_carlo.py"),
+      path.resolve(process.cwd(), "scripts", "simulate_monte_carlo.py"),
+      path.resolve(process.cwd(), "dist", "scripts", "simulate_monte_carlo.py")
+    ];
+    let scriptPath = candidatePaths.find((p) => {
+      try {
+        return fsSync.existsSync(p);
+      } catch {
+        return false;
+      }
+    }) || candidatePaths[0];
 
     const { stdout, stderr } = await execAsync(`python3 "${scriptPath}" "${inputPath}"`, {
       timeout: 20000,
