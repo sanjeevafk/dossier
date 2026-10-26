@@ -997,3 +997,27 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+// ============================================================
+// 8. THEME TOGGLE (LIGHT / DARK EDITORIAL SYSTEM)
+// ============================================================
+function toggleTheme() {
+  const isDark = document.documentElement.classList.toggle('dark');
+  try {
+    localStorage.setItem('dossier_theme', isDark ? 'dark' : 'light');
+  } catch (e) {}
+}
+
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    try {
+      if (!localStorage.getItem('dossier_theme')) {
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    } catch (err) {}
+  });
+}

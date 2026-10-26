@@ -29,8 +29,9 @@ async def generate_dossier_pdf(dossier_id: str, port: int = 3000, output_path: s
         target_url = f"http://127.0.0.1:{port}#print={dossier_id}"
         await page.goto(target_url, wait_until="networkidle", timeout=15000)
         
-        # Wait for dossier to load into DOM and expand all details accordions
+        # Wait for dossier to load into DOM, ensure light paper theme, and expand all details accordions
         await page.evaluate("""() => {
+            document.documentElement.classList.remove('dark');
             const details = document.querySelectorAll('#resultsSection details');
             details.forEach(d => d.setAttribute('open', ''));
         }""")

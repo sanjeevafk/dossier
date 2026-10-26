@@ -4,6 +4,7 @@
 :root {
   --bg-sand: #fbfbfa;
   --bg-card: #ffffff;
+  --bg-subtle: #f5f5f4;
   --border-subtle: #e7e5e4;
   --border-strong: #d6d3d1;
   --text-main: #09090b;
@@ -12,12 +13,137 @@
   --accent-gold-hover: #eab308;
 }
 
+html.dark {
+  --bg-sand: #0c0a09;
+  --bg-card: #1c1917;
+  --bg-subtle: #292524;
+  --border-subtle: #292524;
+  --border-strong: #44403c;
+  --text-main: #fafaf9;
+  --text-muted: #a8a29e;
+  --accent-gold: #facc15;
+  --accent-gold-hover: #fde047;
+}
+
 body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-sand);
   color: var(--text-main);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Dark mode overrides for editorial clarity */
+html.dark header {
+  background-color: rgba(12, 10, 9, 0.88) !important;
+  border-color: #292524 !important;
+}
+
+html.dark footer {
+  background-color: #0c0a09 !important;
+  border-color: #292524 !important;
+}
+
+html.dark .bg-white {
+  background-color: #171717 !important;
+  color: #fafaf9 !important;
+}
+
+html.dark .bg-sand-50 {
+  background-color: #141413 !important;
+}
+
+html.dark .bg-sand-100 {
+  background-color: #262624 !important;
+}
+
+html.dark .border-sand-200,
+html.dark .border-sand-100,
+html.dark .border-sand-300 {
+  border-color: #2b2927 !important;
+}
+
+html.dark .divide-sand-200 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-sand-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #2b2927 !important;
+}
+
+html.dark .text-zinc-950,
+html.dark .text-zinc-900,
+html.dark .text-zinc-800 {
+  color: #fafaf9 !important;
+}
+
+html.dark .text-zinc-700,
+html.dark .text-zinc-600 {
+  color: #d4d4d8 !important;
+}
+
+html.dark .text-zinc-500,
+html.dark .text-zinc-400 {
+  color: #a1a1aa !important;
+}
+
+html.dark .bg-zinc-950 {
+  background-color: #27272a !important;
+  color: #ffffff !important;
+}
+
+html.dark .bg-zinc-100,
+html.dark .bg-zinc-200 {
+  background-color: #27272a !important;
+  color: #e4e4e7 !important;
+}
+
+html.dark .hover\:bg-zinc-800:hover {
+  background-color: #3f3f46 !important;
+}
+
+html.dark .bg-emerald-100 {
+  background-color: rgba(6, 78, 59, 0.4) !important;
+  color: #6ee7b7 !important;
+}
+
+html.dark .bg-red-100 {
+  background-color: rgba(127, 29, 29, 0.4) !important;
+  color: #fca5a5 !important;
+}
+
+html.dark .bg-amber-100 {
+  background-color: rgba(120, 53, 15, 0.4) !important;
+  color: #fcd34d !important;
+}
+
+html.dark .text-emerald-700,
+html.dark .text-emerald-800 {
+  color: #34d399 !important;
+}
+
+html.dark .text-red-700,
+html.dark .text-red-800 {
+  color: #f87171 !important;
+}
+
+html.dark .text-amber-700,
+html.dark .text-amber-800 {
+  color: #fbbf24 !important;
+}
+
+html.dark input,
+html.dark select {
+  background-color: #1c1917 !important;
+  color: #fafaf9 !important;
+  border-color: #292524 !important;
+}
+
+html.dark textarea#ideaInput {
+  color: #fafaf9 !important;
+  background-color: #171717 !important;
+}
+
+html.dark textarea#ideaInput::placeholder {
+  color: #71717a !important;
 }
 
 code, kbd, samp, pre, .font-mono {
@@ -157,8 +283,11 @@ code, kbd, samp, pre, .font-mono {
     display: grid !important;
   }
 
-  /* Keep core cards from breaking mid-box */
+  /* Keep core cards and stochastic financial ledger from breaking mid-box */
   #resultsSection > div,
+  #mcFinancialLedger,
+  #mcSummaryCards,
+  #mcFinancialLedger > div,
   .rounded-xl,
   .rounded-2xl {
     break-inside: avoid !important;
