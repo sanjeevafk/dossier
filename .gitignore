@@ -55,11 +55,11 @@ docs/local/
 local/
 local
 
-# TrueForge / Runtime Local State
+# Runtime Local State
 *.db
 *.sqlite
 *.sqlite3
-data/
+/data/
 storage/
 logs/
 *.log
