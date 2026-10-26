@@ -6,6 +6,7 @@ import { queryEdgarFormD } from "../dist/tools/edgar.js";
 import { queryHuggingFace } from "../dist/tools/huggingface.js";
 import { queryClinicalEvidence } from "../dist/tools/clinical.js";
 import { queryMacroData } from "../dist/tools/macro.js";
+import { extractDomainTokens, getSearchQueryCandidates } from "../dist/tools/queryTokens.js";
 
 function fetchMock(payload, ok = true) {
   return async () => ({
@@ -124,4 +125,82 @@ test("Macro grounds audience country with World Bank data", async () => {
   assert.equal(r.indicators[0].country, "IN");
   assert.equal(r.indicators[0].value, 60.25);
   assert.ok(r.keyTakeaway.includes("60.25"));
+});
+
+test("Domain token extraction filters out AI/copilot/tool stop words", () => {
+  const tokens = extractDomainTokens("AI Trading Copilot SaaS");
+  assert.deepEqual(tokens, ["trading"]);
+
+  const candidates = getSearchQueryCandidates("AI Trading Copilot");
+  assert.ok(candidates.includes("AI Trading Copilot"));
+  assert.ok(candidates.includes("trading"));
+});
+
+test("Manifold falls back to domain query if composite phrase returns no binary markets", async () => {
+  const multiChoicePayload = [
+    { question: "General AI question", outcomeType: "MULTIPLE_CHOICE", isResolved: false, probability: 0.5 }
+  ];
+  const binaryPayload = [
+    { question: "Trading bot regulation passes in 2026", outcomeType: "BINARY", isResolved: false, probability: 0.45, volume: 10000, uniqueBettorCount: 25, url: "https://manifold.markets/x/trade", slug: "trade" }
+  ];
+
+  let calls = 0;
+  const mock = async (url) => {
+    calls++;
+    if (url.includes("Copilot")) return { ok: true, json: async () => multiChoicePayload };
+    return { ok: true, json: async () => binaryPayload };
+  };
+
+  const r = await queryManifoldMarkets("AI Trading Copilot", mock);
+  assert.equal(calls, 2);
+  assert.equal(r.marketsFound.length, 1);
+  assert.equal(r.marketsFound[0].probabilityPercent, 45);
+  assert.ok(r.marketsFound[0].question.includes("Trading"));
+});
+
+test("HuggingFace falls back to domain query if composite phrase returns empty", async () => {
+  const hfPayload = [
+    { id: "community/crypto-trading-bot", likes: 45, downloads: 1200, trendingScore: 3 }
+  ];
+
+  let calls = 0;
+  const mock = async (url) => {
+    calls++;
+    if (url.includes("Copilot")) return { ok: true, json: async () => [] };
+    return { ok: true, json: async () => hfPayload };
+  };
+
+  const r = await queryHuggingFace("AI Trading Copilot", mock);
+  assert.equal(calls, 2);
+  assert.equal(r.models.length, 1);
+  assert.equal(r.models[0].id, "community/crypto-trading-bot");
+});
+
+test("EDGAR falls back to domain candidate if composite title has zero Form D hits", async () => {
+  const edgarPayload = {
+    hits: {
+      total: { value: 1 },
+      hits: [{
+        _id: "trade-doc",
+        _source: {
+          ciks: ["0001999999"],
+          file_date: "2025-01-15",
+          adsh: "0001999999-25-000001",
+          file_description: "METANET AI TRADING LTD"
+        }
+      }]
+    }
+  };
+
+  let calls = 0;
+  const mock = async (url) => {
+    calls++;
+    if (url.includes("Copilot")) return { ok: true, json: async () => ({ hits: { total: { value: 0 }, hits: [] } }) };
+    return { ok: true, json: async () => edgarPayload };
+  };
+
+  const r = await queryEdgarFormD("AI Trading Copilot", mock);
+  assert.equal(calls, 2);
+  assert.equal(r.totalFilings, 1);
+  assert.equal(r.filings[0].company, "METANET AI TRADING LTD");
 });

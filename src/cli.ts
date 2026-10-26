@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+import dns from "node:dns";
+try {
+  dns.setDefaultResultOrder?.("ipv4first");
+} catch {
+  // Best-effort IPv4 preference
+}
+
 import { Command } from "commander";
 import pc from "picocolors";
 import fs from "node:fs/promises";

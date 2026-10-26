@@ -1,3 +1,5 @@
+import { getSearchQueryCandidates } from "./queryTokens.js";
+
 export interface FormDFiling {
   company: string;
   cik: string;
@@ -36,51 +38,60 @@ export async function queryEdgarFormD(
 
   if (!cleanKeyword) return empty("Empty query — no EDGAR search performed.");
 
-  const url = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${cleanKeyword}"`)}&forms=D&startdt=2022-01-01&enddt=2026-12-31`;
+  const candidates = getSearchQueryCandidates(cleanKeyword);
+  if (candidates.length === 0) candidates.push(cleanKeyword);
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    const res = await fetchImpl(url, {
-      signal: controller.signal,
-      headers: { Accept: "application/json", "User-Agent": "Dossier research contact@dossier.local" }
-    });
-    clearTimeout(timeoutId);
-    if (!res.ok) return empty(`EDGAR returned HTTP ${res.status} — no fundraising evidence retrieved.`);
+  for (const qTerm of candidates) {
+    const url = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(qTerm)}&forms=D&startdt=2022-01-01&enddt=2026-12-31`;
 
-    const data = await res.json();
-    const hits = data?.hits?.hits;
-    if (!Array.isArray(hits) || hits.length === 0) {
-      return empty(`No Form D filings match "${cleanKeyword}" — no SEC fundraising evidence.`);
-    }
-
-    const filings: FormDFiling[] = [];
-    const seen = new Set<string>();
-    for (const h of hits) {
-      const src = (h?._source || {}) as Record<string, unknown>;
-      const adsh = String(src.adsh || "");
-      if (!adsh || seen.has(adsh)) continue;
-      seen.add(adsh);
-      const ciks = Array.isArray(src.ciks) ? src.ciks : [];
-      const cik = String(ciks[0] || "").replace(/^0+/, "") || "unknown";
-      filings.push({
-        company: String(src.file_description || src.display_names || "Unknown filer").slice(0, 100),
-        cik,
-        filedDate: String(src.file_date || "unknown"),
-        filingUrl: `https://www.sec.gov/Archives/edgar/data/${ciks[0] || ""}/${adsh.replace(/-/g, "")}/${h?._id || ""}`
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const res = await fetchImpl(url, {
+        signal: controller.signal,
+        headers: { Accept: "application/json", "User-Agent": "Dossier research contact@dossier.local" }
       });
-      if (filings.length >= 3) break;
-    }
+      clearTimeout(timeoutId);
+      if (!res.ok) continue;
 
-    const total = Number(data?.hits?.total?.value) || filings.length;
-    return {
-      query: cleanKeyword,
-      source: "SEC EDGAR Form D (keyless)",
-      totalFilings: total,
-      filings,
-      keyTakeaway: `${total} Form D filing(s) match "${cleanKeyword}" — real fundraising activity, latest ${filings[0]?.filedDate}.`
-    };
-  } catch {
-    return empty(`EDGAR unreachable — no fundraising evidence for "${cleanKeyword}".`);
+      const data = await res.json();
+      const hits = data?.hits?.hits;
+      if (!Array.isArray(hits) || hits.length === 0) {
+        continue;
+      }
+
+      const filings: FormDFiling[] = [];
+      const seen = new Set<string>();
+      for (const h of hits) {
+        const src = (h?._source || {}) as Record<string, unknown>;
+        const adsh = String(src.adsh || "");
+        if (!adsh || seen.has(adsh)) continue;
+        seen.add(adsh);
+        const ciks = Array.isArray(src.ciks) ? src.ciks : [];
+        const cik = String(ciks[0] || "").replace(/^0+/, "") || "unknown";
+        filings.push({
+          company: String(src.file_description || src.display_names || "Unknown filer").slice(0, 100),
+          cik,
+          filedDate: String(src.file_date || "unknown"),
+          filingUrl: `https://www.sec.gov/Archives/edgar/data/${ciks[0] || ""}/${adsh.replace(/-/g, "")}/${h?._id || ""}`
+        });
+        if (filings.length >= 3) break;
+      }
+
+      if (filings.length > 0) {
+        const total = Number(data?.hits?.total?.value) || filings.length;
+        return {
+          query: cleanKeyword,
+          source: "SEC EDGAR Form D (keyless)",
+          totalFilings: total,
+          filings,
+          keyTakeaway: `${total} Form D filing(s) match "${qTerm}" — real fundraising activity, latest ${filings[0]?.filedDate}.`
+        };
+      }
+    } catch {
+      // Continue to next candidate or fall through
+    }
   }
+
+  return empty(`No Form D filings match "${cleanKeyword}" — no SEC fundraising evidence.`);
 }

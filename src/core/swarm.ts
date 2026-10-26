@@ -1,3 +1,10 @@
+import dns from "node:dns";
+try {
+  dns.setDefaultResultOrder?.("ipv4first");
+} catch {
+  // Best-effort IPv4 preference
+}
+
 import {
   IdeaInput,
   IdeaDossier,
@@ -29,8 +36,7 @@ import { buildMutationProposals } from "./mutator.js";
 import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
-import { queryPolymarketMarkets } from "../tools/polymarket.js";
-import { queryManifoldMarkets } from "../tools/manifold.js";
+import { queryUnifiedPredictionMarkets } from "../tools/markets/index.js";
 import { queryOpenAlex } from "../tools/openalex.js";
 import { queryEdgarFormD } from "../tools/edgar.js";
 import { queryHuggingFace } from "../tools/huggingface.js";
@@ -773,14 +779,13 @@ Market & Prediction Signals: ${marketContext}`;
     emit({ type: "sandbox_simulating", iterationCount: 10000 });
 
     const isHealthcare = domain.archetype === "healthcare_clinical";
-    const [marketResearch, polymarketSignals, manifoldSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
+    const [marketResearch, unifiedMarkets, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
       performMarketResearch(idea.title, [
         idea.targetAudience,
         idea.monetization,
         domain.regulatoryEnvironment
       ], { exaKey: options.exaKey, tavilyKey: options.tavilyKey }),
-      queryPolymarketMarkets(idea.title),
-      queryManifoldMarkets(idea.title),
+      queryUnifiedPredictionMarkets(idea.title),
       queryOpenAlex(`${idea.title} ${domain.archetypeLabel}`),
       queryEdgarFormD(idea.title),
       queryHuggingFace(idea.title),
@@ -827,17 +832,12 @@ Market & Prediction Signals: ${marketContext}`;
     } else {
       reconSourceParts.push("No community discussions (Reddit/HN/X) were retrievable for this concept.");
     }
-    if (polymarketSignals.marketsFound.length > 0) {
+    if (unifiedMarkets.signals.length > 0) {
       reconSourceParts.push(
-        `Prediction markets (Polymarket): ${polymarketSignals.marketsFound.map(m => `"${m.title}" @ ${m.probabilityYesPercent}% [${m.marketUrl}]`).join("; ")}. ${polymarketSignals.keyTakeaway}`
+        `Prediction markets (${unifiedMarkets.activeSources.map(s => s.toUpperCase()).join("/")}): ${unifiedMarkets.signals.slice(0, 3).map(m => `"${m.title.slice(0, 70)}" @ ${m.probabilityYesPercent}% [${m.source}]`).join("; ")}. ${unifiedMarkets.keyTakeaway}`
       );
     } else {
-      reconSourceParts.push(polymarketSignals.keyTakeaway);
-    }
-    if (manifoldSignals.marketsFound.length > 0) {
-      reconSourceParts.push(
-        `Prediction markets (Manifold): ${manifoldSignals.marketsFound.map(m => `"${m.question.slice(0, 80)}" @ ${m.probabilityPercent}% [${m.marketUrl}]`).join("; ")}.`
-      );
+      reconSourceParts.push(unifiedMarkets.keyTakeaway);
     }
     if (openAlexSignals.papers.length > 0) {
       reconSourceParts.push(
@@ -944,18 +944,34 @@ Market & Prediction Signals: ${marketContext}`;
     // that absence — the feed never presents heuristic priors as sourced data.
     const externalEvidenceItems: EvidenceItem[] = [];
     let retrievedExternalCount = 0;
-    if (polymarketSignals.marketsFound.length > 0) {
-      const top = polymarketSignals.marketsFound[0];
+    if (unifiedMarkets.signals.length > 0) {
+      const top = unifiedMarkets.signals[0];
+      const consensusNote = unifiedMarkets.consensusGroups.length > 0 && unifiedMarkets.consensusGroups[0].sources.length > 1
+        ? ` Shared cross-market topic "${unifiedMarkets.consensusGroups[0].canonicalQuestion.slice(0, 70)}" priced at ${unifiedMarkets.consensusGroups[0].consensusProbabilityPercent}% across ${unifiedMarkets.consensusGroups[0].sources.join("+")} (spread: ${unifiedMarkets.consensusGroups[0].spreadPercent}%).`
+        : "";
       externalEvidenceItems.push({
         id: "EV-03",
-        claim: `Macro prediction market sentiment: ${polymarketSignals.keyTakeaway} Top correlated market: "${top.title}" at ${top.probabilityYesPercent}%.`,
+        claim: `Macro prediction market sentiment: ${unifiedMarkets.keyTakeaway} Top market: "${top.title}" at ${top.probabilityYesPercent}% on ${top.source}.${consensusNote}`,
         tier: "EXTERNAL_EVIDENCE",
         claimType: "EXTERNAL_EVIDENCE",
-        provenance: `Polymarket Gamma API [${top.marketUrl}]`,
-        indicator: polymarketSignals.macroSentiment === "BEARISH" ? "CONTRADICTING" : "SUPPORTING",
+        provenance: `Prediction Market Oracle (${top.source.toUpperCase()}) [${top.url}]`,
+        indicator: unifiedMarkets.macroSentiment === "BEARISH" ? "CONTRADICTING" : (unifiedMarkets.macroSentiment === "BULLISH" ? "SUPPORTING" : "NEUTRAL"),
         confidencePercent: 75
       });
       retrievedExternalCount++;
+
+      unifiedMarkets.signals.slice(0, 3).forEach((sig, idx) => {
+        externalEvidenceItems.push({
+          id: `EV-03M${idx + 1}`,
+          claim: `${sig.source.toUpperCase()} market: "${sig.title}" at ${sig.probabilityYesPercent}% ($${sig.volumeUsd.toLocaleString()} volume, status: ${sig.status}).`,
+          tier: "EXTERNAL_EVIDENCE",
+          claimType: "EXTERNAL_EVIDENCE",
+          provenance: sig.url,
+          indicator: sig.probabilityYesPercent >= 60 ? "SUPPORTING" : (sig.probabilityYesPercent <= 40 ? "CONTRADICTING" : "NEUTRAL"),
+          confidencePercent: 70
+        });
+        retrievedExternalCount++;
+      });
     }
     if (marketResearch.dataSource === "live-web-recon" && marketResearch.rawResults.length > 0) {
       marketResearch.rawResults.slice(0, 2).forEach((r, i) => {
@@ -986,18 +1002,6 @@ Market & Prediction Signals: ${marketContext}`;
       });
       retrievedExternalCount++;
     });
-    for (const m of manifoldSignals.marketsFound.slice(0, 2)) {
-      externalEvidenceItems.push({
-        id: `EV-03M${manifoldSignals.marketsFound.indexOf(m) + 1}`,
-        claim: `Manifold prediction market: "${m.question}" at ${m.probabilityPercent}% (${m.bettors} bettors, $${m.volumeUsd} volume).`,
-        tier: "EXTERNAL_EVIDENCE",
-        claimType: "EXTERNAL_EVIDENCE",
-        provenance: m.marketUrl,
-        indicator: m.probabilityPercent >= 60 ? "SUPPORTING" : m.probabilityPercent <= 40 ? "CONTRADICTING" : "NEUTRAL",
-        confidencePercent: 70
-      });
-      retrievedExternalCount++;
-    }
     for (const p of openAlexSignals.papers.slice(0, 2)) {
       externalEvidenceItems.push({
         id: `EV-03A${openAlexSignals.papers.indexOf(p) + 1}`,
@@ -1588,8 +1592,7 @@ Market & Prediction Signals: ${marketContext}`;
     const externalEvidenceSources: ExternalEvidenceSource[] = [
       ...marketResearch.rawResults.map(r => ({ title: r.title, url: r.url, provider: marketResearch.reconProvider })),
       ...marketResearch.community.discussions.map(d => ({ title: d.title, url: d.url, provider: d.platform })),
-      ...polymarketSignals.marketsFound.map(m => ({ title: m.title, url: m.marketUrl, provider: "polymarket" })),
-      ...manifoldSignals.marketsFound.map(m => ({ title: m.question.slice(0, 120), url: m.marketUrl, provider: "manifold" })),
+      ...unifiedMarkets.signals.map(m => ({ title: `[${m.source.toUpperCase()}] ${m.title.slice(0, 120)}`, url: m.url, provider: m.source })),
       ...openAlexSignals.papers.slice(0, 3).map(p => ({ title: p.title.slice(0, 120), url: p.openAccessUrl || "https://openalex.org", provider: "openalex" })),
       ...edgarSignals.filings.map(f => ({ title: `Form D: ${f.company}`, url: f.filingUrl, provider: "sec-edgar" })),
       ...hfSignals.models.map(m => ({ title: `Hub: ${m.id}`, url: m.modelUrl, provider: "huggingface" })),
@@ -1632,7 +1635,19 @@ Market & Prediction Signals: ${marketContext}`;
       killConditions,
       cheapestValidationExperiment,
       resilienceBreakdown,
-      predictionMarkets: polymarketSignals,
+      predictionMarkets: {
+        source: unifiedMarkets.activeSources.length > 0
+          ? `Unified Prediction Oracle (${unifiedMarkets.activeSources.map(s => s.toUpperCase()).join("/")})`
+          : "Unified Prediction Oracle",
+        macroSentiment: unifiedMarkets.macroSentiment,
+        keyTakeaway: unifiedMarkets.keyTakeaway,
+        marketsFound: unifiedMarkets.signals.map(s => ({
+          title: `[${s.source.toUpperCase()}] ${s.title}`,
+          probabilityYesPercent: s.probabilityYesPercent,
+          volumeUsd: s.volumeUsd,
+          marketUrl: s.url
+        }))
+      },
       debateTrail,
       convergenceRounds,
       debateRoundsExecuted: convergenceRounds,

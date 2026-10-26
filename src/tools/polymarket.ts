@@ -1,3 +1,5 @@
+import { getSearchQueryCandidates, extractDomainTokens } from "./queryTokens.js";
+
 export interface PredictionMarketSignal {
   id: string;
   title: string;
@@ -31,72 +33,82 @@ export async function queryPolymarketMarkets(
   fetchImpl: FetchImpl = fetch
 ): Promise<PolymarketReconResult> {
   const cleanKeyword = keyword.trim();
-  // Only markets whose title shares a significant token with the query count as
-  // correlated evidence; search otherwise returns adjacent-domain events.
-  const queryTokens = cleanKeyword.toLowerCase().split(/\s+/).filter((t) => t.replace(/[^a-z0-9]/g, "").length >= 4);
-  const url = `https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(cleanKeyword || "AI")}`;
+  const domainTokens = extractDomainTokens(cleanKeyword);
+  const queryTokens = domainTokens.length > 0
+    ? domainTokens
+    : cleanKeyword.toLowerCase().split(/\s+/).filter((t) => t.replace(/[^a-z0-9]/g, "").length >= 4);
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+  const queryCandidates = getSearchQueryCandidates(cleanKeyword);
+  if (queryCandidates.length === 0) {
+    queryCandidates.push("AI");
+  }
 
-    const res = await fetchImpl(url, {
-      signal: controller.signal,
-      headers: { "Accept": "application/json" }
-    });
-    clearTimeout(timeoutId);
+  for (const queryTerm of queryCandidates) {
+    const url = `https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(queryTerm)}`;
 
-    if (res.ok) {
-      const data = await res.json();
-      const events = Array.isArray(data) ? data : data?.events;
-      if (Array.isArray(events) && events.length > 0) {
-        const signals: PredictionMarketSignal[] = [];
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-        for (const event of events.slice(0, 3)) {
-          const titleLower = String(event.title || "").toLowerCase();
-          if (queryTokens.length > 0 && !queryTokens.some((t) => titleLower.includes(t.replace(/[^a-z0-9]/g, "")))) {
-            continue; // Title shares no significant token with the concept — not correlated evidence.
-          }
-          const firstMarket = event.markets?.[0];
-          if (!firstMarket?.outcomePrices) {
-            continue; // No parseable odds — exclude rather than defaulting to a fake 50%.
-          }
-          let probYes: number;
-          try {
-            const prices = JSON.parse(firstMarket.outcomePrices);
-            if (!Array.isArray(prices) || prices.length === 0 || Number.isNaN(parseFloat(prices[0]))) {
+      const res = await fetchImpl(url, {
+        signal: controller.signal,
+        headers: { "Accept": "application/json" }
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const events = Array.isArray(data) ? data : data?.events;
+        if (Array.isArray(events) && events.length > 0) {
+          const signals: PredictionMarketSignal[] = [];
+
+          for (const event of events.slice(0, 10)) {
+            const titleLower = String(event.title || "").toLowerCase();
+            if (queryTokens.length > 0 && !queryTokens.some((t) => titleLower.includes(t.replace(/[^a-z0-9]/g, "")))) {
+              continue; // Title shares no significant token with the concept — not correlated evidence.
+            }
+            const firstMarket = event.markets?.[0];
+            if (!firstMarket?.outcomePrices) {
+              continue; // No parseable odds — exclude rather than defaulting to a fake 50%.
+            }
+            let probYes: number;
+            try {
+              const prices = JSON.parse(firstMarket.outcomePrices);
+              if (!Array.isArray(prices) || prices.length === 0 || Number.isNaN(parseFloat(prices[0]))) {
+                continue;
+              }
+              probYes = Math.round(parseFloat(prices[0]) * 100);
+            } catch {
               continue;
             }
-            probYes = Math.round(parseFloat(prices[0]) * 100);
-          } catch {
-            continue;
+
+            signals.push({
+              id: event.id || firstMarket?.id || String(Math.random()),
+              title: event.title || firstMarket?.question || "Prediction Market",
+              category: event.tags?.[0]?.label || "Tech/AI",
+              probabilityYesPercent: probYes,
+              volumeUsd: Math.round(parseFloat(event.volume || firstMarket?.volume || "0") || 0),
+              liquidityUsd: Math.round(parseFloat(event.liquidity || firstMarket?.liquidity || "0") || 0),
+              marketUrl: `https://polymarket.com/event/${event.slug || ""}`
+            });
+            if (signals.length >= 3) break;
           }
 
-          signals.push({
-            id: event.id || firstMarket?.id || String(Math.random()),
-            title: event.title || firstMarket?.question || "Prediction Market",
-            category: event.tags?.[0]?.label || "Tech/AI",
-            probabilityYesPercent: probYes,
-            volumeUsd: Math.round(parseFloat(event.volume || firstMarket?.volume || "0") || 0),
-            liquidityUsd: Math.round(parseFloat(event.liquidity || firstMarket?.liquidity || "0") || 0),
-            marketUrl: `https://polymarket.com/event/${event.slug || ""}`
-          });
-        }
-
-        if (signals.length > 0) {
-          const avgProb = Math.round(signals.reduce((a, b) => a + b.probabilityYesPercent, 0) / signals.length);
-          return {
-            query: cleanKeyword,
-            source: "Polymarket Gamma Live Oracle",
-            marketsFound: signals,
-            macroSentiment: avgProb >= 60 ? "BULLISH" : (avgProb <= 40 ? "BEARISH" : "NEUTRAL"),
-            keyTakeaway: `Prediction market odds indicate ${avgProb}% average probability across ${signals.length} correlated market(s).`
-          };
+          if (signals.length > 0) {
+            const avgProb = Math.round(signals.reduce((a, b) => a + b.probabilityYesPercent, 0) / signals.length);
+            return {
+              query: cleanKeyword,
+              source: "Polymarket Gamma Live Oracle",
+              marketsFound: signals,
+              macroSentiment: avgProb >= 60 ? "BULLISH" : (avgProb <= 40 ? "BEARISH" : "NEUTRAL"),
+              keyTakeaway: `Prediction market odds indicate ${avgProb}% average probability across ${signals.length} correlated market(s).`
+            };
+          }
         }
       }
+    } catch {
+      // Continue to next query candidate or fall through
     }
-  } catch {
-    // Fall through to the honest empty result below.
   }
 
   return {
