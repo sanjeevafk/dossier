@@ -114,21 +114,24 @@ export function sanitizeReconQuery(query: string): string {
  * can meter cost. Never throws — an unreachable or unconfigured provider
  * yields `provider: "none"`.
  */
-export async function performLiveWebRecon(queries: string[]): Promise<ReconOutcome> {
+export async function performLiveWebRecon(
+  queries: string[],
+  opts: { exaKey?: string; tavilyKey?: string } = {}
+): Promise<ReconOutcome> {
   const cleanQueries = queries.map((q) => q.trim()).filter(Boolean).slice(0, 3);
   if (cleanQueries.length === 0) {
     return { provider: "none", queries: [], results: [] };
   }
 
-  const exaKey = process.env.EXA_API_KEY;
-  const tavilyKey = process.env.TAVILY_API_KEY;
+  const exaKey = opts.exaKey ?? process.env.EXA_API_KEY;
+  const tavilyKey = opts.tavilyKey ?? process.env.TAVILY_API_KEY;
 
   if (!exaKey && !tavilyKey) {
     return {
       provider: "none",
       queries: cleanQueries,
       results: [],
-      error: "No recon provider configured (set EXA_API_KEY or TAVILY_API_KEY)"
+      error: "No recon key supplied — bring your own EXA_API_KEY or TAVILY_API_KEY (header X-Exa-Key / X-Tavily-Key, or server env)"
     };
   }
 

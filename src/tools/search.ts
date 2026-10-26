@@ -40,19 +40,23 @@ export interface ResearchFindings {
 export async function performMarketResearch(
   ideaTitle: string,
   domainKeywords: string[],
-  opts: { liveRecon?: boolean } = {}
+  opts: { liveRecon?: boolean; exaKey?: string; tavilyKey?: string } = {}
 ): Promise<ResearchFindings> {
   const query = `${ideaTitle} ${domainKeywords.join(" ")}`.trim();
   const cleanTitle = ideaTitle.trim().slice(0, 120);
 
-  const liveReconAllowed = opts.liveRecon ?? process.env.DOSSIER_PRO === "1";
+  // BYOK: live recon runs when the caller supplies a provider key
+  // (per-request headers or server env). No key → honest "none".
+  const exaKey = opts.exaKey ?? process.env.EXA_API_KEY;
+  const tavilyKey = opts.tavilyKey ?? process.env.TAVILY_API_KEY;
+  const liveReconAllowed = (opts.liveRecon ?? true) && (!!exaKey || !!tavilyKey);
   const [recon, community] = await Promise.all([
     liveReconAllowed
       ? performLiveWebRecon([
           `${cleanTitle} competitors alternatives pricing`,
           `${cleanTitle} ${domainKeywords.slice(0, 2).join(" ")} customer complaints churn reviews`
-        ])
-      : Promise.resolve({ provider: "none" as const, queries: [], results: [], error: "Free tier: live recon gated to Pro (DOSSIER_PRO=1)" }),
+        ], { exaKey, tavilyKey })
+      : Promise.resolve({ provider: "none" as const, queries: [], results: [], error: "No recon key supplied — bring your own EXA_API_KEY or TAVILY_API_KEY (header X-Exa-Key / X-Tavily-Key, or server env)" }),
     queryCommunitySentiment(cleanTitle)
   ]);
 

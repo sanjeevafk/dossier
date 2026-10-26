@@ -69,7 +69,7 @@ Inspired by **Stanford University's CS329A (Self-Improving AI Agents)** and **Az
 Queries Polymarket's open Gamma API (`https://gamma-api.polymarket.com/events`) with zero API key dependencies to pull real-time trading volumes, betting odds, and crowd-sourced probability for macro tech trends.
 
 ### B. Live Recon (Exa/Tavily + Hacker News + CLI bridges)
-Live web recon (Exa or Tavily, 7-day SQLite cache, MiniLM rerank) plus zero-key Hacker News Algolia and best-effort Reddit/X CLI bridges surface real competitor pages and community threads with source URLs. No provider → explicit `dataSource: "none"`; free tier gates live recon to Pro (`DOSSIER_PRO=1`).
+Live web recon (Exa or Tavily, 7-day SQLite cache, MiniLM rerank) plus zero-key Hacker News Algolia and best-effort Reddit/X CLI bridges surface real competitor pages and community threads with source URLs. No provider → explicit `dataSource: "none"`. Keys are bring-your-own: per-request headers (`X-Exa-Key` / `X-Tavily-Key`, MCP `exaKey`/`tavilyKey` args) or server env. No paywall — callers pay their provider directly.
 
 ### C. Dossier MCP Server (`src/mcp-server.ts`)
 Exposes 9 tools over STDIO: `evaluate_idea`, `stress_test_concept`, `run_sandbox_economics`, `verify_claims_epistemics`, `list_dossiers`, `get_dossier`, `export_dossier`, `update_approval_gate`, `update_outcome` (ledger outcome ingestion for calibration). `src/tools/mcp.ts` + `dossier.mcp.json` are legacy client scaffolding, currently unused by the swarm.

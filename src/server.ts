@@ -152,12 +152,16 @@ app.post("/api/evaluate", requireAuth, async (req: Request, res: Response) => {
       monetization: monetization || "$49/month SaaS"
     };
 
-    const proTier = req.headers["x-dossier-pro"] === "1" || process.env.DOSSIER_PRO === "1";
+    // BYOK recon: per-request keys ride headers; server env is the fallback.
+    // MIT codebase — no paywall, callers pay their own provider directly.
+    const exaKey = typeof req.headers["x-exa-key"] === "string" ? req.headers["x-exa-key"] : undefined;
+    const tavilyKey = typeof req.headers["x-tavily-key"] === "string" ? req.headers["x-tavily-key"] : undefined;
     const dossier = await orchestrator.evaluateIdea(ideaInput, {
       pricingMonthlyUsd: pricingMonthlyUsd ? parseFloat(pricingMonthlyUsd) : undefined,
       estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined,
       useLiveLLM: useLiveLLM !== false,
-      proTier
+      exaKey,
+      tavilyKey
     });
 
     res.json({ success: true, dossier, llmStatus: getLLMStatus(), costUsd: dossier.evaluationMode === "LIVE_LLM" ? 0.3 : 0.0 });
@@ -210,7 +214,8 @@ app.post("/api/evaluate/stream", requireAuth, async (req: Request, res: Response
       pricingMonthlyUsd: pricingMonthlyUsd ? parseFloat(pricingMonthlyUsd) : undefined,
       estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined,
       useLiveLLM: useLiveLLM !== false,
-      proTier: req.headers["x-dossier-pro"] === "1" || process.env.DOSSIER_PRO === "1",
+      exaKey: typeof req.headers["x-exa-key"] === "string" ? req.headers["x-exa-key"] : undefined,
+      tavilyKey: typeof req.headers["x-tavily-key"] === "string" ? req.headers["x-tavily-key"] : undefined,
       onProgress: (stage, detail) => {
         sendSSE("progress", { stage, detail, timestamp: new Date().toISOString() });
       },

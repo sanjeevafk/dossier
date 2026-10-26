@@ -88,6 +88,14 @@ class DossierMCPServer {
                 cac: {
                   type: "number",
                   description: "Optional estimated customer acquisition cost in USD (default: 150)"
+                },
+                exaKey: {
+                  type: "string",
+                  description: "Optional Exa API key (BYOK — falls back to server EXA_API_KEY)"
+                },
+                tavilyKey: {
+                  type: "string",
+                  description: "Optional Tavily API key (BYOK — falls back to server TAVILY_API_KEY)"
                 }
               },
               required: ["title", "summary", "targetAudience", "monetization"]
@@ -241,7 +249,9 @@ class DossierMCPServer {
             const dossier = await orchestrator.evaluateIdea(input, {
               pricingMonthlyUsd: typeof args?.pricing === "number" ? args.pricing : undefined,
               estimatedCacUsd: typeof args?.cac === "number" ? args.cac : undefined,
-              useLiveLLM: true
+              useLiveLLM: true,
+              exaKey: typeof args?.exaKey === "string" ? args.exaKey : undefined,
+              tavilyKey: typeof args?.tavilyKey === "string" ? args.tavilyKey : undefined
             });
 
             return {
