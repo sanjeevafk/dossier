@@ -8,6 +8,8 @@ const require = createRequire(import.meta.url);
 
 const DATA_DIR = process.env.DOSSIER_DATA_DIR
   ? path.resolve(process.env.DOSSIER_DATA_DIR)
+  : process.env.NODE_ENV === "test"
+  ? path.resolve(process.cwd(), "data/test")
   : path.resolve(process.cwd(), "data");
 const STORAGE_DIR = path.join(DATA_DIR, "reports");
 const DB_PATH = path.join(DATA_DIR, "dossiers.db");
