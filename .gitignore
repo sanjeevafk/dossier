@@ -54,7 +54,8 @@ local
 *.db
 *.sqlite
 *.sqlite3
-data/
+/data/
+!src/data/
 storage/
 logs/
 *.log

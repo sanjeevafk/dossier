@@ -45,6 +45,8 @@ import { queryEdgarFormD } from "../tools/edgar.js";
 import { queryHuggingFace } from "../tools/huggingface.js";
 import { queryClinicalEvidence } from "../tools/clinical.js";
 import { queryMacroData } from "../tools/macro.js";
+import { findMatchingItchProblems } from "../data/fixMyItchProblems.js";
+import { findMatchingGraveyardPrecedents } from "../data/graveyardAntipatterns.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
 import { getBaseRate, shrinkTowardBaseRate } from "./baseRates.js";
@@ -782,6 +784,9 @@ Market & Prediction Signals: ${marketContext}`;
     emit({ type: "sandbox_simulating", iterationCount: 10000 });
 
     const geo = detectJurisdiction(idea.targetAudience, idea.summary, idea.title);
+    const combinedIdeaText = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization}`;
+    const itchMatches = findMatchingItchProblems(combinedIdeaText);
+    const graveyardMatches = findMatchingGraveyardPrecedents(combinedIdeaText);
     const isHealthcare = domain.archetype === "healthcare_clinical";
     const [marketResearch, unifiedMarkets, newsSignals, reachSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
       performMarketResearch(idea.title, [
@@ -886,6 +891,16 @@ Market & Prediction Signals: ${marketContext}`;
         `Agent-Reach developer/community intel: ${reachSignals.keyTakeaway}`
       );
     }
+    if (itchMatches.length > 0) {
+      reconSourceParts.push(
+        `Commercial Problem Catalog (Razorpay Fix My Itch): Matches verified problem "${itchMatches[0].title}" (${itchMatches[0].problemStatement}) — Unmet need: ${itchMatches[0].unmetNeed}.`
+      );
+    }
+    if (graveyardMatches.length > 0) {
+      reconSourceParts.push(
+        `Startup Graveyard Forensics (Loot Drop): Matches failure pattern of ${graveyardMatches.map(g => `"${g.companyName}" (${g.burnedCapitalUsd} burned, ${g.lifespan}): ${g.fatalFlaw}`).join("; ")}.`
+      );
+    }
 
     const marketContext = `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
 
@@ -909,6 +924,23 @@ Market & Prediction Signals: ${marketContext}`;
           emit({ type: "parse_fallback", role, reason: live.fallbackReason });
         }
         const opinion: AgentOpinion = live?.opinion || this.generateHeuristicOpinion(role, idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+        if (role === "redteam" && graveyardMatches.length > 0) {
+          const g = graveyardMatches[0];
+          opinion.fatalFlaws.unshift(
+            `Graveyard Forensic Precedent [${g.companyName} — ${g.burnedCapitalUsd} burned]: ${g.fatalFlaw}`
+          );
+          opinion.mustTestBeforeBuilding.unshift(
+            `Falsify ${g.companyName} Death Trap: ${g.takeaway}`
+          );
+          opinion.score = 28;
+          opinion.verdict = "STRONG_KILL";
+        }
+        if (role === "customer" && itchMatches.length > 0) {
+          const itch = itchMatches[0];
+          opinion.keyAssumptions.unshift(
+            `Verified Buyer Demand (Razorpay Fix My Itch): "${itch.problemStatement}"`
+          );
+        }
         if (evaluationMode === "HEURISTIC_ENGINE" && !invariants.isPromptInjection && !invariants.isImpossiblePhysics) {
           opinion.score = Math.max(10, Math.min(100, shrinkTowardBaseRate(opinion.score, domain.archetype)));
         }
@@ -1132,6 +1164,32 @@ Market & Prediction Signals: ${marketContext}`;
         provenance: disc.url,
         indicator: "NEUTRAL",
         confidencePercent: 80
+      });
+      retrievedExternalCount++;
+    }
+    for (let i = 0; i < itchMatches.length; i++) {
+      const p = itchMatches[i];
+      externalEvidenceItems.push({
+        id: `EV-04F${i + 1}`,
+        claim: `Verified Commercial Demand (Razorpay Fix My Itch - ${p.category}): "${p.problemStatement}" (Target: ${p.targetPersona})`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: p.sourceUrl,
+        indicator: "SUPPORTING",
+        confidencePercent: 90
+      });
+      retrievedExternalCount++;
+    }
+    for (let i = 0; i < graveyardMatches.length; i++) {
+      const g = graveyardMatches[i];
+      externalEvidenceItems.push({
+        id: `EV-04D${i + 1}`,
+        claim: `Startup Graveyard Forensic Precedent (Loot Drop - ${g.companyName}): Burned ${g.burnedCapitalUsd} before death (${g.lifespan}) from ${g.antipattern} — ${g.fatalFlaw}`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: g.sourceUrl,
+        indicator: "CONTRADICTING",
+        confidencePercent: 95
       });
       retrievedExternalCount++;
     }
@@ -1363,6 +1421,9 @@ Market & Prediction Signals: ${marketContext}`;
     // capped below the KILL threshold (50) no matter how optimistic the remaining dimensions are.
     if (invariants.isThinWrapper || sandboxSim.metrics.ltvCacRatio < 1) {
       compositeScore = Math.min(compositeScore, 44);
+    }
+    if (graveyardMatches.length > 0) {
+      compositeScore = Math.min(compositeScore, 46);
     }
     if (invariants.isNoMonetization) {
       compositeScore = Math.min(compositeScore, 39);
@@ -1673,7 +1734,9 @@ Market & Prediction Signals: ${marketContext}`;
       ...newsSignals.articles.map(a => ({ title: `[NEWS] ${a.title.slice(0, 120)}`, url: a.url, provider: a.source })),
       ...reachSignals.gitHubRepos.map(g => ({ title: `[GitHub] ${g.fullName} (${g.stars}★): ${g.description.slice(0, 80)}`, url: g.url, provider: "github" })),
       ...(reachSignals.deepScrape ? [{ title: `[Jina Reader] ${reachSignals.deepScrape.title}`, url: reachSignals.deepScrape.url, provider: "jina-reader" }] : []),
-      ...reachSignals.regionalDiscussions.map(v => ({ title: `[${v.platform.toUpperCase()}] ${v.title.slice(0, 100)}`, url: v.url, provider: v.platform }))
+      ...reachSignals.regionalDiscussions.map(v => ({ title: `[${v.platform.toUpperCase()}] ${v.title.slice(0, 100)}`, url: v.url, provider: v.platform })),
+      ...itchMatches.map(p => ({ title: `[Razorpay Fix My Itch] ${p.problemStatement}`, url: p.sourceUrl, provider: "razorpay-fix-my-itch" })),
+      ...graveyardMatches.map(g => ({ title: `[Loot Drop Graveyard] ${g.companyName} (${g.burnedCapitalUsd} burned): ${g.fatalFlaw.slice(0, 80)}`, url: g.sourceUrl, provider: "loot-drop-graveyard" }))
     ];
 
     const dossier: IdeaDossier = {
@@ -1772,7 +1835,13 @@ Market & Prediction Signals: ${marketContext}`;
         churn,
         cac,
         survival24Mo: mc?.survivalProbability24Mo,
-        ltvCacRatio: sandboxSim.metrics.ltvCacRatio
+        ltvCacRatio: sandboxSim.metrics.ltvCacRatio,
+        graveyardPrecedent: graveyardMatches[0] ? {
+          companyName: graveyardMatches[0].companyName,
+          burnedCapitalUsd: graveyardMatches[0].burnedCapitalUsd,
+          fatalFlaw: graveyardMatches[0].fatalFlaw,
+          takeaway: graveyardMatches[0].takeaway
+        } : undefined
       });
       dossier.mutationProposals = mutationProposals;
       emit({ type: "mutation_proposals", proposals: mutationProposals });

@@ -11,4 +11,6 @@ export * from "./tools/edgar.js";
 export * from "./tools/huggingface.js";
 export * from "./tools/clinical.js";
 export * from "./tools/macro.js";
+export * from "./data/fixMyItchProblems.js";
+export * from "./data/graveyardAntipatterns.js";
 export * from "./core/swarm.js";
