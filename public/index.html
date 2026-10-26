@@ -49,7 +49,7 @@
           DOSSIER
         </span>
         <span class="text-[10px] font-mono tracking-wider px-2 py-0.5 rounded border border-sand-300 bg-sand-100 text-zinc-600 font-semibold">
-          SYSTEM // TF-007
+          SYSTEM // V2.0
         </span>
       </a>
 
@@ -250,7 +250,7 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
             <span class="px-2 py-0.5 bg-zinc-900 text-white font-bold rounded text-[10px] tracking-wider uppercase">
               EVIDENCE-FIRST DOSSIER
             </span>
-            <span class="text-zinc-500" id="resDossierCode">DOSSIER // TF-007</span>
+            <span class="text-zinc-500" id="resDossierCode">DOSSIER // AUDITED</span>
             <span class="text-emerald-700 font-bold" id="resDossierStatus">STATUS: COMPILED</span>
           </div>
 
@@ -308,26 +308,51 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
 
       <!-- 5-Dimensional Resilience Breakdown -->
       <div class="space-y-3">
-        <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
-          Transparent 5-Dimensional Resilience Breakdown
-        </h3>
+        <div class="flex items-center justify-between">
+          <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
+            Resilience Score Breakdown
+          </h3>
+          <span class="text-[10px] font-mono text-zinc-500">5 AUDITED PILLARS</span>
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono text-xs" id="resilienceGrid"></div>
       </div>
 
-      <!-- 6-Agent Swarm Perspectives & Mandates -->
-      <div class="space-y-3">
-        <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
-          6-Agent Swarm Deliberations &amp; Risk Hypotheses
-        </h3>
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs" id="consensusGrid"></div>
+      <!-- Core Decision Factors: Fatal Flaw Trap & 7-Day Test -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+        <!-- Fatal Flaw & Kill Conditions -->
+        <div class="p-5 bg-sand-50 border border-sand-200 rounded-xl flex flex-col justify-between space-y-3">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-red-900 uppercase tracking-wider">Primary Fatal Flaw Trap</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 bg-red-100 text-red-800 rounded font-bold">KILL CONDITION</span>
+            </div>
+            <div id="resAssumptionClaim" class="text-xs text-zinc-800 font-sans leading-relaxed"></div>
+          </div>
+          <div class="pt-2 border-t border-sand-200">
+            <div class="text-[10px] font-mono text-zinc-500 uppercase font-semibold mb-1.5">Falsifiable Stop Criteria:</div>
+            <div id="resKillConditions" class="text-xs text-zinc-700 font-sans space-y-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Cheapest 7-Day Validation Experiment -->
+        <div class="p-5 bg-sand-50 border border-sand-200 rounded-xl flex flex-col justify-between space-y-3">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-zinc-900 uppercase tracking-wider">Recommended 7-Day Test</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 bg-zinc-200 text-zinc-800 rounded font-bold">NEXT ACTION</span>
+            </div>
+            <div id="resValidationExp" class="text-xs text-zinc-800 font-sans leading-relaxed space-y-2.5"></div>
+          </div>
+          <div id="resValidationSignals" class="pt-2 border-t border-sand-200 font-mono text-[11px] space-y-1.5"></div>
+        </div>
       </div>
 
-      <!-- Evidence & Fatal Flaw Traps -->
+      <!-- Verified Grounding & Failure Graveyard Forensics -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-xs">
         <div class="p-4 bg-sand-50 border border-sand-200 rounded-xl space-y-2 shadow-2xs">
           <div class="flex items-center justify-between text-emerald-800 font-bold">
             <span>VERIFIED FIELD EVIDENCE</span>
-            <span class="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">CANONICAL / SOURCED</span>
+            <span class="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">GROUNDED FACT</span>
           </div>
           <div id="resEvidenceClaim" class="text-zinc-800 font-sans leading-relaxed text-xs"></div>
           <div class="flex items-center justify-between text-[10px] text-zinc-500 pt-1 border-t border-sand-200">
@@ -337,26 +362,13 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
         </div>
 
         <div class="p-4 bg-sand-50 border border-sand-200 rounded-xl space-y-2 shadow-2xs">
-          <div class="flex items-center justify-between text-red-800 font-bold">
-            <span>CRITICAL UNVALIDATED ASSUMPTION</span>
-            <span class="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-800 rounded">MUST TEST BEFORE BUILD</span>
+          <div class="flex items-center justify-between text-zinc-900 font-bold">
+            <span>STARTUP GRAVEYARD FORENSICS</span>
+            <span class="text-[10px] px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded">LOOT DROP / ITCH</span>
           </div>
-          <div id="resAssumptionClaim" class="text-zinc-800 font-sans leading-relaxed text-xs"></div>
-          <div class="flex items-center justify-between text-[10px] text-zinc-500 pt-1 border-t border-sand-200">
-            <span id="resAssumptionRole">ROLE: RED TEAM SKEPTIC</span>
-            <span id="resAssumptionRisk" class="text-red-700 font-bold">IMPACT: HIGH</span>
+          <div id="resCommercialGrounding" class="text-zinc-800 font-sans leading-relaxed text-xs">
+            Comparing concept against verified merchant demand friction and past startup mortalities.
           </div>
-        </div>
-      </div>
-
-      <!-- Real-World Demand & Failure Graveyard Forensics -->
-      <div class="p-5 bg-sand-50 border border-sand-200 rounded-xl space-y-3 font-mono text-xs">
-        <div class="flex items-center justify-between">
-          <span class="font-bold text-zinc-900 uppercase">COMMERCIAL GROUNDING &amp; PRECEDENT AUDIT</span>
-          <span class="text-[10px] text-zinc-500">RAZORPAY ITCH + LOOT DROP GRAVEYARD</span>
-        </div>
-        <div id="resCommercialGrounding" class="font-sans text-xs text-zinc-700 leading-relaxed">
-          Comparing concept against verified merchant demand friction and past startup mortalities.
         </div>
       </div>
 
@@ -364,45 +376,52 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
       <div class="space-y-4">
         <div class="flex items-center justify-between">
           <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
-            Sandboxed Python Unit Economics (10,000 Stochastic Iterations)
+            Sandboxed Stochastic Unit Economics
           </h3>
-          <span class="text-[10px] font-mono text-zinc-500">NUMPY SUBPROCESS // DETERMINISTIC</span>
+          <span class="text-[10px] font-mono text-zinc-500">10,000 RUNS // DETERMINISTIC PYTHON3</span>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs" id="mcSummaryCards"></div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="p-3 bg-white border border-sand-200 rounded-xl space-y-2">
-            <div class="text-[10px] font-mono text-zinc-500 uppercase font-bold">5-Year Survival Probability</div>
+          <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 shadow-md">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-zinc-400 uppercase font-bold tracking-wider">5-Year Survival Probability</span>
+              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Cohort Decay</span>
+            </div>
             <div class="h-44 flex items-center justify-center canvas-container">
               <canvas id="chartSurvival" class="w-full h-full"></canvas>
             </div>
+            <div class="text-[10px] font-mono text-zinc-400 leading-tight pt-1 border-t border-zinc-800">
+              Share of 10,000 cohort runs staying cash-positive over 5 years.
+            </div>
           </div>
-          <div class="p-3 bg-white border border-sand-200 rounded-xl space-y-2">
-            <div class="text-[10px] font-mono text-zinc-500 uppercase font-bold">CAC Payback Distribution (Months)</div>
+
+          <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 shadow-md">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-zinc-400 uppercase font-bold tracking-wider">CAC Payback Distribution</span>
+              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Months to Breakeven</span>
+            </div>
             <div class="h-44 flex items-center justify-center canvas-container">
               <canvas id="chartPayback" class="w-full h-full"></canvas>
             </div>
+            <div class="text-[10px] font-mono text-zinc-400 leading-tight pt-1 border-t border-zinc-800">
+              Months of gross margin required to recover customer acquisition cost.
+            </div>
           </div>
-          <div class="p-3 bg-white border border-sand-200 rounded-xl space-y-2">
-            <div class="text-[10px] font-mono text-zinc-500 uppercase font-bold">Sensitivity Tornado (Downside Drivers)</div>
+
+          <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 shadow-md">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-zinc-400 uppercase font-bold tracking-wider">Sensitivity Tornado</span>
+              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Payback Drag</span>
+            </div>
             <div class="h-44 flex items-center justify-center canvas-container">
               <canvas id="chartTornado" class="w-full h-full"></canvas>
             </div>
+            <div class="text-[10px] font-mono text-zinc-400 leading-tight pt-1 border-t border-zinc-800">
+              Which variable prolongs payback longest if assumptions degrade by 10%.
+            </div>
           </div>
-        </div>
-      </div>
-
-      <!-- Kill Conditions & Cheapest Validation Experiment -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
-        <div class="p-4 bg-sand-50 border border-sand-200 rounded-xl space-y-2">
-          <div class="text-zinc-900 font-bold uppercase tracking-wider">FALSIFIABLE KILL CONDITIONS</div>
-          <div id="resKillConditions" class="text-zinc-700 font-sans space-y-1"></div>
-        </div>
-
-        <div class="p-4 bg-sand-50 border border-sand-200 rounded-xl space-y-2">
-          <div class="text-zinc-900 font-bold uppercase tracking-wider">CHEAPEST 7-DAY VALIDATION TEST</div>
-          <div id="resValidationExp" class="text-zinc-700 font-sans space-y-1"></div>
         </div>
       </div>
 
@@ -415,13 +434,35 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="resMutationGrid"></div>
       </div>
 
-      <!-- Epistemic Robustness Verification Audit Trail -->
-      <div class="space-y-3 font-mono text-xs">
-        <div class="flex items-center justify-between">
-          <span class="font-bold text-zinc-800 uppercase tracking-wider">Epistemic Robustness Invariant Audit</span>
-          <span class="text-[10px] text-zinc-500" id="resAuditStats">AUDITED: 7 CLAIMS</span>
-        </div>
-        <div class="border border-sand-200 rounded-xl overflow-hidden divide-y divide-sand-100 bg-sand-50" id="resAuditTable"></div>
+      <!-- Progressive Deep Dive: 6-Agent Perspectives & Invariant Audit -->
+      <div class="pt-2 border-t border-sand-200 space-y-3">
+        <!-- 6-Agent Swarm Deliberations Collapsible -->
+        <details class="group bg-sand-50 border border-sand-200 rounded-xl overflow-hidden text-xs">
+          <summary class="p-4 flex items-center justify-between cursor-pointer font-mono font-bold text-zinc-800 select-none hover:bg-sand-100 transition">
+            <span class="flex items-center gap-2">
+              <span class="text-zinc-500 font-normal">[+]</span>
+              <span>6-Agent Swarm Deliberations &amp; Risk Hypotheses</span>
+            </span>
+            <span class="text-[10px] font-normal text-zinc-500">6 SPECIALIZED ROLES</span>
+          </summary>
+          <div class="p-4 pt-0">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs mt-3" id="consensusGrid"></div>
+          </div>
+        </details>
+
+        <!-- Epistemic Robustness Verification Audit Trail Collapsible -->
+        <details class="group bg-sand-50 border border-sand-200 rounded-xl overflow-hidden text-xs">
+          <summary class="p-4 flex items-center justify-between cursor-pointer font-mono font-bold text-zinc-800 select-none hover:bg-sand-100 transition">
+            <span class="flex items-center gap-2">
+              <span class="text-zinc-500 font-normal">[+]</span>
+              <span>Epistemic Robustness Invariant Audit Trail</span>
+            </span>
+            <span class="text-[10px] font-normal text-zinc-500" id="resAuditStats">AUDITED: 5 CLAIMS</span>
+          </summary>
+          <div class="p-4 pt-0">
+            <div class="border border-sand-200 rounded-xl overflow-hidden divide-y divide-sand-100 bg-white mt-3" id="resAuditTable"></div>
+          </div>
+        </details>
       </div>
 
     </section>

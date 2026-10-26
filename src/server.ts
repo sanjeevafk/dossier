@@ -93,7 +93,7 @@ app.get("/health", (req: Request, res: Response) => {
   const llmStatus = getLLMStatus();
   res.json({
     status: "ok",
-    service: "dossier-trueforge",
+    service: "dossier-intelligence",
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
     memoryUsageMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
@@ -379,7 +379,7 @@ app.post("/api/chat", requireAuth, async (req: Request, res: Response) => {
         ? "Consensus of 6 adversarial agents (Skeptic, Investor, Architect, Market, Customer, Founder)"
         : `Agent ${role.toUpperCase()}`;
         
-      const systemPrompt = `You are part of the Dossier Adversarial Intelligence Swarm built on TrueForge.
+      const systemPrompt = `You are part of the Dossier Adversarial Intelligence Swarm.
 Role: ${rolePrompt}
 Domain Archetype: ${domain.archetypeLabel}
 Idea: "${ideaTitle}" — ${ideaSummary}

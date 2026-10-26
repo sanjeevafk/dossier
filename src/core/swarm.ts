@@ -156,7 +156,7 @@ export class IdeaSwarmOrchestrator {
       mandate: defaultRoleConfig.description
     };
 
-    const systemPrompt = `You are Agent ${roleMeta.number} // ${roleMeta.title} in the TrueForge Adversarial Intelligence Swarm.
+    const systemPrompt = `You are Agent ${roleMeta.number} // ${roleMeta.title} in the Dossier Adversarial Intelligence Swarm.
 Domain Archetype: ${domain.archetypeLabel}
 Primary Customer: ${domain.primaryCustomer}
 Procurement & Sales Cycle: ${domain.procurementCycle}
@@ -301,7 +301,7 @@ Market & Prediction Signals: ${marketContext}`;
     if (context.hasLiveLLM) {
       try {
         const skepticTurn = await generateAgentTurn(
-          `You are Agent ${challengerOpinion.roleNumber} // ${challengerOpinion.roleTitle} in the TrueForge adversarial crossfire. You MUST cite the stress-sandbox numbers verbatim and probe exactly one testable claim. Return strictly valid JSON: {"crossExam": string, "targetClaim": string}.`,
+          `You are Agent ${challengerOpinion.roleNumber} // ${challengerOpinion.roleTitle} in the Dossier adversarial crossfire. You MUST cite the stress-sandbox numbers verbatim and probe exactly one testable claim. Return strictly valid JSON: {"crossExam": string, "targetClaim": string}.`,
           `Stress evidence you must cite: ${context.stressSummary}\nContested claim to attack: "${context.contestedClaim}"\nIssue a direct cross-examination of at most 100 words to Agent ${defenderOpinion.roleNumber} // ${defenderOpinion.roleTitle}.`,
           { temperature: 0.4, maxTokens: 800, jsonMode: true }
         );
@@ -755,8 +755,8 @@ Market & Prediction Signals: ${marketContext}`;
     const emit = options.onEvent || (() => {});
 
     // 01 INGEST & CLASSIFY
-    notify("01 INGEST", `Ingesting "${idea.title}" into TrueForge execution runtime...`);
-    emit({ type: "stage", stage: "01 INGEST", detail: `Ingesting "${idea.title}" into TrueForge execution runtime...`, timestamp: new Date().toISOString() });
+    notify("01 INGEST", `Ingesting "${idea.title}" into Dossier execution runtime...`);
+    emit({ type: "stage", stage: "01 INGEST", detail: `Ingesting "${idea.title}" into Dossier execution runtime...`, timestamp: new Date().toISOString() });
 
     const domain = classifyIdeaDomain(idea);
     notify("01 CLASSIFY", `Classified concept as [${domain.archetypeLabel}] — Target: ${domain.primaryCustomer}`);
@@ -1215,7 +1215,7 @@ Market & Prediction Signals: ${marketContext}`;
         claim: `Sandboxed unit economics computation: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)}mo (Python3 Subprocess Exit 0). Input pricing ($${pricing}/mo) and CAC ($${cac}) remain MODELLED_ASSUMPTION.`,
         tier: "VERIFIED_COMPUTATION",
         claimType: "VERIFIED_COMPUTATION",
-        provenance: "TrueForge Python3 Sandbox (Isolated Subprocess Exit 0)",
+        provenance: "Dossier Python3 Sandbox (Isolated Subprocess Exit 0)",
         indicator: "SUPPORTING",
         confidencePercent: 98
       },
@@ -1640,7 +1640,7 @@ Market & Prediction Signals: ${marketContext}`;
       },
       {
         id: "A04",
-        statement: "TrueForge sandboxed execution guarantees safe isolation for all external actions.",
+        statement: "Dossier sandboxed execution guarantees safe isolation for all external actions.",
         evidenceStatus: "VERIFIED",
         riskLevel: "LOW",
         disproofCondition: "Sandbox execution returns non-zero error or uncontained process escape."
@@ -1741,7 +1741,7 @@ Market & Prediction Signals: ${marketContext}`;
 
     const dossier: IdeaDossier = {
       id: `DOSSIER-${Date.now().toString().slice(-6)}`,
-      dossierCode: `TF-007-${domain.archetype.toUpperCase().slice(0, 3)}`,
+      dossierCode: `DOS-${domain.archetype.toUpperCase().slice(0, 3)}`,
       timestamp: new Date().toISOString(),
       evaluationMode,
       pSuccess: Math.round(compositeScore) / 100,
@@ -1815,7 +1815,7 @@ Market & Prediction Signals: ${marketContext}`;
         ],
         day3to5: [
           `03 — Deploy targeted pilot LOI requests (Approval Gate 01).`,
-          `04 — Prototype isolated core single-job execution inside TrueForge sandbox.`
+          `04 — Prototype isolated core single-job execution inside Dossier sandbox.`
         ],
         day6to7: [
           `05 — Re-run DOSSIER with live LOI response evidence.`,
