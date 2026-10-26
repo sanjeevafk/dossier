@@ -50,18 +50,25 @@ html.dark .bg-white {
   color: #fafaf9 !important;
 }
 
-html.dark .bg-sand-50 {
-  background-color: #141413 !important;
+html.dark .bg-sand-50,
+html.dark [class*="bg-sand-50"] {
+  background-color: #121110 !important;
 }
 
-html.dark .bg-sand-100 {
-  background-color: #262624 !important;
+html.dark .bg-sand-100,
+html.dark [class*="bg-sand-100"] {
+  background-color: #1c1a19 !important;
 }
 
 html.dark .border-sand-200,
 html.dark .border-sand-100,
-html.dark .border-sand-300 {
-  border-color: #2b2927 !important;
+html.dark .border-sand-300,
+html.dark [class*="border-sand-"] {
+  border-color: #262422 !important;
+}
+
+html.dark [class*="shadow-"] {
+  box-shadow: none !important;
 }
 
 html.dark .divide-sand-200 > :not([hidden]) ~ :not([hidden]),
