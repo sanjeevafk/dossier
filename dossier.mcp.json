@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "mcpServers": {
+    "dossier": {
+      "command": "node",
+      "args": ["dist/mcp-server.js"],
+      "description": "Dossier Adversarial Multi-Agent Idea Intelligence & Epistemic Robust Verification Engine"
+    },
+    "agent-reach": {
+      "command": "agent-reach",
+      "args": ["doctor"],
+      "description": "Agent Reach social & community intelligence (Reddit, Twitter/X, HackerNews, YouTube, GitHub, V2EX, Jina Web)"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "description": "Isolated filesystem MCP server for writing audit logs and sandbox artifacts"
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "description": "GitHub MCP server for technical architect to inspect comps, repos, and stars"
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "description": "Brave Search MCP server for market recon and live web intelligence"
+    },
+    "polymarket-oracle": {
+      "command": "curl",
+      "args": ["-s", "https://gamma-api.polymarket.com/events?limit=5&active=true"],
+      "description": "Polymarket Gamma Live Prediction Market Oracle for macro probability & trend betting odds"
+    }
+  }
+}
