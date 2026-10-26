@@ -183,17 +183,38 @@ async function runAgyCliTurn(
   options: LLMGenerateOptions
 ): Promise<string> {
   const prompt = `${systemPrompt.trim()}\n\n---\n\n${userPrompt.trim()}`;
-  const args = [
-    "-p", prompt,
-    "--disable-slash-commands",
-    "--print-timeout", `${AGY_PRINT_TIMEOUT_S}s`,
-    "--model", options.model || provider.defaultModel
-  ];
-  const { stdout } = await execFileAsync("agy", args, {
-    timeout: (AGY_PRINT_TIMEOUT_S + 30) * 1000,
-    maxBuffer: 8 * 1024 * 1024
-  });
-  return stdout;
+  const targetModel = options.model || provider.defaultModel;
+  const fallbackModels = ["gemini-3.8-flash-medium", "gemini-3.8-flash-high", "gpt-oss-120b-medium"];
+  const candidateModels = [targetModel, ...fallbackModels.filter(m => m !== targetModel)];
+
+  let lastErr: any = null;
+  for (const model of candidateModels) {
+    try {
+      const args = [
+        "-p", prompt,
+        "--disable-slash-commands",
+        "--print-timeout", `${AGY_PRINT_TIMEOUT_S}s`,
+        "--model", model
+      ];
+      const { stdout } = await execFileAsync("agy", args, {
+        timeout: (AGY_PRINT_TIMEOUT_S + 30) * 1000,
+        maxBuffer: 8 * 1024 * 1024
+      });
+      if (stdout && stdout.trim()) {
+        lastSuccessfulModel = model;
+        return stdout;
+      }
+    } catch (err: any) {
+      lastErr = err;
+      const errMsg = String(err?.message || "");
+      if (errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("quota reached") || errMsg.includes("429")) {
+        // Quota exhausted on this model — seamlessly try next candidate model
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 // Backward-compatible default client

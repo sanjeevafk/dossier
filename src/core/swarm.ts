@@ -32,6 +32,7 @@ import { buildOutsideViewPanel } from "./outside-view.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
+import { runAnalystWithTools, GroundedEvidencePack } from "../tools/analyst-tools.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
 import { forecastLedger } from "../services/ledger.js";
@@ -44,6 +45,7 @@ export interface SwarmExecutionOptions {
   expectedChurnMonthly?: number;
   estimatedCacUsd?: number;
   useLiveLLM?: boolean;
+  model?: string;
 }
 
 /**
@@ -835,14 +837,93 @@ ${agentContext}`;
     const evaluationMode: "LIVE_LLM" | "HEURISTIC_ENGINE" =
       shouldCallLive && getLLMStatus().hasLiveLLM ? "LIVE_LLM" : "HEURISTIC_ENGINE";
 
-    // Stream agents live: each role emits agent_start when it begins computing
-    // and agent_opinion the moment its (LLM or heuristic) opinion resolves.
-    const AGENT_ROLES = ["analyst", "customer", "architect", "investor", "redteam", "expert"] as const;
-    const [analystOpinion, customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion] = await Promise.all(
-      AGENT_ROLES.map(async (role) => {
+    // Dynamic Tool Calling for Agent 01 (Market Analyst)
+    // Runs first to discover real competitors, pricing pages, and customer friction,
+    // which are then routed as grounded evidence to the remaining 5 agents.
+    let analystOpinion: AgentOpinion;
+    let groundedPack: GroundedEvidencePack | null = null;
+
+    if (evaluationMode === "LIVE_LLM") {
+      emit({ type: "stage", stage: "03.1 RECON", detail: "Market Analyst running live web recon tools & competitor search...", timestamp: new Date().toISOString() });
+      emit({ type: "agent_start", role: "analyst", roleTitle: domain.specialistRoleLabels.analyst.title });
+      const analystStart = Date.now();
+
+      const analystToolResult = await runAnalystWithTools(idea, domain, econContext, { model: options.model });
+      groundedPack = analystToolResult.groundedEvidence;
+
+      if (analystToolResult.opinion) {
+        analystOpinion = analystToolResult.opinion;
+      } else {
+        if (analystToolResult.fallbackReason) {
+          emit({ type: "parse_fallback", role: "analyst", reason: analystToolResult.fallbackReason });
+        }
+        const liveFallback = await this.evaluateRoleWithLLM("analyst", idea, agentContextFor("analyst"), domain, invariants);
+        analystOpinion = liveFallback.opinion || this.generateHeuristicOpinion("analyst", idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+      }
+
+      analystOpinion.telemetryMetadata = {
+        latencyMs: Date.now() - analystStart,
+        threatSeverity: analystOpinion.score < 50 ? "HIGH" : "MODERATE",
+        modelId: getLLMStatus().activeModel
+      };
+
+      if (groundedPack.identifiedCompetitors.length > 0) {
+        marketResearch.identifiedCompetitors = groundedPack.identifiedCompetitors;
+      }
+      if (groundedPack.rawResults.length > 0 && marketResearch.rawResults.length === 0) {
+        marketResearch.rawResults = groundedPack.rawResults;
+      }
+
+      emit({
+        type: "agent_opinion",
+        role: "analyst",
+        roleTitle: domain.specialistRoleLabels.analyst.title,
+        verdict: analystOpinion.verdict,
+        score: analystOpinion.score,
+        fatalFlaw: analystOpinion.fatalFlaws[0]
+      });
+    } else {
+      // Heuristic offline mode
+      emit({ type: "agent_start", role: "analyst", roleTitle: domain.specialistRoleLabels.analyst.title });
+      analystOpinion = this.generateHeuristicOpinion("analyst", idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+      analystOpinion.telemetryMetadata = {
+        latencyMs: 10,
+        threatSeverity: analystOpinion.score < 50 ? "HIGH" : "MODERATE",
+        modelId: "deterministic-heuristics"
+      };
+      emit({
+        type: "agent_opinion",
+        role: "analyst",
+        roleTitle: domain.specialistRoleLabels.analyst.title,
+        verdict: analystOpinion.verdict,
+        score: analystOpinion.score,
+        fatalFlaw: analystOpinion.fatalFlaws[0]
+      });
+    }
+
+    // Role-Scoped Context Routing: route the Analyst's verified intelligence to downstream agents
+    const groundedContextFor = (role: SwarmRole): string => {
+      const lines: string[] = [];
+      if (groundedPack) {
+        if (role === "customer") lines.push(groundedPack.roleContextLines.customer);
+        else if (role === "redteam") lines.push(groundedPack.roleContextLines.redteam);
+        else if (role === "investor") lines.push(groundedPack.roleContextLines.investor, marketLine);
+        else if (role === "architect") lines.push(groundedPack.roleContextLines.architect);
+        else if (role === "expert") lines.push(groundedPack.roleContextLines.expert);
+      } else {
+        return agentContextFor(role);
+      }
+      lines.push(econContext);
+      return lines.join(" ");
+    };
+
+    // Parallel execution for remaining 5 specialist agents with grounded evidence packs
+    const REMAINING_ROLES = ["customer", "architect", "investor", "redteam", "expert"] as const;
+    const [customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion] = await Promise.all(
+      REMAINING_ROLES.map(async (role) => {
         emit({ type: "agent_start", role, roleTitle: domain.specialistRoleLabels[role].title });
         const roleStart = Date.now();
-        const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, agentContextFor(role), domain, invariants) : null;
+        const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, groundedContextFor(role), domain, invariants) : null;
         if (live?.fallbackReason) {
           emit({ type: "parse_fallback", role, reason: live.fallbackReason });
         }
@@ -1455,7 +1536,10 @@ ${agentContext}`;
     const externalEvidenceSources: ExternalEvidenceSource[] = [
       ...marketResearch.rawResults.map(r => ({ title: r.title, url: r.url, provider: marketResearch.reconProvider })),
       ...marketResearch.community.discussions.map(d => ({ title: d.title, url: d.url, provider: d.platform })),
-      ...polymarketSignals.marketsFound.map(m => ({ title: m.title, url: m.marketUrl, provider: "polymarket" }))
+      ...polymarketSignals.marketsFound.map(m => ({ title: m.title, url: m.marketUrl, provider: "polymarket" })),
+      ...marketResearch.identifiedCompetitors
+        .filter(c => c.url && !marketResearch.rawResults.some(r => r.url === c.url))
+        .map(c => ({ title: `${c.name} (${c.category})`, url: c.url!, provider: "analyst-recon" }))
     ];
 
     const dossier: IdeaDossier = {
@@ -1464,6 +1548,7 @@ ${agentContext}`;
       timestamp: new Date().toISOString(),
       evaluationMode,
       externalEvidenceSources,
+      identifiedCompetitors: marketResearch.identifiedCompetitors,
       idea,
       domainClassification: domain,
       epistemicSummary,

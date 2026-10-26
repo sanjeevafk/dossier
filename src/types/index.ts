@@ -267,7 +267,16 @@ export interface VerificationAudit {
 export interface ExternalEvidenceSource {
   title: string;
   url: string;
-  provider: string; // "exa" | "tavily" | "polymarket"
+  provider: string; // "exa" | "tavily" | "polymarket" | "duckduckgo" | "hackernews"
+}
+
+export interface MarketCompetitor {
+  name: string;
+  url?: string;
+  category: "direct" | "indirect" | "incumbent";
+  strengths: string;
+  vulnerability: string;
+  pricingEstimate?: string;
 }
 
 /** Honest inter-agent disagreement signal — replaces cosmetic confidence scores. */
@@ -289,6 +298,8 @@ export interface IdeaDossier {
   evaluationMode?: "LIVE_LLM" | "HEURISTIC_ENGINE";
   /** Actually-retrieved external sources backing this dossier (empty when no recon provider ran). */
   externalEvidenceSources?: ExternalEvidenceSource[];
+  /** Competitors discovered through Market Analyst live web recon. */
+  identifiedCompetitors?: MarketCompetitor[];
   idea: IdeaInput;
   domainClassification: DomainClassification;
   epistemicSummary?: EpistemicTaxonomySummary;

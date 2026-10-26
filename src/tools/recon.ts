@@ -14,7 +14,7 @@ export interface ReconSourceResult {
 }
 
 export interface ReconOutcome {
-  provider: "exa" | "tavily" | "none";
+  provider: "exa" | "tavily" | "duckduckgo" | "none";
   queries: string[];
   results: ReconSourceResult[];
   error?: string;
@@ -90,10 +90,68 @@ async function searchTavily(apiKey: string, query: string): Promise<ReconSourceR
 }
 
 /**
+ * Zero-key web search via public DuckDuckGo HTML endpoint.
+ * Extracts title, destination URL, and text snippet without API keys.
+ */
+export async function searchDuckDuckGo(
+  query: string,
+  maxResults = MAX_RESULTS_PER_QUERY,
+  fetchImpl: typeof fetch = globalThis.fetch
+): Promise<ReconSourceResult[]> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), RECON_TIMEOUT_MS);
+  try {
+    const url = "https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query);
+    const res = await fetchImpl(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      }
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+    const results: ReconSourceResult[] = [];
+    const blocks = html.split(/<div class="result results_links/);
+    for (let i = 1; i < blocks.length && results.length < maxResults; i++) {
+      const block = blocks[i];
+      const titleMatch = block.match(/class="result__a"[^>]*>([\s\S]*?)<\/a>/);
+      const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+      const hrefMatch = block.match(/href="([^"]*uddg=[^"]*)"/);
+
+      if (titleMatch && hrefMatch) {
+        let rawUrl = hrefMatch[1];
+        if (rawUrl.includes("uddg=")) {
+          rawUrl = decodeURIComponent(rawUrl.split("uddg=")[1].split("&")[0]);
+        }
+        const title = titleMatch[1].replace(/<[^>]+>/g, "").trim();
+        const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, "").trim() : "";
+        if (title && rawUrl.startsWith("http")) {
+          results.push({
+            title: truncate(title, 140),
+            url: rawUrl,
+            snippet: truncate(snippet),
+            queryLabel: "competitive"
+          });
+        }
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
  * Run live web recon across the given queries using the first configured provider.
  * Never throws — an unreachable or unconfigured provider yields `provider: "none"`.
  */
-export async function performLiveWebRecon(queries: string[]): Promise<ReconOutcome> {
+export async function performLiveWebRecon(
+  queries: string[],
+  options: { allowDuckDuckGo?: boolean } = {}
+): Promise<ReconOutcome> {
   const cleanQueries = queries.map((q) => q.trim()).filter(Boolean).slice(0, 3);
   if (cleanQueries.length === 0) {
     return { provider: "none", queries: [], results: [] };
@@ -103,6 +161,32 @@ export async function performLiveWebRecon(queries: string[]): Promise<ReconOutco
   const tavilyKey = process.env.TAVILY_API_KEY;
 
   if (!exaKey && !tavilyKey) {
+    if (options.allowDuckDuckGo || process.env.ENABLE_DUCKDUCKGO === "true") {
+      const collected: ReconSourceResult[] = [];
+      const seenUrls = new Set<string>();
+      const errors: string[] = [];
+
+      for (let q = 0; q < cleanQueries.length; q++) {
+        const queryLabel: ReconSourceResult["queryLabel"] = q === 0 ? "competitive" : "sentiment";
+        try {
+          const results = await searchDuckDuckGo(cleanQueries[q]);
+          for (const result of results) {
+            if (seenUrls.has(result.url)) continue;
+            seenUrls.add(result.url);
+            collected.push({ ...result, queryLabel });
+            if (collected.length >= MAX_TOTAL_RESULTS) break;
+          }
+        } catch (err: any) {
+          errors.push(`${cleanQueries[q]}: ${err?.message || "DDG search failed"}`);
+        }
+        if (collected.length >= MAX_TOTAL_RESULTS) break;
+      }
+
+      if (collected.length > 0) {
+        return { provider: "duckduckgo", queries: cleanQueries, results: collected };
+      }
+    }
+
     return {
       provider: "none",
       queries: cleanQueries,

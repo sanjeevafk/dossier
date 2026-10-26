@@ -177,3 +177,55 @@ test("Community sentiment degrades to explicit 'none' when every backend fails",
     globalThis.fetch = savedFetch;
   }
 });
+
+test("Role-scoped context engineering routes grounded competitor intelligence to Red Team and complaints to Customer", async () => {
+  const { buildRoleEvidenceSlices } = await import("../dist/tools/analyst-tools.js");
+
+  const competitors = [
+    {
+      name: "Vanta",
+      url: "https://vanta.com",
+      category: "incumbent",
+      strengths: "100+ integrations and auditor partner network",
+      vulnerability: "High entry pricing ($15k/yr)",
+      pricingEstimate: "$15,000/yr"
+    }
+  ];
+
+  const frictions = [
+    "Customers express extreme fatigue over screenshot evidence collection on HN"
+  ];
+
+  const results = [
+    {
+      title: "SOC 2 Software Pricing 2026",
+      url: "https://example.com/pricing",
+      snippet: "Compare Vanta vs Drata pricing",
+      queryLabel: "competitive"
+    }
+  ];
+
+  const discussions = [
+    {
+      platform: "hackernews",
+      title: "Ask HN: Why is SOC 2 compliance so expensive?",
+      url: "https://news.ycombinator.com/item?id=12345",
+      score: 180
+    }
+  ];
+
+  const slices = buildRoleEvidenceSlices(competitors, frictions, results, discussions, "duckduckgo");
+
+  // Red Team must receive competitor names, URLs, and failure modes
+  assert.ok(slices.redteam.includes("Vanta"), "Red Team must receive discovered competitor name");
+  assert.ok(slices.redteam.includes("https://vanta.com"), "Red Team must receive competitor URL");
+  assert.ok(slices.redteam.includes("100+ integrations"), "Red Team must receive competitor strengths");
+
+  // Customer Advocate must receive friction and pricing benchmarks
+  assert.ok(slices.customer.includes("screenshot evidence collection"), "Customer must receive buyer friction");
+  assert.ok(slices.customer.includes("$15,000/yr"), "Customer must receive pricing benchmarks");
+
+  // Technical Architect must be shielded from commercial fluff
+  assert.ok(!slices.architect.includes("Vanta"), "Architect must NOT receive competitor brand names");
+  assert.ok(slices.architect.includes("compute burden"), "Architect must focus on deterministic compute and latency");
+});

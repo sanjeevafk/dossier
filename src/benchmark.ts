@@ -387,6 +387,36 @@ export async function runDossierBenchmark(options: { replay?: boolean } = {}): P
     process.exitCode = 1;
   }
 
+  // ── INVARIANT ASSERTIONS (Hamel Husain Eval Pattern) ──
+  const invariantViolations: string[] = [];
+
+  // 1. Zero-Moat Invariant: Thin wrappers must never clear score 40 or get BUILD
+  const thinWrappers = results.filter((r) => ["BM-04", "BM-12"].includes(r.id));
+  for (const tw of thinWrappers) {
+    if (tw.score >= 40 || tw.verdict.includes("BUILD")) {
+      invariantViolations.push(`Zero-Moat Invariant Violated: ${tw.id} scored ${tw.score} with verdict ${tw.verdict} (must be < 40 and KILL)`);
+    }
+  }
+
+  // 2. Unmonetized Invariant: Non-monetized project must be KILL
+  const unmonetized = results.find((r) => r.id === "BM-11");
+  if (unmonetized && (unmonetized.score >= 40 || !unmonetized.verdict.includes("KILL"))) {
+    invariantViolations.push(`Monetization Invariant Violated: BM-11 scored ${unmonetized.score} with verdict ${unmonetized.verdict} (must be KILL)`);
+  }
+
+  // 3. Dispersion Invariant
+  if (!dispersionGatePassed) {
+    invariantViolations.push(`Dispersion Gate Violated: σ=${scoreStdDev.toFixed(1)} < ${SCORE_DISPERSION_GATE}`);
+  }
+
+  if (invariantViolations.length > 0) {
+    console.error("\n❌ HARNESS EVALUATION INVARIANTS FAILED:");
+    for (const v of invariantViolations) console.error(`  • ${v}`);
+    process.exitCode = 1;
+  } else {
+    console.log("✅ ALL HARNESS EVALUATION INVARIANTS PASSED (Zero-Moat, Monetization, and Dispersion Gates satisfied).\n");
+  }
+
   if (replay) {
     // Verdict-replay regression: diff this run against the last recorded snapshot.
     let previous: { results?: Array<{ id: string; score: number; verdict: string }> } | null = null;
