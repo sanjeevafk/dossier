@@ -17,7 +17,10 @@ export const SWARM_ROLES: Record<SwarmRole, RoleConfig> = {
     description: "Competition, market size, demand signals, and whitespace analysis.",
     systemPrompt: `You are Agent 01 // MARKET ANALYST in the Dossier adversarial validation platform.
 Analyze the target concept's market dynamics, demand signals, direct/indirect competitors, and positioning whitespace.`,
-    scoringCalibration: `MANDATORY: DO NOT cluster scores in the 65–85 band. Score 35 or below with verdict PIVOT_REQUIRED when the category is saturated or the concept is a non-differentiated utility wrapper. Score above 75 only when a structurally defensible wedge exists (proprietary data, regulatory grip, or asymmetric distribution) combined with pricing power above category norms.`
+    scoringCalibration: `MANDATORY: Differentiate vigorously across the full 0–100 spectrum.
+- Saturated commodity wrappers or undifferentiated utilities: score 30 or below with verdict PIVOT_REQUIRED or LEAN_KILL.
+- Established categories where incumbent competition proves large existing enterprise demand: score 60–75 when the target market is massive and the idea provides a specific automation wedge.
+- Score above 75 only when a structural wedge exists (proprietary data, regulatory grip, or asymmetric distribution) combined with pricing power.`
   },
   customer: {
     number: "02",
@@ -26,7 +29,10 @@ Analyze the target concept's market dynamics, demand signals, direct/indirect co
     description: "User pain, adoption friction, switching costs, and willingness to pay.",
     systemPrompt: `You are Agent 02 // CUSTOMER ADVOCATE in the Dossier platform.
 Analyze user psychology, day-to-day workflow disruption, actual willingness to pay, and habit inertia.`,
-    scoringCalibration: `MANDATORY: Score 50 or below for single-purpose utilities with novelty churn, and 35 or below when the asking price exceeds the user's habitual spend for equivalent tools. Score above 70 only when the customer has a budgeted, recurring pain and a credible time-shaved workflow replacement on day one.`
+    scoringCalibration: `MANDATORY: Calibrate willingness to pay by buyer type and value delivered.
+- Single-purpose consumer utilities with novelty churn or asking prices above habitual spend: score 30 or below.
+- High-priority B2B/enterprise solutions solving mandatory, audited, or revenue-blocking pain with demonstrated $500+/mo budget line items: score 65–80.
+- SMB or specialized tools with adoption friction or moderate budget priority: score 45–60.`
   },
   architect: {
     number: "03",
@@ -45,10 +51,11 @@ Analyze engineering feasibility, compute/API token costs, real-time latency, and
     systemPrompt: `You are Agent 04 // INVESTOR in the Dossier platform.
 Evaluate business model viability, defensibility against incumbents, pricing power, and venture upside.`,
     scoringCalibration: `MANDATORY VENTURE-ECONOMICS GATES:
-- Thin wrappers or single-purpose utilities replicable as a native platform feature: score 28 or below, verdict STRONG_KILL.
-- High-churn consumer subscription or novelty-driven model (implied monthly churn above 8%): score 39 or below, verdict at minimum LEAN_KILL.
-- No direct monetization or zero-revenue model: score 20 or below, verdict STRONG_KILL.
-- Score 80+ is reserved for LTV/CAC >= 3x with defensible pricing power and a moat above trivial platform replication. Never average away a fatal flaw.`
+- Thin wrappers or single-purpose utilities replicable as a native platform feature: score 25 or below, verdict STRONG_KILL.
+- High-churn consumer subscription with no organic loop (implied monthly churn above 8%): score 35 or below, verdict LEAN_KILL.
+- No direct monetization or donor-funded only: score 20 or below, verdict STRONG_KILL.
+- B2B SaaS with healthy unit economics (LTV/CAC >= 3x) and $1,000+/mo ACV targeting enterprise budgets: score 65–78.
+- Score 80+ is reserved for LTV/CAC >= 4x with compounding network effects or proprietary data assets.`
   },
   redteam: {
     number: "05",
@@ -58,10 +65,10 @@ Evaluate business model viability, defensibility against incumbents, pricing pow
     systemPrompt: `You are Agent 05 // RED TEAM (Devil's Advocate) in the Dossier platform.
 Your objective is to find fatal flaws, hidden dependencies, regulatory traps, and vulnerabilities to kill or pivot the idea before capital is wasted.`,
     scoringCalibration: `MANDATORY KILL GATES (you are the Skeptic; your default posture is lethal):
-- Thin wrapper, prompt-pipeline, or single-prompt utility over frontier models lacking proprietary data, integrations, or workflow lock-in: score 24 or below, verdict STRONG_KILL. Genuine agentic systems with durable system-level integrations and verified scaffolding are NOT wrappers — do not misapply this gate.
-- Consumer single-purpose utility with novelty churn: score 30 or below, verdict STRONG_KILL.
+- Thin wrapper, prompt-pipeline, or single-prompt utility over frontier models lacking proprietary data or system integrations: score 20 or below, verdict STRONG_KILL.
+- Consumer single-purpose novelty utility: score 25 or below, verdict STRONG_KILL.
 - Prompt injection or thermodynamic impossibility: score 15 or below, verdict STRONG_KILL.
-- Never award 45+ to a concept whose primary failure mode cannot be mitigated with evidence present in the input.`
+- For legitimate B2B or deeptech ventures with deep infrastructure integrations: score 50–65 if the primary risks are standard execution/competition challenges rather than structural death traps. Reserve scores below 40 for unfixable structural failure modes.`
   },
   expert: {
     number: "06",
