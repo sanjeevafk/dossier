@@ -30,7 +30,7 @@ test("Google News RSS parses articles with title, source, and links", async () =
     </channel>
   </rss>`;
 
-  const result = await queryNewsHeadlines("Mars Rover Exploration", fetchMock(xml));
+  const result = await queryNewsHeadlines("Mars Rover Exploration Unit Test Mock", fetchMock(xml));
   assert.equal(result.articles.length, 2);
   assert.equal(result.articles[0].source, "ScienceAlert");
   assert.ok(result.articles[0].title.includes("Perseverance"));
@@ -45,7 +45,7 @@ test("Google News returns honest empty on HTTP failure", async () => {
 });
 
 test("Google News utilizes SQLite cache on repeated queries", async () => {
-  const key = "cached-rover-query";
+  const key = `cached-rover-query-${Date.now()}`;
   dossierStorage.setReconCache(`news:google:${key}`, "google-news", {
     articles: [
       {

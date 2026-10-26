@@ -1,3 +1,5 @@
+import { detectJurisdiction } from "./geo.js";
+
 export interface MacroIndicator {
   indicator: string;
   country: string;
@@ -14,18 +16,6 @@ export interface MacroReconResult {
 
 type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>;
 
-/** Country guess from audience text for World Bank lookups. */
-function guessCountryIso2(audience: string): string {
-  const text = audience.toLowerCase();
-  if (/india|indian|bharat|asha|nhm|sih/.test(text)) return "IN";
-  if (/nigeria|kenya|ghana|africa/.test(text)) return "NG";
-  if (/brazil|brasil|latam/.test(text)) return "BR";
-  if (/indonesia|philippines|vietnam|asean/.test(text)) return "ID";
-  if (/europe|eu\b|germany|france/.test(text)) return "EU";
-  if (/china|chinese/.test(text)) return "CN";
-  return "US";
-}
-
 /**
  * Query the World Bank API (keyless) for macro grounding of TAM claims:
  * internet penetration, GDP per capita, health expenditure. Replaces the
@@ -36,7 +26,8 @@ export async function queryMacroData(
   audience: string,
   fetchImpl: FetchImpl = fetch
 ): Promise<MacroReconResult> {
-  const country = guessCountryIso2(audience || "");
+  const geo = detectJurisdiction(audience || "");
+  const country = geo.worldBankCountry;
   const indicators = [
     { code: "IT.NET.USER.ZS", label: "Internet penetration (% population)" },
     { code: "NY.GDP.PCAP.CD", label: "GDP per capita (US$)" }

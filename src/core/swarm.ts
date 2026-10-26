@@ -38,6 +38,8 @@ import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryUnifiedPredictionMarkets } from "../tools/markets/index.js";
 import { queryNewsHeadlines } from "../tools/news.js";
+import { detectJurisdiction } from "../tools/geo.js";
+import { queryAgentReachIntel } from "../tools/agentReach.js";
 import { queryOpenAlex } from "../tools/openalex.js";
 import { queryEdgarFormD } from "../tools/edgar.js";
 import { queryHuggingFace } from "../tools/huggingface.js";
@@ -779,15 +781,20 @@ Market & Prediction Signals: ${marketContext}`;
 
     emit({ type: "sandbox_simulating", iterationCount: 10000 });
 
+    const geo = detectJurisdiction(idea.targetAudience, idea.summary, idea.title);
     const isHealthcare = domain.archetype === "healthcare_clinical";
-    const [marketResearch, unifiedMarkets, newsSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
+    const [marketResearch, unifiedMarkets, newsSignals, reachSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
       performMarketResearch(idea.title, [
         idea.targetAudience,
         idea.monetization,
         domain.regulatoryEnvironment
       ], { exaKey: options.exaKey, tavilyKey: options.tavilyKey }),
       queryUnifiedPredictionMarkets(idea.title),
-      queryNewsHeadlines(idea.title),
+      queryNewsHeadlines(idea.title, geo.googleNewsLocale),
+      queryAgentReachIntel(idea.title, {
+        isTechSoftware: domain.archetype === "b2b_saas" || domain.archetype === "deeptech_research" || domain.archetype === "web3_defi",
+        preferredChannels: geo.preferredCommunityChannels
+      }),
       queryOpenAlex(`${idea.title} ${domain.archetypeLabel}`),
       queryEdgarFormD(idea.title),
       queryHuggingFace(idea.title),
@@ -869,6 +876,14 @@ Market & Prediction Signals: ${marketContext}`;
     if (macroSignals.indicators.length > 0) {
       reconSourceParts.push(
         `Macro grounding (World Bank): ${macroSignals.keyTakeaway}`
+      );
+    }
+    reconSourceParts.push(
+      `Jurisdiction & Policy Context (${geo.regionName} / ${geo.countryCode}): Currency ${geo.currency}, Regulatory framework: ${geo.regulatoryFramework}.`
+    );
+    if (reachSignals.gitHubRepos.length > 0 || reachSignals.deepScrape || reachSignals.regionalDiscussions.length > 0) {
+      reconSourceParts.push(
+        `Agent-Reach developer/community intel: ${reachSignals.keyTakeaway}`
       );
     }
 
@@ -1079,6 +1094,44 @@ Market & Prediction Signals: ${marketContext}`;
         provenance: "https://api.worldbank.org/v2",
         indicator: "NEUTRAL",
         confidencePercent: 85
+      });
+      retrievedExternalCount++;
+    }
+    for (let i = 0; i < Math.min(reachSignals.gitHubRepos.length, 2); i++) {
+      const repo = reachSignals.gitHubRepos[i];
+      externalEvidenceItems.push({
+        id: `EV-04G${i + 1}`,
+        claim: `Open source developer traction on GitHub (${repo.fullName}): ${repo.stars} stars — "${repo.description || "Active codebase"}".`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: repo.url,
+        indicator: "SUPPORTING",
+        confidencePercent: 88
+      });
+      retrievedExternalCount++;
+    }
+    if (reachSignals.deepScrape) {
+      externalEvidenceItems.push({
+        id: "EV-04J",
+        claim: `Jina Reader deep inspection (${reachSignals.deepScrape.url}): "${reachSignals.deepScrape.title}" ${reachSignals.deepScrape.extractedPricing ? `[Pricing: ${reachSignals.deepScrape.extractedPricing}]` : ""}`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: reachSignals.deepScrape.url,
+        indicator: "NEUTRAL",
+        confidencePercent: 85
+      });
+      retrievedExternalCount++;
+    }
+    for (let i = 0; i < Math.min(reachSignals.regionalDiscussions.length, 2); i++) {
+      const disc = reachSignals.regionalDiscussions[i];
+      externalEvidenceItems.push({
+        id: `EV-04V${i + 1}`,
+        claim: `Regional community discussion (${disc.platform}): "${disc.title}" (${disc.replies || 0} replies)`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: disc.url,
+        indicator: "NEUTRAL",
+        confidencePercent: 80
       });
       retrievedExternalCount++;
     }
@@ -1617,7 +1670,10 @@ Market & Prediction Signals: ${marketContext}`;
       ...edgarSignals.filings.map(f => ({ title: `Form D: ${f.company}`, url: f.filingUrl, provider: "sec-edgar" })),
       ...hfSignals.models.map(m => ({ title: `Hub: ${m.id}`, url: m.modelUrl, provider: "huggingface" })),
       ...clinicalSignals.studies.map(s => ({ title: `${s.nctId}: ${s.title.slice(0, 100)}`, url: s.studyUrl, provider: "clinicaltrials" })),
-      ...newsSignals.articles.map(a => ({ title: `[NEWS] ${a.title.slice(0, 120)}`, url: a.url, provider: a.source }))
+      ...newsSignals.articles.map(a => ({ title: `[NEWS] ${a.title.slice(0, 120)}`, url: a.url, provider: a.source })),
+      ...reachSignals.gitHubRepos.map(g => ({ title: `[GitHub] ${g.fullName} (${g.stars}★): ${g.description.slice(0, 80)}`, url: g.url, provider: "github" })),
+      ...(reachSignals.deepScrape ? [{ title: `[Jina Reader] ${reachSignals.deepScrape.title}`, url: reachSignals.deepScrape.url, provider: "jina-reader" }] : []),
+      ...reachSignals.regionalDiscussions.map(v => ({ title: `[${v.platform.toUpperCase()}] ${v.title.slice(0, 100)}`, url: v.url, provider: v.platform }))
     ];
 
     const dossier: IdeaDossier = {
