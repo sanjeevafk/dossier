@@ -132,7 +132,7 @@ app.get("/api/dossiers/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Export dossier as Markdown or JSON
+// Export dossier as Markdown, JSON, or Playwright-rendered PDF
 app.get("/api/dossiers/:id/export", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
@@ -147,6 +147,24 @@ app.get("/api/dossiers/:id/export", async (req: Request, res: Response) => {
       res.setHeader("Content-Disposition", `attachment; filename="dossier_${id}.json"`);
       res.setHeader("Content-Type", "application/json");
       res.send(JSON.stringify(dossier, null, 2));
+    } else if (format === "pdf") {
+      // Execute headless Playwright PDF export script
+      const { execFile } = await import("child_process");
+      const path = await import("path");
+      const scriptPath = path.resolve(process.cwd(), "scripts/export_pdf.py");
+      const currentPort = port;
+
+      execFile("python3", [scriptPath, id, String(currentPort)], { maxBuffer: 30 * 1024 * 1024, encoding: "buffer" }, (error, stdout, stderr) => {
+        if (error) {
+          log.error({ err: error, stderr: stderr.toString() }, "Playwright PDF export failed");
+          res.status(500).json({ success: false, error: "Failed to generate PDF report via Playwright" });
+          return;
+        }
+
+        res.setHeader("Content-Disposition", `attachment; filename="dossier_${id}.pdf"`);
+        res.setHeader("Content-Type", "application/pdf");
+        res.send(stdout);
+      });
     } else {
       const markdown = dossierStorage.exportDossierMarkdown(dossier);
       res.setHeader("Content-Disposition", `attachment; filename="dossier_${id}.md"`);

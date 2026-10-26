@@ -762,17 +762,20 @@ function renderMonteCarloPanel(dossier) {
 // 4. EXPORT ENGINE (PDF, MARKDOWN, JSON, VALIDATION KIT)
 // ============================================================
 function exportDossierPdf() {
-  if (!currentRenderedDossier) {
-    alert("No active dossier report is loaded to export.");
+  if (!currentRenderedDossierId) {
+    if (!currentRenderedDossier) {
+      alert("No active dossier report is loaded to export.");
+      return;
+    }
+    // Fallback to browser print if no ID saved yet
+    const detailsList = document.querySelectorAll('#resultsSection details');
+    detailsList.forEach(d => d.setAttribute('open', ''));
+    window.print();
     return;
   }
 
-  // Ensure all collapsible sections are open for printing
-  const detailsList = document.querySelectorAll('#resultsSection details');
-  detailsList.forEach(d => d.setAttribute('open', ''));
-
-  // Trigger print dialog
-  window.print();
+  // Trigger Playwright server-side PDF generation & direct download
+  window.open(`/api/dossiers/${currentRenderedDossierId}/export?format=pdf`, '_blank');
 }
 
 function downloadDossierExport(format) {
