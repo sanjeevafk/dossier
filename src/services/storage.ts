@@ -417,7 +417,7 @@ export class DossierStorageService {
     const rb = d.resilienceBreakdown;
     const exp = d.cheapestValidationExperiment;
 
-    return `# ⚡ DOSSIER REPORT: ${d.idea.title.toUpperCase()}
+    return `# DOSSIER REPORT: ${d.idea.title.toUpperCase()}
 > **Dossier Code:** \`${d.dossierCode}\` | **ID:** \`${d.id}\` | **Date:** \`${d.timestamp.slice(0, 10)}\`  
 > **Status:** \`COMPILED\` | **Harness:** \`TrueForge (File TF-007)\` | **Protocol:** \`Epistemic Robust Verifier\`
 
