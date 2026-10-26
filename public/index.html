@@ -95,36 +95,36 @@
     <section id="heroSection" class="space-y-8">
       
       <!-- Headline & Pitch -->
-      <div class="max-w-3xl space-y-4">
-        <div class="inline-flex items-center gap-2 font-mono text-[11px] font-bold tracking-wider uppercase text-zinc-500">
-          <span class="w-1.5 h-1.5 rounded-full bg-accentGold"></span>
+      <div class="max-w-4xl space-y-4">
+        <div class="inline-flex items-center gap-2 font-mono text-xs font-bold tracking-wider uppercase text-zinc-500">
+          <span class="w-2 h-2 rounded-full bg-accentGold"></span>
           <span>Zero-Sycophancy Idea Intelligence</span>
         </div>
 
-        <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-zinc-950 leading-[1.12]">
+        <h1 class="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-zinc-950 leading-[1.08]">
           Interrogate your venture before the market kills it.
         </h1>
 
-        <p class="text-base sm:text-lg text-zinc-600 leading-relaxed font-normal">
+        <p class="text-lg sm:text-xl text-zinc-700 leading-relaxed font-normal max-w-3xl">
           Six domain-specialized agents interrogate your business model, stress-test unit economics with 10,000 Monte Carlo runs, and cross-reference real-world merchant demand with startup failure forensics.
         </p>
       </div>
 
       <!-- THE ONE-SHOT CONSOLE (2000 CHARACTERS OR LESS) -->
-      <div class="bg-white border border-sand-200 rounded-2xl shadow-sm p-5 md:p-6 space-y-4 transition-all focus-within:border-zinc-400">
+      <div class="bg-white border border-sand-200 rounded-2xl shadow-sm p-6 md:p-8 space-y-5 transition-all focus-within:border-zinc-500">
         
         <!-- Console Header Bar -->
         <div class="flex items-center justify-between pb-3 border-b border-sand-200/80 font-mono text-xs">
           <div class="flex items-center gap-2 text-zinc-800 font-bold">
-            <svg class="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
             </svg>
-            <span>INPUT CONSOLE</span>
+            <span class="tracking-wider">INPUT CONSOLE</span>
             <span class="text-zinc-400 font-normal">// PLAIN TEXT SPECIFICATION</span>
           </div>
           
-          <div class="flex items-center gap-1 font-mono text-[11px]">
-            <span id="charCount" class="font-bold text-zinc-700">0</span>
+          <div class="flex items-center gap-1 font-mono text-xs">
+            <span id="charCount" class="font-bold text-zinc-800">0</span>
             <span class="text-zinc-400">/ 2,000</span>
           </div>
         </div>
@@ -135,7 +135,7 @@
             id="ideaInput"
             rows="5"
             maxlength="2000"
-            class="w-full bg-transparent border-0 p-0 text-sm md:text-base text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0 resize-y leading-relaxed font-sans"
+            class="w-full bg-transparent border-0 p-0 text-base md:text-lg text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-0 resize-y leading-relaxed font-sans"
             placeholder="Describe your startup concept, target buyer workflow, unit economics, or hardware/regulatory constraints in 2,000 characters or less...
 
 Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kirana retailers that reconciles distributor invoices via OCR, generates UPI collection links, and charges $15/month per store."
@@ -143,18 +143,18 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
         </div>
 
         <!-- Presets & Run Action Toolbar -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-sand-200/80">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-sand-200/80">
           
           <!-- Sample Presets for Instant 1-Shot Test -->
           <div class="flex flex-wrap items-center gap-2">
-            <span class="text-[11px] font-mono text-zinc-400 shrink-0">Sample ideas:</span>
-            <button onclick="loadSamplePreset('reconcilepay')" type="button" class="px-2.5 py-1 rounded bg-sand-100 hover:bg-sand-200 text-zinc-700 text-xs font-medium transition cursor-pointer">
+            <span class="text-xs font-mono text-zinc-500 shrink-0">Sample ideas:</span>
+            <button onclick="loadSamplePreset('reconcilepay')" type="button" class="px-3 py-1.5 rounded-lg bg-sand-100 hover:bg-sand-200 text-zinc-800 text-xs font-medium transition cursor-pointer">
               Kirana Invoicing (B2B SaaS)
             </button>
-            <button onclick="loadSamplePreset('reloot')" type="button" class="px-2.5 py-1 rounded bg-sand-100 hover:bg-sand-200 text-zinc-700 text-xs font-medium transition cursor-pointer">
+            <button onclick="loadSamplePreset('reloot')" type="button" class="px-3 py-1.5 rounded-lg bg-sand-100 hover:bg-sand-200 text-zinc-800 text-xs font-medium transition cursor-pointer">
               Used Furniture (Marketplace)
             </button>
-            <button onclick="loadSamplePreset('autosoc2')" type="button" class="px-2.5 py-1 rounded bg-sand-100 hover:bg-sand-200 text-zinc-700 text-xs font-medium transition cursor-pointer">
+            <button onclick="loadSamplePreset('autosoc2')" type="button" class="px-3 py-1.5 rounded-lg bg-sand-100 hover:bg-sand-200 text-zinc-800 text-xs font-medium transition cursor-pointer">
               K8s Compliance (DevSecOps)
             </button>
           </div>
@@ -170,7 +170,7 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
             <button
               id="runEvaluationBtn"
               onclick="executeOneShotEvaluation()"
-              class="w-full sm:w-auto px-5 py-2.5 bg-zinc-950 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold font-mono tracking-tight transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+              class="w-full sm:w-auto px-6 py-3 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold font-mono tracking-wide transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
             >
               <span id="runBtnText">RUN ADVERSARIAL SWARM</span>
               <svg id="runBtnArrow" class="w-4 h-4 text-accentGold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -182,6 +182,69 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
 
         </div>
 
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- ABOVE-THE-FOLD TANGIBLE SAMPLE VERDICT TEASER               -->
+      <!-- ============================================================ -->
+      <div class="bg-sand-50/90 border border-sand-200 rounded-2xl p-6 md:p-7 space-y-5 shadow-2xs">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-sand-200 pb-4">
+          <div>
+            <div class="flex items-center gap-2 font-mono text-[11px] text-zinc-500 uppercase tracking-wider font-bold">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              <span>Sample Analysis Output</span>
+              <span>//</span>
+              <span class="text-zinc-700">What a completed dossier looks like</span>
+            </div>
+            <h3 class="text-lg font-extrabold text-zinc-950 mt-1">
+              AutoSOC2: Continuous Compliance Auditor for Kubernetes
+            </h3>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-mono text-xs font-black tracking-wide">
+              BUILD IF VALIDATED • 78/100
+            </span>
+            <button onclick="loadSamplePreset('autosoc2'); executeOneShotEvaluation();" class="px-3 py-1 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-mono font-bold rounded-lg transition cursor-pointer">
+              Inspect Full Dossier
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Flaw 1 -->
+          <div class="p-3.5 bg-white border border-sand-200 rounded-xl space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-red-800 font-bold uppercase">Fatal Risk 01</span>
+              <span class="text-[10px] font-mono text-zinc-400">PROCUREMENT</span>
+            </div>
+            <p class="text-xs text-zinc-800 font-sans leading-relaxed">
+              Enterprise security reviews stall pilots for 4–9 months while incumbents bundle automated compliance for free.
+            </p>
+          </div>
+
+          <!-- Flaw 2 -->
+          <div class="p-3.5 bg-white border border-sand-200 rounded-xl space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-amber-800 font-bold uppercase">Stochastic Economics</span>
+              <span class="text-[10px] font-mono text-zinc-400">MONTE CARLO</span>
+            </div>
+            <p class="text-xs text-zinc-800 font-sans leading-relaxed">
+              P50 payback is <strong>3.0 months</strong> with 7.77x LTV/CAC, but token costs above $0.20/user drag payback out by +3.7 months.
+            </p>
+          </div>
+
+          <!-- 7-Day Test -->
+          <div class="p-3.5 bg-white border border-sand-200 rounded-xl space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-zinc-900 font-bold uppercase">Next Action</span>
+              <span class="text-[10px] font-mono text-emerald-700 font-bold">7-DAY TEST</span>
+            </div>
+            <p class="text-xs text-zinc-800 font-sans leading-relaxed">
+              Interview 10 DevOps leads with a 1-page spec. Pass gate: &gt;= 3 signed Letters of Intent. If &lt;= 1 signed, kill idea immediately.
+            </p>
+          </div>
+        </div>
       </div>
 
     </section>
@@ -592,50 +655,57 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
     </section>
 
     <!-- ============================================================ -->
-    <!-- 7. MODEL CONTEXT PROTOCOL (MCP) SETUP GUIDE                  -->
+    <!-- 7. DEVELOPER & MCP PROTOCOL INTEGRATION (DECOUPLED DRAWER)    -->
     <!-- ============================================================ -->
-    <section id="mcpSection" class="pt-12 border-t border-sand-200 space-y-8">
-      <div class="max-w-2xl space-y-2">
-        <div class="font-mono text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Integration</div>
-        <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950">
-          Model Context Protocol (MCP) Setup.
-        </h2>
-        <p class="text-sm text-zinc-600 leading-relaxed">
-          Dossier natively exposes its adversarial swarm, epistemic verification engine, and sandboxed Monte Carlo runner over standard MCP stdio for seamless integration into your AI coding harnesses.
-        </p>
-      </div>
+    <section id="mcpSection" class="pt-8 border-t border-sand-200">
+      <details class="group bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden font-mono text-xs">
+        <summary class="p-6 md:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none hover:bg-zinc-900 transition">
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2 text-accentGold text-[11px] font-bold uppercase tracking-wider">
+              <span>[+] DEVELOPER &amp; MCP PROTOCOL INTEGRATION</span>
+            </div>
+            <h3 class="text-xl font-extrabold text-white font-sans tracking-tight">
+              Connect Dossier Adversarial Swarm to Claude Desktop, Cursor, &amp; CLI
+            </h3>
+            <p class="text-zinc-400 font-sans text-xs max-w-2xl leading-relaxed">
+              Expose the 6-agent swarm, isolated Python Monte Carlo runner, and epistemic verification engine over standard MCP stdio JSON-RPC.
+            </p>
+          </div>
+          <span class="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 font-mono text-xs font-semibold shrink-0">
+            View Stdio JSON Config
+          </span>
+        </summary>
 
-      <!-- Tabbed Code Box -->
-      <div class="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden font-mono text-xs">
-        
-        <!-- Tab Bar -->
-        <div class="flex items-center justify-between px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 text-[11px]">
-          <div class="flex items-center gap-2">
-            <button onclick="setMcpTab('claude')" id="mcpTab-claude" class="px-2.5 py-1 rounded bg-zinc-800 text-white font-bold transition">
-              Claude Desktop
-            </button>
-            <button onclick="setMcpTab('cursor')" id="mcpTab-cursor" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white transition">
-              Cursor
-            </button>
-            <button onclick="setMcpTab('windsurf')" id="mcpTab-windsurf" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white transition">
-              Windsurf / Antigravity
-            </button>
-            <button onclick="setMcpTab('cli')" id="mcpTab-cli" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white transition">
-              CLI / Stdio
+        <div class="p-6 md:p-8 pt-0 space-y-5 border-t border-zinc-900">
+          
+          <!-- Tab Bar -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-b border-zinc-800 text-[11px]">
+            <div class="flex items-center gap-2">
+              <button onclick="setMcpTab('claude')" id="mcpTab-claude" class="px-3 py-1 rounded bg-zinc-800 text-white font-bold transition">
+                Claude Desktop
+              </button>
+              <button onclick="setMcpTab('cursor')" id="mcpTab-cursor" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
+                Cursor
+              </button>
+              <button onclick="setMcpTab('windsurf')" id="mcpTab-windsurf" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
+                Windsurf / Antigravity
+              </button>
+              <button onclick="setMcpTab('cli')" id="mcpTab-cli" class="px-3 py-1 rounded text-zinc-400 hover:text-white transition">
+                CLI / Stdio
+              </button>
+            </div>
+
+            <button onclick="copyMcpCode()" class="flex items-center gap-1.5 px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-[11px] font-semibold transition cursor-pointer">
+              <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+              <span id="copyMcpText">Copy Config</span>
             </button>
           </div>
 
-          <button onclick="copyMcpCode()" class="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-[11px] font-semibold transition cursor-pointer">
-            <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-            </svg>
-            <span id="copyMcpText">Copy Config</span>
-          </button>
-        </div>
-
-        <!-- Code Content -->
-        <div class="p-5 overflow-x-auto text-zinc-300">
-          <pre id="mcpCodeBlock" class="leading-relaxed"><code>{
+          <!-- Code Content -->
+          <div class="overflow-x-auto text-zinc-300">
+            <pre id="mcpCodeBlock" class="leading-relaxed"><code>{
   "mcpServers": {
     "dossier": {
       "command": "node",
@@ -643,16 +713,16 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
     }
   }
 }</code></pre>
-        </div>
+          </div>
 
-        <!-- Exposed MCP Tools Summary Footer -->
-        <div class="p-4 bg-zinc-900/60 border-t border-zinc-800 text-[11px] text-zinc-400 flex flex-wrap gap-4">
-          <div><span class="text-zinc-200 font-bold">evaluate_idea</span> — Full 6-agent swarm intelligence &amp; dossier synthesis</div>
-          <div><span class="text-zinc-200 font-bold">run_sandbox_economics</span> — Isolated Python3 deterministic unit economics</div>
-          <div><span class="text-zinc-200 font-bold">verify_claims_epistemics</span> — 7-tier epistemic hierarchy claim audit</div>
+          <!-- Exposed MCP Tools Summary Footer -->
+          <div class="p-4 bg-zinc-900/60 rounded-xl border border-zinc-800 text-[11px] text-zinc-400 flex flex-wrap gap-4 font-mono">
+            <div><span class="text-zinc-200 font-bold">evaluate_idea</span> — Full 6-agent swarm intelligence &amp; dossier synthesis</div>
+            <div><span class="text-zinc-200 font-bold">run_sandbox_economics</span> — Isolated Python3 deterministic unit economics</div>
+            <div><span class="text-zinc-200 font-bold">verify_claims_epistemics</span> — 7-tier epistemic hierarchy claim audit</div>
+          </div>
         </div>
-
-      </div>
+      </details>
     </section>
 
     <!-- ============================================================ -->
