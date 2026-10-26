@@ -43,6 +43,11 @@ dist/
 .next/
 out/
 
+# Models & large checkpoints
+models/
+*.safetensors
+*.onnx
+
 # Local evaluation runs & generated dossiers
 reports/
 scripts/evaluate_*.ts

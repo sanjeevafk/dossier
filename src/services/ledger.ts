@@ -159,6 +159,16 @@ export class DossierForecastLedger {
     return records;
   }
 
+  /** Retrieve a single forecast by ID directly. */
+  public async getForecast(id: string): Promise<ForecastRecord | null> {
+    try {
+      const data = await fs.readFile(this.filePath(id), "utf-8");
+      return JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+
   public async listForecasts(limit = 50, status?: ForecastRecord["status"]): Promise<ForecastRecord[]> {
     await fs.mkdir(LEDGER_DIR, { recursive: true });
     const files = await fs.readdir(LEDGER_DIR);

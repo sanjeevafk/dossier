@@ -19,8 +19,8 @@ test("Compiled dossiers register dated falsifiable forecasts in the ledger", asy
 
   const records = [];
   for (const id of dossier.forecastIds) {
-    const all = await forecastLedger.listForecasts(1000);
-    records.push(...all.filter((r) => r.id === id));
+    const rec = await forecastLedger.getForecast(id);
+    if (rec) records.push(rec);
   }
   assert.equal(records.length, dossier.forecastIds.length, "All forecast ids must exist in the ledger");
 
