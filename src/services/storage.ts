@@ -1,8 +1,15 @@
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import { IdeaDossier, ApprovalAction } from "../types/index.js";
 
-const STORAGE_DIR = path.resolve(process.cwd(), "reports");
+const candidateStorageDirs = [
+  process.env.DOSSIER_DATA_DIR,
+  path.resolve(import.meta.dirname, "..", "..", "reports"),
+  path.resolve(process.cwd(), "reports")
+].filter(Boolean) as string[];
+
+const STORAGE_DIR = candidateStorageDirs.find((d) => fsSync.existsSync(d)) || candidateStorageDirs[0];
 
 export interface DossierSummary {
   id: string;
@@ -182,7 +189,7 @@ export class DossierStorageService {
 
     return `# ⚡ DOSSIER REPORT: ${d.idea.title.toUpperCase()}
 > **Dossier Code:** \`${d.dossierCode}\` | **ID:** \`${d.id}\` | **Date:** \`${d.timestamp.slice(0, 10)}\`  
-> **Status:** \`COMPILED\` | **Harness:** \`TrueForge (File TF-007)\` | **Protocol:** \`Stanford CS329A\`
+> **Status:** \`COMPILED\` | **Runtime:** \`Dossier Swarm (File TF-007)\` | **Protocol:** \`Stanford CS329A\`
 
 ---
 
@@ -277,7 +284,7 @@ ${d.killConditions.map((c, i) => `${i + 1}. **KILL** ${c}`).join("\n")}
 
 ---
 
-## 8. Dual-Key Human Approval Gates (TrueForge Safety)
+## 8. Dual-Key Human Approval Gates (Safety Checkpoints)
 
 ${d.approvalGates.map(gate => `- **[${gate.status}]** \`${gate.id}\` (${gate.actionType})
   - *Summary:* ${gate.summary}

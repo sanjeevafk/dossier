@@ -16,24 +16,29 @@ import {
   CheapestValidationExperiment,
   EpistemicTier,
   EpistemicTaxonomySummary,
+  SwarmDissent,
   ValidationVerdict,
   ValidationPriorityItem,
   SwarmEvent,
   IdeaDomainArchetype,
   SandboxStressStats,
-  Contradiction as ContradictionEntry
+  Contradiction as ContradictionEntry,
+  DecisionModelOutput
 } from "../types/index.js";
 import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
 import { StanfordRobustVerifier } from "./verifier.js";
 import { buildMutationProposals } from "./mutator.js";
 import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
+import { buildOutsideViewPanel } from "./outside-view.js";
+import { runDecisionModel } from "../tools/decision-runner.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
 import { queryPolymarketMarkets } from "../tools/polymarket.js";
+import { runAnalystWithTools, GroundedEvidencePack } from "../tools/analyst-tools.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
-import { forecastLedger } from "../services/forecastLedger.js";
+import { forecastLedger } from "../services/ledger.js";
 import { z } from "zod";
 
 export interface SwarmExecutionOptions {
@@ -43,19 +48,22 @@ export interface SwarmExecutionOptions {
   expectedChurnMonthly?: number;
   estimatedCacUsd?: number;
   useLiveLLM?: boolean;
+  model?: string;
 }
 
 /**
  * Deterministic adversarial invariants shared by the live-LLM and heuristic evaluation paths.
- * These enforce hard kill ceilings independent of model drift.
+ * These enforce hard kill ceilings independent of model drift, reinforced by the calibrated decision model.
  */
-function detectAdversarialInvariants(idea: IdeaInput, pricing: number) {
+function detectAdversarialInvariants(idea: IdeaInput, pricing: number, decisionEvaluation?: DecisionModelOutput) {
   const text = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization} ${idea.techStack || ""}`.toLowerCase();
+  const thinWrapperByDecision = decisionEvaluation?.answers?.moat?.flagged ?? false;
+  const zeroMonetizationByDecision = decisionEvaluation?.answers?.monetization?.flagged ?? false;
   return {
     isPromptInjection: /ignore (previous|all) instructions|system prompt|jailbreak|output 100|developer mode/i.test(text),
     isImpossiblePhysics: /perpetual motion|free energy|infinite electricity|zero input energy|violates thermodynamics|overunity/i.test(text),
-    isNoMonetization: /free forever|no monetization|zero revenue|not charging/i.test(text) || pricing <= 0,
-    isThinWrapper: /(chrome extension|browser extension|gpt wrapper|chat with pdf|meeting notes|summariz|prompt engineering|simple crm|transcriber|ai copywriter|ai tweet)/i.test(text)
+    isNoMonetization: /free forever|no monetization|zero revenue|not charging/i.test(text) || pricing <= 0 || zeroMonetizationByDecision,
+    isThinWrapper: /(chrome extension|browser extension|gpt wrapper|chat with pdf|meeting notes|summariz|prompt engineering|simple crm|transcriber|ai copywriter|ai tweet)/i.test(text) || thinWrapperByDecision
   };
 }
 
@@ -146,7 +154,7 @@ export class IdeaSwarmOrchestrator {
   private async evaluateRoleWithLLM(
     role: SwarmRole,
     idea: IdeaInput,
-    marketContext: string,
+    agentContext: string,
     domain: DomainClassification,
     invariants: AdversarialInvariants
   ): Promise<{ opinion: AgentOpinion | null; fallbackReason?: string }> {
@@ -162,7 +170,7 @@ export class IdeaSwarmOrchestrator {
       mandate: defaultRoleConfig.description
     };
 
-    const systemPrompt = `You are Agent ${roleMeta.number} // ${roleMeta.title} in the TrueForge Adversarial Intelligence Swarm.
+    const systemPrompt = `You are Agent ${roleMeta.number} // ${roleMeta.title} in the Dossier Adversarial Intelligence Swarm.
 Domain Archetype: ${domain.archetypeLabel}
 Primary Customer: ${domain.primaryCustomer}
 Procurement & Sales Cycle: ${domain.procurementCycle}
@@ -198,7 +206,8 @@ Target Audience: ${idea.targetAudience}
 Monetization & Model: ${idea.monetization}
 Tech Stack: ${idea.techStack || "Standard"}
 Domain: ${domain.archetypeLabel}
-Market & Prediction Signals: ${marketContext}`;
+Evidence pack retrieved for your role (may be partially empty — statements above each line's provenance):
+${agentContext}`;
 
     try {
       const turnStart = Date.now();
@@ -307,7 +316,7 @@ Market & Prediction Signals: ${marketContext}`;
     if (context.hasLiveLLM) {
       try {
         const skepticTurn = await generateAgentTurn(
-          `You are Agent ${challengerOpinion.roleNumber} // ${challengerOpinion.roleTitle} in the TrueForge adversarial crossfire. You MUST cite the stress-sandbox numbers verbatim and probe exactly one testable claim. Return strictly valid JSON: {"crossExam": string, "targetClaim": string}.`,
+          `You are Agent ${challengerOpinion.roleNumber} // ${challengerOpinion.roleTitle} in the Dossier adversarial crossfire. You MUST cite the stress-sandbox numbers verbatim and probe exactly one testable claim. Return strictly valid JSON: {"crossExam": string, "targetClaim": string}.`,
           `Stress evidence you must cite: ${context.stressSummary}\nContested claim to attack: "${context.contestedClaim}"\nIssue a direct cross-examination of at most 100 words to Agent ${defenderOpinion.roleNumber} // ${defenderOpinion.roleTitle}.`,
           { temperature: 0.4, maxTokens: 800, jsonMode: true }
         );
@@ -761,12 +770,20 @@ Market & Prediction Signals: ${marketContext}`;
     const emit = options.onEvent || (() => {});
 
     // 01 INGEST & CLASSIFY
-    notify("01 INGEST", `Ingesting "${idea.title}" into TrueForge execution runtime...`);
-    emit({ type: "stage", stage: "01 INGEST", detail: `Ingesting "${idea.title}" into TrueForge execution runtime...`, timestamp: new Date().toISOString() });
+    notify("01 INGEST", `Ingesting "${idea.title}" into Dossier execution runtime...`);
+    emit({ type: "stage", stage: "01 INGEST", detail: `Ingesting "${idea.title}" into Dossier execution runtime...`, timestamp: new Date().toISOString() });
 
     const domain = classifyIdeaDomain(idea);
     notify("01 CLASSIFY", `Classified concept as [${domain.archetypeLabel}] — Target: ${domain.primaryCustomer}`);
     emit({ type: "domain", domain });
+
+    // 01.1 FAST DECISION MODEL PRE-SCREEN (Hamel Husain Oct 2026 pattern, ~20ms)
+    notify("01 SCREEN", `Running fast calibrated decision model gatekeeper on "${idea.title}"...`);
+    const decisionEvaluation = await runDecisionModel(idea);
+    emit({ type: "decision_gate", evaluation: decisionEvaluation });
+    if (decisionEvaluation.fatal_flags.length > 0) {
+      notify("01 GATED", `Decision Model flagged fatal gate(s): ${decisionEvaluation.fatal_flags.join(", ")}`);
+    }
 
     // 02 DECOMPOSE & RECON
     notify("02 DECOMPOSE", `Decomposing variables under ${domain.procurementCycle} framework...`);
@@ -784,7 +801,7 @@ Market & Prediction Signals: ${marketContext}`;
     };
     const pricing = options.pricingMonthlyUsd ?? pricingOrder[domain.archetype];
     const cac = options.estimatedCacUsd ?? (domain.archetype === "hardware_robotics" ? 2500 : domain.archetype === "b2b_saas" ? 1200 : (domain.archetype === "deeptech_research" ? 5000 : 350));
-    const invariants = detectAdversarialInvariants(idea, pricing);
+    const invariants = detectAdversarialInvariants(idea, pricing, decisionEvaluation);
     const churn = options.expectedChurnMonthly ?? (invariants.isThinWrapper ? 0.28 : (domain.archetype === "consumer_social" ? 0.12 : 0.04));
 
     emit({ type: "sandbox_simulating", iterationCount: 10000 });
@@ -817,35 +834,46 @@ Market & Prediction Signals: ${marketContext}`;
 
     const mc = sandboxSim.metrics.monteCarlo;
 
-    // Evidence provenance block: only REAL retrieved sources are described as
-    // sourced. When recon/markets/community are unavailable this is stated
-    // explicitly so agents never mistake heuristic priors for external evidence.
-    const reconSourceParts: string[] = [];
-    if (marketResearch.dataSource === "live-web-recon" && marketResearch.rawResults.length > 0) {
-      reconSourceParts.push(
-        `Live web recon (${marketResearch.reconProvider}): ${marketResearch.rawResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
-      );
-    } else {
-      reconSourceParts.push(
-        `No live web recon results were retrieved (${marketResearch.reconError || "provider unavailable"}) — treat competitive and demand statements as heuristic priors, not sourced evidence.`
-      );
-    }
-    if (marketResearch.community.discussions.length > 0) {
-      reconSourceParts.push(
-        `Community discussions (${marketResearch.community.provider}): ${marketResearch.community.discussions.slice(0, 3).map(d => `"${d.title}"${typeof d.score === "number" ? ` (${d.score} pts${typeof d.comments === "number" ? `, ${d.comments} comments` : ""})` : ""} [${d.url}]`).join("; ")}`
-      );
-    } else {
-      reconSourceParts.push("No community discussions (Reddit/HN/X) were retrievable for this concept.");
-    }
-    if (polymarketSignals.marketsFound.length > 0) {
-      reconSourceParts.push(
-        `Prediction markets: ${polymarketSignals.marketsFound.map(m => `"${m.title}" @ ${m.probabilityYesPercent}% [${m.marketUrl}]`).join("; ")}. ${polymarketSignals.keyTakeaway}`
-      );
-    } else {
-      reconSourceParts.push(polymarketSignals.keyTakeaway);
-    }
+    // Evidence packs: each agent receives the slice of RETRIEVED evidence relevant
+    // to its mandate, or an explicit absence statement — never a shared digest,
+    // never fabricated data.
+    const competitiveResults = marketResearch.rawResults.filter((r) => r.queryLabel === "competitive");
+    const sentimentResults = marketResearch.rawResults.filter((r) => r.queryLabel === "sentiment");
+    const communityDiscussions = marketResearch.community.discussions;
 
-    const marketContext = `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
+    const competitiveLine = competitiveResults.length > 0
+      ? `Live competitor recon (${marketResearch.reconProvider}): ${competitiveResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
+      : `No competitive recon was retrieved — do NOT assert specific competitor names, prices, or market shares; reason from priors and label them as priors.`;
+    const sentimentLine = sentimentResults.length > 0
+      ? `Customer-sentiment recon: ${sentimentResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
+      : `No customer-sentiment recon was retrieved.`;
+    const communityLine = communityDiscussions.length > 0
+      ? `Community discussions (${marketResearch.community.provider}): ${communityDiscussions.slice(0, 3).map(d => `"${d.title}"${typeof d.score === "number" ? ` (${d.score} pts)` : ""} [${d.url}]`).join("; ")}`
+      : `No community discussions (Reddit/HN/X) were retrievable — do NOT claim community sentiment either way.`;
+    const marketLine = polymarketSignals.marketsFound.length > 0
+      ? `Prediction markets: ${polymarketSignals.marketsFound.map(m => `"${m.title}" @ ${m.probabilityYesPercent}% [${m.marketUrl}]`).join("; ")}. ${polymarketSignals.keyTakeaway}`
+      : `No correlated prediction-market data is available.`;
+    const econContext = `Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
+
+    const decisionLine = decisionEvaluation
+      ? `Calibrated Decision Gatekeeper (${decisionEvaluation.engine || "Julia-1"}): Verdict=${decisionEvaluation.verdict}, LossRatio=${decisionEvaluation.loss_ratio}x. ` +
+        `Moat P(wrapper)=${decisionEvaluation.answers?.moat?.probabilities?.thin_wrapper ?? "n/a"} [Flagged=${decisionEvaluation.answers?.moat?.flagged}], ` +
+        `Regulatory P(fatal)=${decisionEvaluation.answers?.regulatory_risk?.probabilities?.regulatory_fatal ?? "n/a"} [Flagged=${decisionEvaluation.answers?.regulatory_risk?.flagged}], ` +
+        `Procurement P(deadlock)=${decisionEvaluation.answers?.sales_cycle?.probabilities?.procurement_deadlock ?? "n/a"} [Flagged=${decisionEvaluation.answers?.sales_cycle?.flagged}], ` +
+        `Monetization P(zero)=${decisionEvaluation.answers?.monetization?.probabilities?.monetization_zero ?? "n/a"} [Flagged=${decisionEvaluation.answers?.monetization?.flagged}]. ` +
+        (decisionEvaluation.fatal_flags.length > 0 ? `TRIGGERED FATAL FAILURE MODES: ${decisionEvaluation.fatal_flags.join(", ")}. ` : "")
+      : "";
+
+    const agentContextFor = (role: SwarmRole): string => {
+      const lines: string[] = [];
+      if (role === "analyst") lines.push(competitiveLine, marketLine, decisionLine);
+      else if (role === "redteam") lines.push(sentimentLine, communityLine, decisionLine);
+      else if (role === "customer") lines.push(communityLine, decisionLine);
+      else if (role === "investor") lines.push(marketLine, decisionLine);
+      else if (role === "architect" || role === "expert") lines.push(decisionLine);
+      lines.push(econContext);
+      return lines.join(" ");
+    };
 
     // 03 INVESTIGATE (Domain-Tailored Specialist Subagents)
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
@@ -855,21 +883,101 @@ Market & Prediction Signals: ${marketContext}`;
     const evaluationMode: "LIVE_LLM" | "HEURISTIC_ENGINE" =
       shouldCallLive && getLLMStatus().hasLiveLLM ? "LIVE_LLM" : "HEURISTIC_ENGINE";
 
-    // Stream agents live: each role emits agent_start when it begins computing
-    // and agent_opinion the moment its (LLM or heuristic) opinion resolves.
-    const AGENT_ROLES = ["analyst", "customer", "architect", "investor", "redteam", "expert"] as const;
-    const [analystOpinion, customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion] = await Promise.all(
-      AGENT_ROLES.map(async (role) => {
+    // Dynamic Tool Calling for Agent 01 (Market Analyst)
+    // Runs first to discover real competitors, pricing pages, and customer friction,
+    // which are then routed as grounded evidence to the remaining 5 agents.
+    let analystOpinion: AgentOpinion;
+    let groundedPack: GroundedEvidencePack | null = null;
+
+    if (evaluationMode === "LIVE_LLM") {
+      emit({ type: "stage", stage: "03.1 RECON", detail: "Market Analyst running live web recon tools & competitor search...", timestamp: new Date().toISOString() });
+      emit({ type: "agent_start", role: "analyst", roleTitle: domain.specialistRoleLabels.analyst.title });
+      const analystStart = Date.now();
+
+      const analystToolResult = await runAnalystWithTools(idea, domain, econContext, { model: options.model });
+      groundedPack = analystToolResult.groundedEvidence;
+
+      if (analystToolResult.opinion) {
+        analystOpinion = analystToolResult.opinion;
+      } else {
+        if (analystToolResult.fallbackReason) {
+          emit({ type: "parse_fallback", role: "analyst", reason: analystToolResult.fallbackReason });
+        }
+        const liveFallback = await this.evaluateRoleWithLLM("analyst", idea, agentContextFor("analyst"), domain, invariants);
+        analystOpinion = liveFallback.opinion || this.generateHeuristicOpinion("analyst", idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+      }
+
+      analystOpinion.telemetryMetadata = {
+        latencyMs: Date.now() - analystStart,
+        threatSeverity: analystOpinion.score < 50 ? "HIGH" : "MODERATE",
+        modelId: getLLMStatus().activeModel
+      };
+
+      if (groundedPack.identifiedCompetitors.length > 0) {
+        marketResearch.identifiedCompetitors = groundedPack.identifiedCompetitors;
+      }
+      if (groundedPack.rawResults.length > 0 && marketResearch.rawResults.length === 0) {
+        marketResearch.rawResults = groundedPack.rawResults;
+      }
+
+      emit({
+        type: "agent_opinion",
+        role: "analyst",
+        roleTitle: domain.specialistRoleLabels.analyst.title,
+        verdict: analystOpinion.verdict,
+        score: analystOpinion.score,
+        fatalFlaw: analystOpinion.fatalFlaws[0]
+      });
+    } else {
+      // Heuristic offline mode
+      emit({ type: "agent_start", role: "analyst", roleTitle: domain.specialistRoleLabels.analyst.title });
+      analystOpinion = this.generateHeuristicOpinion("analyst", idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+      analystOpinion.telemetryMetadata = {
+        latencyMs: 10,
+        threatSeverity: analystOpinion.score < 50 ? "HIGH" : "MODERATE",
+        modelId: "deterministic-heuristics"
+      };
+      emit({
+        type: "agent_opinion",
+        role: "analyst",
+        roleTitle: domain.specialistRoleLabels.analyst.title,
+        verdict: analystOpinion.verdict,
+        score: analystOpinion.score,
+        fatalFlaw: analystOpinion.fatalFlaws[0]
+      });
+    }
+
+    // Role-Scoped Context Routing: route the Analyst's verified intelligence to downstream agents
+    const groundedContextFor = (role: SwarmRole): string => {
+      const lines: string[] = [];
+      if (groundedPack) {
+        if (role === "customer") lines.push(groundedPack.roleContextLines.customer);
+        else if (role === "redteam") lines.push(groundedPack.roleContextLines.redteam);
+        else if (role === "investor") lines.push(groundedPack.roleContextLines.investor, marketLine);
+        else if (role === "architect") lines.push(groundedPack.roleContextLines.architect);
+        else if (role === "expert") lines.push(groundedPack.roleContextLines.expert);
+      } else {
+        return agentContextFor(role);
+      }
+      lines.push(econContext);
+      return lines.join(" ");
+    };
+
+    // Parallel execution for remaining 5 specialist agents with grounded evidence packs
+    const REMAINING_ROLES = ["customer", "architect", "investor", "redteam", "expert"] as const;
+    const [customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion] = await Promise.all(
+      REMAINING_ROLES.map(async (role) => {
         emit({ type: "agent_start", role, roleTitle: domain.specialistRoleLabels[role].title });
         const roleStart = Date.now();
-        const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, marketContext, domain, invariants) : null;
+        const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, groundedContextFor(role), domain, invariants) : null;
         if (live?.fallbackReason) {
           emit({ type: "parse_fallback", role, reason: live.fallbackReason });
         }
         const opinion: AgentOpinion = live?.opinion || this.generateHeuristicOpinion(role, idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
         opinion.telemetryMetadata = {
           latencyMs: Date.now() - roleStart,
-          threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE"
+          threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE",
+          modelId: live?.opinion ? getLLMStatus().activeModel : "deterministic-heuristics"
         };
         emit({
           type: "agent_opinion",
@@ -985,7 +1093,7 @@ Market & Prediction Signals: ${marketContext}`;
         claim: `Sandboxed unit economics computation: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)}mo (Python3 Subprocess Exit 0). Input pricing ($${pricing}/mo) and CAC ($${cac}) remain MODELLED_ASSUMPTION.`,
         tier: "VERIFIED_COMPUTATION",
         claimType: "VERIFIED_COMPUTATION",
-        provenance: "TrueForge Python3 Sandbox (Isolated Subprocess Exit 0)",
+        provenance: "Dossier Python3 Sandbox (Isolated Subprocess Exit 0)",
         indicator: "SUPPORTING",
         confidencePercent: 98
       },
@@ -1042,7 +1150,7 @@ Market & Prediction Signals: ${marketContext}`;
               claim: `Value-of-information computation (empirical partial-EVPI over ${sandboxSim.metrics.monteCarlo?.iterations ?? 0} Monte Carlo runs, LTV−CAC decision model): resolving "${sandboxSim.metrics.voi.partialEvpi[0]?.param}" is worth $${sandboxSim.metrics.voi.partialEvpi[0]?.evpiPerCustomer}/customer (${Math.round((sandboxSim.metrics.voi.partialEvpi[0]?.shareOfEvpi ?? 0) * 100)}% of the $${sandboxSim.metrics.voi.evpiPerCustomer}/customer decision value at stake).`,
               tier: "VERIFIED_COMPUTATION",
               claimType: "VERIFIED_COMPUTATION",
-              provenance: "TrueForge Python3 Sandbox (empirical partial-EVPI)",
+              provenance: "Dossier Python3 Sandbox (empirical partial-EVPI)",
               indicator: "SUPPORTING",
               confidencePercent: 92
             } as EvidenceItem
@@ -1333,7 +1441,23 @@ Market & Prediction Signals: ${marketContext}`;
       }
     }
 
-    const confidenceScore = Math.min(Math.max(compositeScore + 10, 65), 95);
+    // Honest swarm-agreement signal (replaces the cosmetic composite+10 confidence):
+    // agreement strength, not idea quality — a split swarm means the verdict needs
+    // human judgment, and that signal must never be averaged away.
+    const killGradeAgents = initialScores.filter((s) => s < 40).length;
+    const avgAgentScore = Math.round(initialScores.reduce((a, b) => a + b, 0) / initialScores.length);
+    const swarmDissent: SwarmDissent = {
+      scoreSpread,
+      killGradeAgents,
+      avgAgentScore,
+      verdictContested: killGradeAgents >= 2 && compositeScore >= 50
+    };
+    const confidenceScore = Math.round(Math.max(25, Math.min(92, 90 - scoreSpread * 0.7 - killGradeAgents * 5)));
+
+    // Outside view: reference-class base rates vs the swarm verdict. Deterministic,
+    // model-independent — quantifies the swarm's optimism premium instead of hiding it.
+    const outsideView = buildOutsideViewPanel(idea, compositeScore);
+    notify("07 VERDICT [OUTSIDE VIEW]", `Reference classes: ${outsideView.matchedClasses.map((c) => c.label).join(", ")} — optimism delta ${outsideView.optimismDelta >= 0 ? "+" : ""}${Math.round(outsideView.optimismDelta * 100)}pts vs base rate.`);
 
     // 08 STRUCTURED EVIDENCE WITH PROVENANCE
     const strongestEvidence = evidenceFeed[0];
@@ -1384,7 +1508,7 @@ Market & Prediction Signals: ${marketContext}`;
       },
       {
         id: "A04",
-        statement: "TrueForge sandboxed execution guarantees safe isolation for all external actions.",
+        statement: "Dossier sandboxed execution guarantees safe isolation for all external actions.",
         evidenceStatus: "VERIFIED",
         riskLevel: "LOW",
         disproofCondition: "Sandbox execution returns non-zero error or uncontained process escape."
@@ -1435,7 +1559,8 @@ Market & Prediction Signals: ${marketContext}`;
       telemetryMetadata: {
         latencyMs: Date.now() - synthesisStart,
         claimsVerified: evidenceFeed.length,
-        threatSeverity: riskLevel
+        threatSeverity: riskLevel,
+        modelId: evaluationMode === "LIVE_LLM" ? getLLMStatus().activeModel : "deterministic-heuristics"
       }
     };
 
@@ -1455,7 +1580,8 @@ Market & Prediction Signals: ${marketContext}`;
           }))
       : undefined;
 
-    const approvalGates: ApprovalAction[] = [      {
+    const approvalGates: ApprovalAction[] = [
+      {
         id: "GATE-01",
         actionType: "PILOT_LOI_DRAFT",
         summary: `Dispatch 10 tailored pilot Letter of Intent (LOI) requests to verified design partners in ${domain.primaryCustomer}.`,
@@ -1485,7 +1611,10 @@ Market & Prediction Signals: ${marketContext}`;
     const externalEvidenceSources: ExternalEvidenceSource[] = [
       ...marketResearch.rawResults.map(r => ({ title: r.title, url: r.url, provider: marketResearch.reconProvider })),
       ...marketResearch.community.discussions.map(d => ({ title: d.title, url: d.url, provider: d.platform })),
-      ...polymarketSignals.marketsFound.map(m => ({ title: m.title, url: m.marketUrl, provider: "polymarket" }))
+      ...polymarketSignals.marketsFound.map(m => ({ title: m.title, url: m.marketUrl, provider: "polymarket" })),
+      ...marketResearch.identifiedCompetitors
+        .filter(c => c.url && !marketResearch.rawResults.some(r => r.url === c.url))
+        .map(c => ({ title: `${c.name} (${c.category})`, url: c.url!, provider: "analyst-recon" }))
     ];
 
     const dossier: IdeaDossier = {
@@ -1494,12 +1623,16 @@ Market & Prediction Signals: ${marketContext}`;
       timestamp: new Date().toISOString(),
       evaluationMode,
       externalEvidenceSources,
+      identifiedCompetitors: marketResearch.identifiedCompetitors,
       idea,
       domainClassification: domain,
       epistemicSummary,
       verificationAudit: audit,
       killScore: compositeScore,
       confidenceScore,
+      swarmDissent,
+      outsideView,
+      decisionEvaluation,
       overallVerdict,
       riskLevel,
       executiveSummary: executiveSynthesizerOpinion.rationale,
@@ -1526,6 +1659,7 @@ Market & Prediction Signals: ${marketContext}`;
       debateRoundsExecuted: convergenceRounds,
       claimDag,
       crossfireToolTraces,
+      validationPriority,
       simulation: {
         cacEstimateUsd: sandboxSim.metrics.cacEstimateUsd,
         ltvEstimateUsd: sandboxSim.metrics.ltvEstimateUsd,
@@ -1543,7 +1677,6 @@ Market & Prediction Signals: ${marketContext}`;
           stdout: sandboxSim.stdout
         }
       },
-      validationPriority,
       validationRoadmap: {
         day1to2: [
           `01 — Execute "${cheapestValidationExperiment.title}": Interview 5 prospective buyers in ${domain.primaryCustomer}.`,
@@ -1551,7 +1684,7 @@ Market & Prediction Signals: ${marketContext}`;
         ],
         day3to5: [
           `03 — Deploy targeted pilot LOI requests (Approval Gate 01).`,
-          `04 — Prototype isolated core single-job execution inside TrueForge sandbox.`
+          `04 — Prototype isolated core single-job execution inside Dossier sandbox.`
         ],
         day6to7: [
           `05 — Re-run DOSSIER with live LOI response evidence.`,
@@ -1577,23 +1710,21 @@ Market & Prediction Signals: ${marketContext}`;
       emit({ type: "mutation_proposals", proposals: mutationProposals });
     }
 
+    // Calibration ledger: persist dated falsifiable forecasts (kill conditions,
+    // weakest assumption, validation experiment) with verdict-implied probabilities.
+    // The ledger is additive — a persistence failure must never fail an evaluation.
+    try {
+      const forecasts = await forecastLedger.persistDossierForecasts(dossier);
+      dossier.forecastIds = forecasts.map((f) => f.id);
+    } catch {
+      // non-blocking
+    }
+
     // Persist dossier asynchronously for historical retrieval and export
     try {
       await dossierStorage.saveDossier(dossier);
     } catch (err: any) {
       // Non-blocking storage save
-    }
-
-    // B1 — Calibration ledger: record the dossier's dated falsifiable forecasts
-    // (verdict, kill conditions, weakest assumption, validation experiment).
-    // Idempotent per dossier; non-blocking on failure.
-    try {
-      const forecastCount = forecastLedger.recordDossierForecasts(dossier);
-      if (forecastCount > 0) {
-        emit({ type: "forecasts_recorded", dossierId: dossier.id, count: forecastCount });
-      }
-    } catch {
-      // Ledger recording must never break evaluation.
     }
 
     emit({ type: "dossier_complete", dossier });

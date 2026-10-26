@@ -131,8 +131,6 @@ def run_simulation(data):
         partial_evpi[name] = max(min(informed_value - baseline_best, evpi), 0.0)
 
     evpi_ranking = sorted(partial_evpi.items(), key=lambda kv: kv[1], reverse=True)
-
-
     def percentiles(values):
         p10, p50, p90 = np.percentile(values, [10, 50, 90])
         return {

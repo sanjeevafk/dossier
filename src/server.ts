@@ -399,7 +399,7 @@ app.post("/api/chat/stream", async (req: Request, res: Response) => {
 
     let streamed = false;
     try {
-      await streamAgentTurn(turn.systemPrompt, message, { temperature: 0.6, maxTokens: 800 }, (chunk) => {
+      await streamAgentTurn(turn.systemPrompt, message, { temperature: 0.6, maxTokens: 800 }, (chunk: string) => {
         streamed = true;
         send("chunk", { text: chunk });
       });

@@ -63,6 +63,8 @@ export interface AgentOpinion {
     latencyMs?: number;
     claimsVerified?: number;
     threatSeverity?: string;
+    /** Exact model/backend that produced this opinion (e.g. "gemini-3.8-flash-medium", "deterministic-heuristics"). */
+    modelId?: string;
   };
 }
 
@@ -296,7 +298,49 @@ export interface VerificationAudit {
 export interface ExternalEvidenceSource {
   title: string;
   url: string;
-  provider: string; // "exa" | "tavily" | "polymarket"
+  provider: string; // "exa" | "tavily" | "polymarket" | "duckduckgo" | "hackernews"
+}
+
+export interface MarketCompetitor {
+  name: string;
+  url?: string;
+  category: "direct" | "indirect" | "incumbent";
+  strengths: string;
+  vulnerability: string;
+  pricingEstimate?: string;
+}
+
+export interface DecisionChoice {
+  choice: string;
+  probabilities: Record<string, number>;
+  threshold: number;
+  flagged: boolean;
+}
+
+export interface DecisionModelOutput {
+  engine?: string;
+  answers: {
+    moat: DecisionChoice;
+    regulatory_risk: DecisionChoice;
+    sales_cycle: DecisionChoice;
+    monetization: DecisionChoice;
+  };
+  fatal_flags: string[];
+  refine_flags: string[];
+  verdict: "BUILD" | "REFINE" | "KILL";
+  loss_ratio: number;
+  runtimeMs?: number;
+}
+
+/** Honest inter-agent disagreement signal — replaces cosmetic confidence scores. */
+export interface SwarmDissent {
+  /** max - min of the six verified agent scores. */
+  scoreSpread: number;
+  /** Agents issuing kill-grade scores (< 40). */
+  killGradeAgents: number;
+  avgAgentScore: number;
+  /** True when agents issue kill-grade scores but the composite still clears 50 — the verdict is contested and needs human judgment. */
+  verdictContested: boolean;
 }
 
 export interface IdeaDossier {
@@ -307,12 +351,21 @@ export interface IdeaDossier {
   evaluationMode?: "LIVE_LLM" | "HEURISTIC_ENGINE";
   /** Actually-retrieved external sources backing this dossier (empty when no recon provider ran). */
   externalEvidenceSources?: ExternalEvidenceSource[];
+  /** Competitors discovered through Market Analyst live web recon. */
+  identifiedCompetitors?: MarketCompetitor[];
   idea: IdeaInput;
   domainClassification: DomainClassification;
   epistemicSummary?: EpistemicTaxonomySummary;
   verificationAudit?: VerificationAudit;
   killScore: number; // 0 to 100 (composite resilience score)
-  confidenceScore: number; // e.g. 78%
+  confidenceScore: number; // swarm-agreement strength (0-100), NOT idea quality
+  swarmDissent?: SwarmDissent;
+  /** IDs of the dated falsifiable forecasts this dossier registered in the calibration ledger. */
+  forecastIds?: string[];
+  /** Outside view: reference-class base rates vs the swarm verdict (optimism premium). */
+  outsideView?: import("../core/outside-view.js").OutsideViewPanel;
+  /** Fast decision model gate evaluation (Hamel Husain Oct 2026 pattern). */
+  decisionEvaluation?: DecisionModelOutput;
   overallVerdict: ValidationVerdict;
   riskLevel: RiskLevel;
   executiveSummary: string;
@@ -420,6 +473,7 @@ export interface CalibrationSummary {
 export type SwarmEvent =
   | { type: "stage"; stage: string; detail: string; timestamp: string }
   | { type: "domain"; domain: DomainClassification }
+  | { type: "decision_gate"; evaluation: DecisionModelOutput }
   | { type: "agent_start"; role: SwarmRole; roleTitle: string }
   | { type: "agent_opinion"; role: SwarmRole; roleTitle: string; verdict: Verdict; score: number; fatalFlaw?: string }
   | { type: "parse_fallback"; role: SwarmRole; reason: string }

@@ -558,7 +558,6 @@
 
           <!-- Stage Progress Rail -->
           <div id="streamStageRail" class="flex flex-wrap gap-1.5"></div>
-
           <!-- Live Agent Opinion Tiles (6 Swarm Agents) -->
           <div>
             <div class="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Live Agent Consensus Matrix:</div>
@@ -632,6 +631,11 @@
               </div>
 
               <p id="resExecutiveSummary" class="text-sm text-zinc-700 mt-2 max-w-3xl leading-relaxed"></p>
+              <div id="resTrustBlock" class="hidden mt-3 font-mono text-[11px] space-y-1 bg-zinc-50 border border-zinc-200 rounded-lg p-2.5">
+                <div id="resSwarmDissent" class="text-zinc-700"></div>
+                <div id="resOutsideView" class="text-purple-700"></div>
+                <div id="resEvidenceSources" class="text-zinc-500 break-all"></div>
+              </div>
 
               <!-- Export Buttons -->
               <div class="flex flex-wrap items-center gap-2 pt-3">
@@ -652,7 +656,7 @@
               </div>
               <div class="bg-white border border-zinc-200 p-3.5 rounded-xl text-center md:text-right min-w-[170px] font-mono text-xs shadow-2xs space-y-1">
                 <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RESILIENCE:</span><span id="resScoreVal" class="text-zinc-900 font-bold">78/100</span></div>
-                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">CONFIDENCE:</span><span id="resConfidence" class="text-zinc-900 font-bold">84%</span></div>
+                <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">SWARM AGREEMENT:</span><span id="resConfidence" class="text-zinc-900 font-bold">84%</span></div>
                 <div class="flex justify-between md:justify-end gap-3"><span class="text-zinc-500">RISK:</span><span id="resRiskLevel" class="text-amber-600 font-bold">MEDIUM</span></div>
               </div>
             </div>
@@ -763,7 +767,7 @@
           <!-- A2 — Validation Priority ranked by Expected Value of Information -->
           <div id="validationPrioritySection" class="hidden space-y-2">
             <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
-              🎯 Validation Priority <span class="text-zinc-400">// ranked by expected value of information (EVPI)</span>
+              Validation Priority <span class="text-zinc-400">// ranked by expected value of information (EVPI)</span>
             </h3>
             <p class="text-[10px] text-zinc-500 font-sans">Empirical decision analysis over the Monte Carlo draws: resolving each uncertain assumption is worth a measurable share of the decision value at stake. Buy information where it is worth the most first.</p>
             <div id="validationPriorityList" class="space-y-2"></div>
@@ -775,7 +779,7 @@
           <!-- Phase 3.3 — Idea Autopsy & Mutation Engine -->
           <div id="mutationSection" class="hidden space-y-2">
             <h3 class="font-mono text-xs font-bold text-zinc-800 uppercase tracking-wider">
-              💀 Idea Autopsy → <span class="text-red-600">Mutation Engine Activated</span> <span class="text-zinc-400">// resilience &lt; 55</span>
+              Idea Autopsy → <span class="text-red-600">Mutation Engine Activated</span> <span class="text-zinc-400">// resilience &lt; 55</span>
             </h3>
             <p class="text-[10px] text-zinc-500 font-sans">Fatal flaws inverted into three algorithmic strategic pivots. Pick one and re-run the full swarm against the mutant — the pivot inherits nothing; it earns its own dossier.</p>
             <div id="mutationCards" class="grid grid-cols-1 lg:grid-cols-3 gap-4"></div>
@@ -793,7 +797,7 @@
           <!-- Human Approval Gate -->
           <div class="p-5 border border-amber-300 bg-amber-50/50 rounded-xl space-y-3">
             <div class="flex justify-between items-center text-amber-900 font-mono text-xs font-bold">
-              <span>🛑 DUAL-KEY HUMAN APPROVAL CHECKPOINT (TRUEFORGE SAFETY)</span>
+              <span>🛑 DUAL-KEY HUMAN APPROVAL CHECKPOINT (SAFETY GATES)</span>
               <span class="text-[10px] px-2 py-0.5 rounded bg-amber-200/80 text-amber-900">AWAITING AUTHORIZATION</span>
             </div>
             <div id="approvalList" class="space-y-3"></div>
@@ -1538,7 +1542,7 @@
       document.getElementById('streamConceptTitle').textContent = conceptTitle.toUpperCase();
       document.getElementById('streamStatusBadge').textContent = 'LIVE SWARM DEBATE IN PROGRESS';
       document.getElementById('streamCurrentStage').textContent = 'STAGE 01 // INGESTING';
-      document.getElementById('streamCurrentDetail').textContent = 'Ingesting concept into TrueForge execution runtime...';
+      document.getElementById('streamCurrentDetail').textContent = 'Ingesting concept into Dossier execution runtime...';
       document.getElementById('streamCrossfireBox').classList.add('hidden');
       resetStageRail();
       startStreamTimer();
@@ -2095,7 +2099,6 @@
         list.appendChild(row);
       });
     }
-
     function renderMonteCarloPanel(dossier) {
       const section = document.getElementById('monteCarloSection');
       const summarySurv = document.getElementById('survivalSummary');
@@ -2178,6 +2181,33 @@
       document.getElementById('resExecutiveSummary').textContent = dossier.executiveSummary;
       document.getElementById('resConfidence').textContent = `${dossier.confidenceScore}%`;
       document.getElementById('resRiskLevel').textContent = dossier.riskLevel;
+      const evalMode = dossier.evaluationMode || 'UNKNOWN';
+      document.getElementById('resDossierStatus').textContent = `STATUS: COMPILED • ${evalMode === 'LIVE_LLM' ? 'LIVE LLM SWARM' : evalMode === 'HEURISTIC_ENGINE' ? 'HEURISTIC ENGINE' : evalMode}`;
+
+      // Honest trust block: swarm dissent + actually-retrieved evidence sources
+      const trustBlock = document.getElementById('resTrustBlock');
+      if (trustBlock) {
+        const sd = dossier.swarmDissent;
+        const sources = dossier.externalEvidenceSources || [];
+        const dissentLine = sd
+          ? `SWARM DISSENT: spread ${sd.scoreSpread}pts · kill-grade ${sd.killGradeAgents}/6 · avg ${sd.avgAgentScore}/100${sd.verdictContested ? ' · ⚠ VERDICT CONTESTED — human judgment required' : ''}`
+          : '';
+        const srcLine = sources.length > 0
+          ? `SOURCES (${sources.length}): ${sources.slice(0, 3).map(s => s.title.slice(0, 48)).join(' · ')}${sources.length > 3 ? ` · +${sources.length - 3} more` : ''}`
+          : `SOURCES: none retrieved — signals below are heuristic priors, not sourced evidence`;
+        trustBlock.classList.remove('hidden');
+        document.getElementById('resSwarmDissent').textContent = dissentLine;
+        const ov = dossier.outsideView;
+        if (ov) {
+          const cls = ov.matchedClasses.map(c => `${c.label} ${Math.round(c.survival24moLow*100)}–${Math.round(c.survival24moHigh*100)}%`).join(' + ');
+          const deltaPct = Math.round(ov.optimismDelta * 100);
+          document.getElementById('resOutsideView').textContent =
+            `OUTSIDE VIEW: ${cls} · swarm implies ${Math.round(ov.impliedSurvival*100)}% vs base ${Math.round(ov.baseSurvivalMidpoint*100)}% → ${deltaPct >= 0 ? '+' : ''}${deltaPct}pts optimism premium`;
+        } else {
+          document.getElementById('resOutsideView').textContent = '';
+        }
+        document.getElementById('resEvidenceSources').textContent = srcLine;
+      }
       if (document.getElementById('resScoreVal')) {
         animateCountUp(document.getElementById('resScoreVal'), dossier.killScore, '/100');
       }

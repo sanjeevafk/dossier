@@ -14,7 +14,7 @@
     "filesystem": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-      "description": "TrueForge isolated filesystem MCP server for writing audit logs and sandbox artifacts"
+      "description": "Isolated filesystem MCP server for writing audit logs and sandbox artifacts"
     },
     "github": {
       "command": "npx",

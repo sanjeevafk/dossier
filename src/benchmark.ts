@@ -1,9 +1,10 @@
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
+import { getLLMStatus } from "./services/llm.js";
 import { IdeaInput } from "./types/index.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-export interface BenchmarkCase {
+interface BenchmarkCase {
   id: string;
   category: string;
   idea: IdeaInput;
@@ -12,7 +13,7 @@ export interface BenchmarkCase {
   expectedVerdictRange: ("BUILD" | "REFINE" | "KILL")[];
 }
 
-export const BENCHMARK_SUITE: BenchmarkCase[] = [
+const BENCHMARK_SUITE: BenchmarkCase[] = [
   {
     id: "BM-01",
     category: "B2B Enterprise SaaS",
@@ -217,13 +218,25 @@ function modalVerdict(values: string[]): string {
 }
 
 const SCORE_DISPERSION_GATE = 18;
+const REPLAY_SNAPSHOT_PATH = path.join(process.cwd(), "reports", "benchmark_last.json");
 
-export async function runDossierBenchmark(): Promise<void> {
-  const RUNS = Math.max(1, Math.min(5, Number.parseInt(process.env.BENCHMARK_RUNS || "3", 10) || 3));
+type VerdictBand = "BUILD" | "REFINE" | "KILL";
+function verdictBand(v: string): VerdictBand {
+  const normalized = v === "BUILD_IF_VALIDATED" ? "BUILD" : v;
+  return normalized === "BUILD" ? "BUILD" : normalized === "REFINE" ? "REFINE" : "KILL";
+}
+
+export async function runDossierBenchmark(options: { replay?: boolean } = {}): Promise<void> {
+  const replay = options.replay === true;
+  const RUNS = replay ? 1 : Math.max(1, Math.min(5, Number.parseInt(process.env.BENCHMARK_RUNS || "3", 10) || 3));
+
+  const suite = process.env.BENCHMARK_LIMIT
+    ? BENCHMARK_SUITE.slice(0, Number.parseInt(process.env.BENCHMARK_LIMIT, 10))
+    : BENCHMARK_SUITE;
 
   console.log("\n=======================================================");
-  console.log("  ⚡ DOSSIER DOMAIN-AWARE BENCHMARK SUITE");
-  console.log(`  ${BENCHMARK_SUITE.length} Diverse-Merit Concepts × ${RUNS} Runs (de-noised dispersion)`);
+  console.log("  DOSSIER DOMAIN-AWARE BENCHMARK SUITE");
+  console.log(`  ${suite.length} Diverse-Merit Concepts × ${RUNS} Runs (de-noised dispersion)`);
   console.log("=======================================================\n");
 
   const orchestrator = new IdeaSwarmOrchestrator();
@@ -241,7 +254,7 @@ export async function runDossierBenchmark(): Promise<void> {
     console.log(`\n──────── Run ${run}/${RUNS} ────────`);
     const runScores: number[] = [];
 
-    for (const item of BENCHMARK_SUITE) {
+    for (const item of suite) {
       console.log(`[run ${run}] Evaluating ${item.id}: "${item.idea.title}" (${item.category})...`);
 
       try {
@@ -276,9 +289,9 @@ export async function runDossierBenchmark(): Promise<void> {
         });
 
         runScores.push(dossier.killScore);
-        console.log(`       ➔ Domain: [${dossier.domainClassification.archetypeLabel}] | Verdict: ${dossier.overallVerdict} (${dossier.killScore}/100) | Rounds: ${dossier.convergenceRounds || 1} | Latency: ${elapsed}ms`);
+        console.log(`       -> Domain: [${dossier.domainClassification.archetypeLabel}] | Verdict: ${dossier.overallVerdict} (${dossier.killScore}/100) | Rounds: ${dossier.convergenceRounds || 1} | Latency: ${elapsed}ms`);
       } catch (err: any) {
-        console.log(`       ✗ FAILED: ${err?.message || "evaluation error"} — excluded from aggregation`);
+        console.log(`       [FAIL] FAILED: ${err?.message || "evaluation error"} — excluded from aggregation`);
       }
     }
 
@@ -288,7 +301,7 @@ export async function runDossierBenchmark(): Promise<void> {
   }
 
   // De-noised aggregation: per-concept means across runs define gate and table.
-  const results = BENCHMARK_SUITE
+  const results = suite
     .filter((item) => (scoresById.get(item.id)?.length ?? 0) > 0)
     .map((item) => {
       const scores = scoresById.get(item.id)!;
@@ -317,7 +330,7 @@ export async function runDossierBenchmark(): Promise<void> {
     });
 
   if (results.length === 0) {
-    console.error("\n✗ BENCHMARK FAILED: no concept produced a usable dossier in any run.\n");
+    console.error("\n[FAIL] BENCHMARK FAILED: no concept produced a usable dossier in any run.\n");
     process.exitCode = 1;
     return;
   }
@@ -335,7 +348,7 @@ export async function runDossierBenchmark(): Promise<void> {
   const dispersionGatePassed = scoreStdDev >= SCORE_DISPERSION_GATE;
 
   console.log("\n==========================================================================================================");
-  console.log(`  📊 DE-NOISED BENCHMARK SUMMARY (mean of ${RUNS} runs per concept)`);
+  console.log(`  DE-NOISED BENCHMARK SUMMARY (mean of ${RUNS} runs per concept)`);
   console.log("==========================================================================================================");
   console.log(`ID     | DOMAIN ARCHETYPE         | SCORE | VERDICT            | FEAS | DMND | ECON | ADV  | ROUNDS | LATENCY`);
   console.log(`-------+--------------------------+-------+--------------------+------+------+------+------+--------+---------`);
@@ -355,8 +368,8 @@ export async function runDossierBenchmark(): Promise<void> {
   }
 
   console.log("==========================================================================================================");
-  console.log(`📈 OVERALL DOMAIN-AWARE BENCHMARK METRICS (de-noised over ${RUNS} runs):`);
-  console.log(`  • Concepts Aggregated     : ${results.length}/${BENCHMARK_SUITE.length}`);
+  console.log(`OVERALL DOMAIN-AWARE BENCHMARK METRICS (de-noised over ${RUNS} runs):`);
+  console.log(`  • Concepts Aggregated     : ${results.length}/${suite.length}`);
   console.log(`  • Average Latency per Idea: ${avgLatency} ms`);
   console.log(`  • Total Benchmark Runtime : ${totalTimeSec} seconds`);
   console.log(`  • Sandboxed Subprocess    : ${sandboxPassRate}% Isolated Exit Code 0`);
@@ -368,24 +381,103 @@ export async function runDossierBenchmark(): Promise<void> {
   console.log("==========================================================================================================");
 
   if (dispersionGatePassed) {
-    console.log(`\n✓ QUALITY GATE 3 PASSED: de-noised score dispersion σ=${scoreStdDev.toFixed(1)} ≥ ${SCORE_DISPERSION_GATE}.\n`);
+    console.log(`\n[PASS] QUALITY GATE 3 PASSED: de-noised score dispersion σ=${scoreStdDev.toFixed(1)} ≥ ${SCORE_DISPERSION_GATE}.\n`);
   } else {
-    console.error(`\n✗ QUALITY GATE 3 FAILED: de-noised score dispersion σ=${scoreStdDev.toFixed(1)} < ${SCORE_DISPERSION_GATE}. Break the mid-band separation further or enrich the benchmark suite's merit diversity.\n`);
+    console.error(`\n[FAIL] QUALITY GATE 3 FAILED: de-noised score dispersion σ=${scoreStdDev.toFixed(1)} < ${SCORE_DISPERSION_GATE}. Break the mid-band separation further or enrich the benchmark suite's merit diversity.\n`);
     process.exitCode = 1;
+  }
+
+  // ── INVARIANT ASSERTIONS (Hamel Husain Eval Pattern) ──
+  const invariantViolations: string[] = [];
+
+  // 1. Zero-Moat Invariant: Thin wrappers must never clear score 40 or get BUILD
+  const thinWrappers = results.filter((r) => ["BM-04", "BM-12"].includes(r.id));
+  for (const tw of thinWrappers) {
+    if (tw.score >= 40 || tw.verdict.includes("BUILD")) {
+      invariantViolations.push(`Zero-Moat Invariant Violated: ${tw.id} scored ${tw.score} with verdict ${tw.verdict} (must be < 40 and KILL)`);
+    }
+  }
+
+  // 2. Unmonetized Invariant: Non-monetized project must be KILL
+  const unmonetized = results.find((r) => r.id === "BM-11");
+  if (unmonetized && (unmonetized.score >= 40 || !unmonetized.verdict.includes("KILL"))) {
+    invariantViolations.push(`Monetization Invariant Violated: BM-11 scored ${unmonetized.score} with verdict ${unmonetized.verdict} (must be KILL)`);
+  }
+
+  // 3. Dispersion Invariant
+  if (!dispersionGatePassed) {
+    invariantViolations.push(`Dispersion Gate Violated: σ=${scoreStdDev.toFixed(1)} < ${SCORE_DISPERSION_GATE}`);
+  }
+
+  if (invariantViolations.length > 0) {
+    console.error("\n[FAIL] HARNESS EVALUATION INVARIANTS FAILED:");
+    for (const v of invariantViolations) console.error(`  • ${v}`);
+    process.exitCode = 1;
+  } else {
+    console.log("[PASS] ALL HARNESS EVALUATION INVARIANTS PASSED (Zero-Moat, Monetization, and Dispersion Gates satisfied).\n");
+  }
+
+  if (replay) {
+    // Verdict-replay regression: diff this run against the last recorded snapshot.
+    let previous: { results?: Array<{ id: string; score: number; verdict: string }> } | null = null;
+    try {
+      previous = JSON.parse(fs.readFileSync(REPLAY_SNAPSHOT_PATH, "utf-8"));
+    } catch {
+      console.error("\n[FAIL] REPLAY ABORTED: no recorded snapshot at reports/benchmark_last.json — run the full benchmark once first.\n");
+      process.exitCode = 1;
+      return;
+    }
+    const prevById = new Map((previous?.results || []).map((r) => [r.id, r]));
+    console.log("\nVERDICT REPLAY DIFF (vs recorded snapshot):");
+    let flips = 0;
+    for (const r of results) {
+      const prev = prevById.get(r.id);
+      if (!prev) {
+        console.log(`  ${r.id.padEnd(6)} NEW — no previous record`);
+        continue;
+      }
+      const prevBand = verdictBand(prev.verdict);
+      const nowBand = verdictBand(r.verdict);
+      const delta = r.score - prev.score;
+      const flipped = prevBand !== nowBand;
+      if (flipped) flips++;
+      console.log(`  ${r.id.padEnd(6)} ${String(prev.score).padStart(3)}/100 ${prevBand.padEnd(6)} → ${String(r.score).padStart(3)}/100 ${nowBand.padEnd(6)} (Δ ${delta >= 0 ? "+" : ""}${delta}) ${flipped ? "[VERDICT FLIP]" : "ok"}`);
+    }
+    if (flips > 0) {
+      console.error(`\n[FAIL] REPLAY FAILED: ${flips} verdict band flip(s) — a prompt/model change altered outcomes. Investigate before shipping.\n`);
+      process.exitCode = 1;
+    } else {
+      console.log("\n[PASS] REPLAY PASSED: no verdict band flips.\n");
+    }
+    return;
+  }
+
+  // Record the machine-readable snapshot future replays diff against.
+  try {
+    fs.mkdirSync(path.dirname(REPLAY_SNAPSHOT_PATH), { recursive: true });
+    fs.writeFileSync(REPLAY_SNAPSHOT_PATH, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      provider: getLLMStatus(),
+      runs: RUNS,
+      results: results.map((r) => ({ id: r.id, score: r.score, verdict: r.verdict, verdictBand: verdictBand(r.verdict) }))
+    }, null, 2));
+    console.log(`Replay snapshot saved: ${REPLAY_SNAPSHOT_PATH}`);
+  } catch (err: any) {
+    console.warn(`Could not save replay snapshot: ${err?.message}`);
   }
 
   // Export to Markdown Report
   const mdReport = `# Dossier Domain-Aware Adversarial Benchmark Report
 
 **Execution Date:** ${new Date().toISOString()}  
-**Agent Harness:** TrueForge Multi-Agent Runtime (File TF-007)  
+**Agent Harness:** Dossier Multi-Agent Runtime (File TF-007)  
 **De-Noising:** ${RUNS} full runs per concept; Quality Gate 3 evaluates σ of per-concept mean scores  
 **Overall Benchmark Runtime:** ${totalTimeSec} seconds  
 **Average Latency:** ${avgLatency} ms per full 6-agent adversarial evaluation  
 **Verdict Expectation Fit:** ${expectationMatchRate}% inside the plan's expected verdict range  
 **Score Range:** ${minScore}–${maxScore} (mean ${meanScore.toFixed(1)})  
 **Per-Run Dispersion σ:** ${perRunStdDevs.map((s) => s.toFixed(1)).join(" / ")}  
-**De-Noised Dispersion (σ):** ${scoreStdDev.toFixed(1)} ${dispersionGatePassed ? `— QUALITY GATE 3 PASSED (≥ ${SCORE_DISPERSION_GATE})` : `— ⚠ QUALITY GATE 3 FAILED (< ${SCORE_DISPERSION_GATE})`}  
+**De-Noised Dispersion (σ):** ${scoreStdDev.toFixed(1)} ${dispersionGatePassed ? `— QUALITY GATE 3 PASSED (≥ ${SCORE_DISPERSION_GATE})` : `— QUALITY GATE 3 FAILED (< ${SCORE_DISPERSION_GATE})`}  
 
 ---
 
@@ -413,12 +505,12 @@ ${results.map(r => `| **${r.id}** | ${r.title} | ${r.domainArchetype} | **${r.sc
 
   const reportPath = path.join(process.cwd(), "docs", "BENCHMARK_RESULTS.md");
   fs.writeFileSync(reportPath, mdReport, "utf-8");
-  console.log(`✔ Benchmark report exported to: ${reportPath}\n`);
+  console.log(`Benchmark report exported to: ${reportPath}\n`);
 }
 
 // Auto-run if executed directly
 if (process.argv[1]?.endsWith("benchmark.ts") || process.argv[1]?.endsWith("benchmark.js")) {
-  runDossierBenchmark().catch((err) => {
+  runDossierBenchmark({ replay: process.argv.includes("--replay") }).catch((err) => {
     console.error("Benchmark failed:", err);
     process.exit(1);
   });

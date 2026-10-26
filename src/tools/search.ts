@@ -1,13 +1,8 @@
 import { performLiveWebRecon, ReconSourceResult } from "./recon.js";
 import { queryCommunitySentiment, CommunityDiscussion } from "./community.js";
+import { MarketCompetitor } from "../types/index.js";
 
-export interface MarketCompetitor {
-  name: string;
-  url?: string;
-  category: "direct" | "indirect" | "incumbent";
-  strengths: string;
-  vulnerability: string;
-}
+export { MarketCompetitor };
 
 export interface ResearchFindings {
   query: string;
