@@ -47,7 +47,7 @@ async def generate_dossier_pdf(dossier_id: str, port: int = 3000, output_path: s
             header_template='''
                 <div style="font-family: monospace; font-size: 7.5pt; color: #a1a1aa; width: 100%; display: flex; justify-content: space-between; padding: 0 14mm;">
                     <span>DOSSIER // ADVERSARIAL VENTURE AUDIT</span>
-                    <span>CONFIDENTIAL &amp; PROPRIETARY</span>
+                    <span></span>
                 </div>
             ''',
             footer_template='''
