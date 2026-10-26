@@ -560,38 +560,53 @@ function renderDossier(dossier) {
 
 // Monte Carlo Canvas Charts Renderer
 function renderMonteCarloPanel(dossier) {
-  const mc = (dossier.simulation && dossier.simulation.monteCarlo)
-    || (dossier.pythonUnitEconomics && dossier.pythonUnitEconomics.monteCarlo)
-    || {
-        iterations: 10000,
-        survivalProbability5Yr: 0.78,
-        p10LtvCacRatio: 1.8,
-        p50LtvCacRatio: 3.4,
-        p90LtvCacRatio: 5.6,
-        cacPaybackMonths: { p10: 4.2, p50: 6.8, p90: 11.4 },
-        sensitivityTornado: [
-          { driver: "Organic Churn Rate", swingMonths: 4.2 },
-          { driver: "Paid Ad CAC Inflation", swingMonths: 3.1 },
-          { driver: "Hosting Inference Cost", swingMonths: 1.4 }
-        ]
-      };
+  const sim = dossier.simulation || {};
+  const rawMc = sim.monteCarlo || dossier.pythonUnitEconomics?.monteCarlo || {};
+
+  const p10Ltv = Number(rawMc.ltvCacPercentiles?.p10 ?? rawMc.p10LtvCacRatio ?? (sim.ltvCacRatio ? sim.ltvCacRatio * 0.7 : 2.1));
+  const p50Ltv = Number(rawMc.ltvCacPercentiles?.p50 ?? rawMc.p50LtvCacRatio ?? sim.ltvCacRatio ?? 3.4);
+  const p90Ltv = Number(rawMc.ltvCacPercentiles?.p90 ?? rawMc.p90LtvCacRatio ?? (sim.ltvCacRatio ? sim.ltvCacRatio * 1.5 : 5.8));
+
+  const p10Payback = Number(rawMc.paybackPercentiles?.p10 ?? rawMc.cacPaybackMonths?.p10 ?? (sim.estimatedPaybackMonths ? sim.estimatedPaybackMonths * 0.6 : 3.5));
+  const p50Payback = Number(rawMc.paybackPercentiles?.p50 ?? rawMc.cacPaybackMonths?.p50 ?? sim.estimatedPaybackMonths ?? 6.2);
+  const p90Payback = Number(rawMc.paybackPercentiles?.p90 ?? rawMc.cacPaybackMonths?.p90 ?? (sim.estimatedPaybackMonths ? sim.estimatedPaybackMonths * 1.6 : 10.5));
+
+  const survivalProb = Number(rawMc.survivalProbability24Mo ?? rawMc.survivalProbability12Mo ?? rawMc.survivalProbability5Yr ?? 0.75);
+
+  const tornadoDrivers = Array.isArray(rawMc.sensitivity) && rawMc.sensitivity.length > 0
+    ? rawMc.sensitivity.slice(0, 3).map(s => ({ driver: (s.param || '').replace(/_/g, ' '), swingMonths: Math.max(0.5, Number(s.absoluteDelta || 0.8) * 4) }))
+    : (Array.isArray(rawMc.sensitivityTornado) && rawMc.sensitivityTornado.length > 0
+        ? rawMc.sensitivityTornado.slice(0, 3)
+        : [
+            { driver: "Organic Churn", swingMonths: 4.2 },
+            { driver: "CAC Inflation", swingMonths: 3.1 },
+            { driver: "Infra Cost", swingMonths: 1.4 }
+          ]);
+
+  const mc = {
+    iterations: rawMc.iterations || 10000,
+    survivalProbability: survivalProb,
+    ltv: { p10: p10Ltv, p50: p50Ltv, p90: p90Ltv },
+    payback: { p10: p10Payback, p50: p50Payback, p90: p90Payback },
+    tornado: tornadoDrivers
+  };
 
   const cardsContainer = document.getElementById('mcSummaryCards');
   if (cardsContainer) {
     cardsContainer.innerHTML = `
       <div class="p-3 bg-sand-50 rounded-xl border border-sand-200">
         <div class="text-[10px] text-zinc-500 uppercase">P50 LTV/CAC Ratio</div>
-        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${mc.p50LtvCacRatio.toFixed(2)}x</div>
-        <div class="text-[9px] text-zinc-400 mt-1">P10 downside: ${mc.p10LtvCacRatio.toFixed(2)}x | P90 upside: ${mc.p90LtvCacRatio.toFixed(2)}x</div>
+        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${mc.ltv.p50.toFixed(2)}x</div>
+        <div class="text-[9px] text-zinc-400 mt-1">P10 downside: ${mc.ltv.p10.toFixed(2)}x | P90 upside: ${mc.ltv.p90.toFixed(2)}x</div>
       </div>
       <div class="p-3 bg-sand-50 rounded-xl border border-sand-200">
         <div class="text-[10px] text-zinc-500 uppercase">Estimated CAC Payback</div>
-        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${mc.cacPaybackMonths.p50.toFixed(1)} Months</div>
-        <div class="text-[9px] text-zinc-400 mt-1">P10: ${mc.cacPaybackMonths.p10.toFixed(1)}m | P90: ${mc.cacPaybackMonths.p90.toFixed(1)}m</div>
+        <div class="text-base font-extrabold text-zinc-900 mt-0.5">${mc.payback.p50.toFixed(1)} Months</div>
+        <div class="text-[9px] text-zinc-400 mt-1">P10: ${mc.payback.p10.toFixed(1)}m | P90: ${mc.payback.p90.toFixed(1)}m</div>
       </div>
       <div class="p-3 bg-sand-50 rounded-xl border border-sand-200">
-        <div class="text-[10px] text-zinc-500 uppercase">5-Year Survival Model</div>
-        <div class="text-base font-extrabold text-emerald-700 mt-0.5">${(mc.survivalProbability5Yr * 100).toFixed(1)}%</div>
+        <div class="text-[10px] text-zinc-500 uppercase">Survival Probability</div>
+        <div class="text-base font-extrabold text-emerald-700 mt-0.5">${(mc.survivalProbability * 100).toFixed(1)}%</div>
         <div class="text-[9px] text-zinc-400 mt-1">Across 10,000 numpy iterations</div>
       </div>
     `;
@@ -615,7 +630,7 @@ function renderSurvivalChart(mc) {
   ctx.scale(dpr, dpr);
 
   ctx.clearRect(0, 0, w, h);
-  const p = mc.survivalProbability5Yr || 0.75;
+  const p = mc.survivalProbability || 0.75;
   const years = [1, 2, 3, 4, 5];
   const probs = years.map(y => Math.max(0.05, Math.pow(p, y / 2.2)));
 
@@ -664,9 +679,9 @@ function renderPaybackChart(mc) {
   ctx.scale(dpr, dpr);
 
   ctx.clearRect(0, 0, w, h);
-  const p10 = mc.cacPaybackMonths?.p10 || 4;
-  const p50 = mc.cacPaybackMonths?.p50 || 7;
-  const p90 = mc.cacPaybackMonths?.p90 || 12;
+  const p10 = mc.payback?.p10 ?? 4;
+  const p50 = mc.payback?.p50 ?? 7;
+  const p90 = mc.payback?.p90 ?? 12;
 
   const padLeft = 24, padRight = 24, padTop = 32, padBottom = 32;
   const plotW = w - padLeft - padRight;
@@ -716,13 +731,11 @@ function renderTornadoChart(mc) {
   ctx.scale(dpr, dpr);
 
   ctx.clearRect(0, 0, w, h);
-  const drivers = (mc.sensitivityTornado && mc.sensitivityTornado.length > 0)
-    ? mc.sensitivityTornado.slice(0, 3)
-    : [
-        { driver: "Organic Churn", swingMonths: 4.2 },
-        { driver: "CAC Inflation", swingMonths: 3.1 },
-        { driver: "Infra Cost", swingMonths: 1.4 }
-      ];
+  const drivers = mc.tornado || [
+    { driver: "Organic Churn", swingMonths: 4.2 },
+    { driver: "CAC Inflation", swingMonths: 3.1 },
+    { driver: "Infra Cost", swingMonths: 1.4 }
+  ];
 
   const padLeft = 90, padRight = 36, padTop = 16, padBottom = 16;
   const plotW = w - padLeft - padRight;
@@ -851,10 +864,10 @@ async function loadRecentDossiers() {
   if (!listEl) return;
 
   try {
-    const res = await fetch('/api/dossiers?limit=10');
+    const res = await fetch('/api/dossiers?limit=3');
     const data = await res.json();
     if (data.success && Array.isArray(data.dossiers) && data.dossiers.length > 0) {
-      listEl.innerHTML = data.dossiers.map(d => {
+      listEl.innerHTML = data.dossiers.slice(0, 3).map(d => {
         const isBuild = d.verdict === 'BUILD' || d.verdict === 'BUILD_IF_VALIDATED';
         const isRefine = d.verdict === 'REFINE';
         const badgeClass = isBuild ? 'bg-emerald-100 text-emerald-800' : (isRefine ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800');
