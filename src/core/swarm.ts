@@ -1,3 +1,10 @@
+import dns from "node:dns";
+try {
+  dns.setDefaultResultOrder?.("ipv4first");
+} catch {
+  // Best-effort IPv4 preference
+}
+
 import {
   IdeaInput,
   IdeaDossier,
@@ -27,18 +34,28 @@ import {
 } from "../types/index.js";
 import { SWARM_ROLES } from "../config/prompts.js";
 import { classifyIdeaDomain } from "./classifier.js";
-import { StanfordRobustVerifier } from "./verifier.js";
+import { EpistemicRobustVerifier } from "./verifier.js";
 import { buildMutationProposals } from "./mutator.js";
 import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
 import { buildOutsideViewPanel } from "./outside-view.js";
 import { runDecisionModel } from "../tools/decision-runner.js";
+import { forecastLedger } from "../services/ledger.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { performMarketResearch } from "../tools/search.js";
-import { queryPolymarketMarkets } from "../tools/polymarket.js";
-import { runAnalystWithTools, GroundedEvidencePack } from "../tools/analyst-tools.js";
+import { queryUnifiedPredictionMarkets } from "../tools/markets/index.js";
+import { queryNewsHeadlines } from "../tools/news.js";
+import { detectJurisdiction } from "../tools/geo.js";
+import { queryAgentReachIntel } from "../tools/agentReach.js";
+import { queryOpenAlex } from "../tools/openalex.js";
+import { queryEdgarFormD } from "../tools/edgar.js";
+import { queryHuggingFace } from "../tools/huggingface.js";
+import { queryClinicalEvidence } from "../tools/clinical.js";
+import { queryMacroData } from "../tools/macro.js";
+import { findMatchingItchProblems } from "../data/fixMyItchProblems.js";
+import { findMatchingGraveyardPrecedents } from "../data/graveyardAntipatterns.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
-import { forecastLedger } from "../services/ledger.js";
+import { getBaseRate, shrinkTowardBaseRate } from "./baseRates.js";
 import { z } from "zod";
 
 export interface SwarmExecutionOptions {
@@ -48,7 +65,9 @@ export interface SwarmExecutionOptions {
   expectedChurnMonthly?: number;
   estimatedCacUsd?: number;
   useLiveLLM?: boolean;
-  model?: string;
+  /** BYOK recon keys (per-request headers); falls back to server env. */
+  exaKey?: string;
+  tavilyKey?: string;
 }
 
 /**
@@ -154,7 +173,7 @@ export class IdeaSwarmOrchestrator {
   private async evaluateRoleWithLLM(
     role: SwarmRole,
     idea: IdeaInput,
-    agentContext: string,
+    marketContext: string,
     domain: DomainClassification,
     invariants: AdversarialInvariants
   ): Promise<{ opinion: AgentOpinion | null; fallbackReason?: string }> {
@@ -206,8 +225,7 @@ Target Audience: ${idea.targetAudience}
 Monetization & Model: ${idea.monetization}
 Tech Stack: ${idea.techStack || "Standard"}
 Domain: ${domain.archetypeLabel}
-Evidence pack retrieved for your role (may be partially empty — statements above each line's provenance):
-${agentContext}`;
+Market & Prediction Signals: ${marketContext}`;
 
     try {
       const turnStart = Date.now();
@@ -276,7 +294,8 @@ ${agentContext}`;
           rationale: parsed.rationale || `Evaluated through ${domain.archetypeLabel} domain lens.`,
           telemetryMetadata: {
             latencyMs: turnLatencyMs,
-            threatSeverity: score < 50 ? "HIGH" : "MODERATE"
+            threatSeverity: score < 50 ? "HIGH" : "MODERATE",
+            modelId: getLLMStatus().activeModel || "live-llm"
           }
         }
       };
@@ -777,8 +796,6 @@ ${agentContext}`;
     notify("01 CLASSIFY", `Classified concept as [${domain.archetypeLabel}] — Target: ${domain.primaryCustomer}`);
     emit({ type: "domain", domain });
 
-    // 01.1 FAST DECISION MODEL PRE-SCREEN (Hamel Husain Oct 2026 pattern, ~20ms)
-    notify("01 SCREEN", `Running fast calibrated decision model gatekeeper on "${idea.title}"...`);
     const decisionEvaluation = await runDecisionModel(idea);
     emit({ type: "decision_gate", evaluation: decisionEvaluation });
     if (decisionEvaluation.fatal_flags.length > 0) {
@@ -806,13 +823,28 @@ ${agentContext}`;
 
     emit({ type: "sandbox_simulating", iterationCount: 10000 });
 
-    const [marketResearch, polymarketSignals, sandboxSim, stressSim] = await Promise.all([
+    const geo = detectJurisdiction(idea.targetAudience, idea.summary, idea.title);
+    const combinedIdeaText = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization}`;
+    const itchMatches = findMatchingItchProblems(combinedIdeaText);
+    const graveyardMatches = findMatchingGraveyardPrecedents(combinedIdeaText);
+    const isHealthcare = domain.archetype === "healthcare_clinical";
+    const [marketResearch, unifiedMarkets, newsSignals, reachSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
       performMarketResearch(idea.title, [
         idea.targetAudience,
         idea.monetization,
         domain.regulatoryEnvironment
-      ]),
-      queryPolymarketMarkets(idea.title),
+      ], { exaKey: options.exaKey, tavilyKey: options.tavilyKey }),
+      queryUnifiedPredictionMarkets(idea.title),
+      queryNewsHeadlines(idea.title, geo.googleNewsLocale),
+      queryAgentReachIntel(idea.title, {
+        isTechSoftware: domain.archetype === "b2b_saas" || domain.archetype === "deeptech_research" || domain.archetype === "web3_defi",
+        preferredChannels: geo.preferredCommunityChannels
+      }),
+      queryOpenAlex(`${idea.title} ${domain.archetypeLabel}`),
+      queryEdgarFormD(idea.title),
+      queryHuggingFace(idea.title),
+      queryClinicalEvidence(idea.title, isHealthcare),
+      queryMacroData(idea.targetAudience),
       runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30),
       // Pessimistic stress run feeding the crossfire tool traces (plan 2.2 ReAct evidence)
       runEconomicsSimulation(pricing * 0.85, Math.min(1, churn * 1.6), cac * 1.6, 500, 1500, 30)
@@ -834,46 +866,93 @@ ${agentContext}`;
 
     const mc = sandboxSim.metrics.monteCarlo;
 
-    // Evidence packs: each agent receives the slice of RETRIEVED evidence relevant
-    // to its mandate, or an explicit absence statement — never a shared digest,
-    // never fabricated data.
-    const competitiveResults = marketResearch.rawResults.filter((r) => r.queryLabel === "competitive");
-    const sentimentResults = marketResearch.rawResults.filter((r) => r.queryLabel === "sentiment");
-    const communityDiscussions = marketResearch.community.discussions;
-
-    const competitiveLine = competitiveResults.length > 0
-      ? `Live competitor recon (${marketResearch.reconProvider}): ${competitiveResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
-      : `No competitive recon was retrieved — do NOT assert specific competitor names, prices, or market shares; reason from priors and label them as priors.`;
-    const sentimentLine = sentimentResults.length > 0
-      ? `Customer-sentiment recon: ${sentimentResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
-      : `No customer-sentiment recon was retrieved.`;
-    const communityLine = communityDiscussions.length > 0
-      ? `Community discussions (${marketResearch.community.provider}): ${communityDiscussions.slice(0, 3).map(d => `"${d.title}"${typeof d.score === "number" ? ` (${d.score} pts)` : ""} [${d.url}]`).join("; ")}`
-      : `No community discussions (Reddit/HN/X) were retrievable — do NOT claim community sentiment either way.`;
-    const marketLine = polymarketSignals.marketsFound.length > 0
-      ? `Prediction markets: ${polymarketSignals.marketsFound.map(m => `"${m.title}" @ ${m.probabilityYesPercent}% [${m.marketUrl}]`).join("; ")}. ${polymarketSignals.keyTakeaway}`
-      : `No correlated prediction-market data is available.`;
-    const econContext = `Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
-
-    const decisionLine = decisionEvaluation
-      ? `Calibrated Decision Gatekeeper (${decisionEvaluation.engine || "Julia-1"}): Verdict=${decisionEvaluation.verdict}, LossRatio=${decisionEvaluation.loss_ratio}x. ` +
+    // Evidence provenance block: only REAL retrieved sources are described as
+    // sourced. When recon/markets/community are unavailable this is stated
+    // explicitly so agents never mistake heuristic priors for external evidence.
+    const reconSourceParts: string[] = [];
+    if (marketResearch.dataSource === "live-web-recon" && marketResearch.rawResults.length > 0) {
+      reconSourceParts.push(
+        `Live web recon (${marketResearch.reconProvider}): ${marketResearch.rawResults.slice(0, 3).map(r => `"${r.title}" [${r.url}]`).join("; ")}`
+      );
+    } else {
+      reconSourceParts.push(
+        `No live web recon results were retrieved (${marketResearch.reconError || "provider unavailable"}) — treat competitive and demand statements as heuristic priors, not sourced evidence.`
+      );
+    }
+    if (marketResearch.community.discussions.length > 0) {
+      reconSourceParts.push(
+        `Community discussions (${marketResearch.community.provider}): ${marketResearch.community.discussions.slice(0, 3).map(d => `"${d.title}"${typeof d.score === "number" ? ` (${d.score} pts${typeof d.comments === "number" ? `, ${d.comments} comments` : ""})` : ""} [${d.url}]`).join("; ")}`
+      );
+    } else {
+      reconSourceParts.push("No community discussions (Reddit/HN/X) were retrievable for this concept.");
+    }
+    if (unifiedMarkets.signals.length > 0) {
+      reconSourceParts.push(
+        `Prediction markets (${unifiedMarkets.activeSources.map(s => s.toUpperCase()).join("/")}): ${unifiedMarkets.signals.slice(0, 3).map(m => `"${m.title.slice(0, 70)}" @ ${m.probabilityYesPercent}% [${m.source}]`).join("; ")}. ${unifiedMarkets.keyTakeaway}`
+      );
+    } else {
+      reconSourceParts.push(unifiedMarkets.keyTakeaway);
+    }
+    if (newsSignals.articles.length > 0) {
+      reconSourceParts.push(
+        `Media coverage (${newsSignals.source}): ${newsSignals.articles.slice(0, 2).map(a => `"${a.title.slice(0, 60)}" [${a.source}]`).join("; ")}.`
+      );
+    }
+    if (openAlexSignals.papers.length > 0) {
+      reconSourceParts.push(
+        `Academic grounding (OpenAlex, ${openAlexSignals.totalWorks.toLocaleString()} works): ${openAlexSignals.papers.slice(0, 2).map(p => `"${p.title.slice(0, 80)}" (${p.year}, ${p.citations} cites)`).join("; ")}.`
+      );
+    }
+    if (edgarSignals.filings.length > 0) {
+      reconSourceParts.push(
+        `Fundraising evidence (SEC Form D): ${edgarSignals.filings.map(f => `${f.company} filed ${f.filedDate}`).join("; ")}.`
+      );
+    }
+    if (hfSignals.models.length > 0) {
+      reconSourceParts.push(
+        `Open-source alternatives (HF Hub): ${hfSignals.models.map(m => `"${m.id}" (${m.likes} likes, ${m.downloads} downloads)`).join("; ")}.`
+      );
+    }
+    if (clinicalSignals.studies.length > 0 || clinicalSignals.clearances.length > 0) {
+      reconSourceParts.push(
+        `Clinical evidence: ${clinicalSignals.studies.map(s => `${s.nctId} (${s.status})`).join("; ")}${clinicalSignals.clearances.length > 0 ? `; 510(k): ${clinicalSignals.clearances.map(c => c.deviceName.slice(0, 50)).join("; ")}` : ""}.`
+      );
+    }
+    if (macroSignals.indicators.length > 0) {
+      reconSourceParts.push(
+        `Macro grounding (World Bank): ${macroSignals.keyTakeaway}`
+      );
+    }
+    reconSourceParts.push(
+      `Jurisdiction & Policy Context (${geo.regionName} / ${geo.countryCode}): Currency ${geo.currency}, Regulatory framework: ${geo.regulatoryFramework}.`
+    );
+    if (reachSignals.gitHubRepos.length > 0 || reachSignals.deepScrape || reachSignals.regionalDiscussions.length > 0) {
+      reconSourceParts.push(
+        `Agent-Reach developer/community intel: ${reachSignals.keyTakeaway}`
+      );
+    }
+    if (itchMatches.length > 0) {
+      reconSourceParts.push(
+        `Commercial Problem Catalog (Razorpay Fix My Itch): Matches verified problem "${itchMatches[0].title}" (${itchMatches[0].problemStatement}) — Unmet need: ${itchMatches[0].unmetNeed}.`
+      );
+    }
+    if (graveyardMatches.length > 0) {
+      reconSourceParts.push(
+        `Startup Graveyard Forensics (Loot Drop): Matches failure pattern of ${graveyardMatches.map(g => `"${g.companyName}" (${g.burnedCapitalUsd} burned, ${g.lifespan}): ${g.fatalFlaw}`).join("; ")}.`
+      );
+    }
+    if (decisionEvaluation) {
+      reconSourceParts.push(
+        `Calibrated Decision Gatekeeper (${decisionEvaluation.engine || "Julia-1"}): Verdict=${decisionEvaluation.verdict}, LossRatio=${decisionEvaluation.loss_ratio}x. ` +
         `Moat P(wrapper)=${decisionEvaluation.answers?.moat?.probabilities?.thin_wrapper ?? "n/a"} [Flagged=${decisionEvaluation.answers?.moat?.flagged}], ` +
         `Regulatory P(fatal)=${decisionEvaluation.answers?.regulatory_risk?.probabilities?.regulatory_fatal ?? "n/a"} [Flagged=${decisionEvaluation.answers?.regulatory_risk?.flagged}], ` +
         `Procurement P(deadlock)=${decisionEvaluation.answers?.sales_cycle?.probabilities?.procurement_deadlock ?? "n/a"} [Flagged=${decisionEvaluation.answers?.sales_cycle?.flagged}], ` +
         `Monetization P(zero)=${decisionEvaluation.answers?.monetization?.probabilities?.monetization_zero ?? "n/a"} [Flagged=${decisionEvaluation.answers?.monetization?.flagged}]. ` +
-        (decisionEvaluation.fatal_flags.length > 0 ? `TRIGGERED FATAL FAILURE MODES: ${decisionEvaluation.fatal_flags.join(", ")}. ` : "")
-      : "";
+        (decisionEvaluation.fatal_flags.length > 0 ? `TRIGGERED FATAL FAILURE MODES: ${decisionEvaluation.fatal_flags.join(", ")}.` : "")
+      );
+    }
 
-    const agentContextFor = (role: SwarmRole): string => {
-      const lines: string[] = [];
-      if (role === "analyst") lines.push(competitiveLine, marketLine, decisionLine);
-      else if (role === "redteam") lines.push(sentimentLine, communityLine, decisionLine);
-      else if (role === "customer") lines.push(communityLine, decisionLine);
-      else if (role === "investor") lines.push(marketLine, decisionLine);
-      else if (role === "architect" || role === "expert") lines.push(decisionLine);
-      lines.push(econContext);
-      return lines.join(" ");
-    };
+    const marketContext = `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
 
     // 03 INVESTIGATE (Domain-Tailored Specialist Subagents)
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
@@ -883,101 +962,42 @@ ${agentContext}`;
     const evaluationMode: "LIVE_LLM" | "HEURISTIC_ENGINE" =
       shouldCallLive && getLLMStatus().hasLiveLLM ? "LIVE_LLM" : "HEURISTIC_ENGINE";
 
-    // Dynamic Tool Calling for Agent 01 (Market Analyst)
-    // Runs first to discover real competitors, pricing pages, and customer friction,
-    // which are then routed as grounded evidence to the remaining 5 agents.
-    let analystOpinion: AgentOpinion;
-    let groundedPack: GroundedEvidencePack | null = null;
-
-    if (evaluationMode === "LIVE_LLM") {
-      emit({ type: "stage", stage: "03.1 RECON", detail: "Market Analyst running live web recon tools & competitor search...", timestamp: new Date().toISOString() });
-      emit({ type: "agent_start", role: "analyst", roleTitle: domain.specialistRoleLabels.analyst.title });
-      const analystStart = Date.now();
-
-      const analystToolResult = await runAnalystWithTools(idea, domain, econContext, { model: options.model });
-      groundedPack = analystToolResult.groundedEvidence;
-
-      if (analystToolResult.opinion) {
-        analystOpinion = analystToolResult.opinion;
-      } else {
-        if (analystToolResult.fallbackReason) {
-          emit({ type: "parse_fallback", role: "analyst", reason: analystToolResult.fallbackReason });
-        }
-        const liveFallback = await this.evaluateRoleWithLLM("analyst", idea, agentContextFor("analyst"), domain, invariants);
-        analystOpinion = liveFallback.opinion || this.generateHeuristicOpinion("analyst", idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
-      }
-
-      analystOpinion.telemetryMetadata = {
-        latencyMs: Date.now() - analystStart,
-        threatSeverity: analystOpinion.score < 50 ? "HIGH" : "MODERATE",
-        modelId: getLLMStatus().activeModel
-      };
-
-      if (groundedPack.identifiedCompetitors.length > 0) {
-        marketResearch.identifiedCompetitors = groundedPack.identifiedCompetitors;
-      }
-      if (groundedPack.rawResults.length > 0 && marketResearch.rawResults.length === 0) {
-        marketResearch.rawResults = groundedPack.rawResults;
-      }
-
-      emit({
-        type: "agent_opinion",
-        role: "analyst",
-        roleTitle: domain.specialistRoleLabels.analyst.title,
-        verdict: analystOpinion.verdict,
-        score: analystOpinion.score,
-        fatalFlaw: analystOpinion.fatalFlaws[0]
-      });
-    } else {
-      // Heuristic offline mode
-      emit({ type: "agent_start", role: "analyst", roleTitle: domain.specialistRoleLabels.analyst.title });
-      analystOpinion = this.generateHeuristicOpinion("analyst", idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
-      analystOpinion.telemetryMetadata = {
-        latencyMs: 10,
-        threatSeverity: analystOpinion.score < 50 ? "HIGH" : "MODERATE",
-        modelId: "deterministic-heuristics"
-      };
-      emit({
-        type: "agent_opinion",
-        role: "analyst",
-        roleTitle: domain.specialistRoleLabels.analyst.title,
-        verdict: analystOpinion.verdict,
-        score: analystOpinion.score,
-        fatalFlaw: analystOpinion.fatalFlaws[0]
-      });
-    }
-
-    // Role-Scoped Context Routing: route the Analyst's verified intelligence to downstream agents
-    const groundedContextFor = (role: SwarmRole): string => {
-      const lines: string[] = [];
-      if (groundedPack) {
-        if (role === "customer") lines.push(groundedPack.roleContextLines.customer);
-        else if (role === "redteam") lines.push(groundedPack.roleContextLines.redteam);
-        else if (role === "investor") lines.push(groundedPack.roleContextLines.investor, marketLine);
-        else if (role === "architect") lines.push(groundedPack.roleContextLines.architect);
-        else if (role === "expert") lines.push(groundedPack.roleContextLines.expert);
-      } else {
-        return agentContextFor(role);
-      }
-      lines.push(econContext);
-      return lines.join(" ");
-    };
-
-    // Parallel execution for remaining 5 specialist agents with grounded evidence packs
-    const REMAINING_ROLES = ["customer", "architect", "investor", "redteam", "expert"] as const;
-    const [customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion] = await Promise.all(
-      REMAINING_ROLES.map(async (role) => {
+    // Stream agents live: each role emits agent_start when it begins computing
+    // and agent_opinion the moment its (LLM or heuristic) opinion resolves.
+    const AGENT_ROLES = ["analyst", "customer", "architect", "investor", "redteam", "expert"] as const;
+    const [analystOpinion, customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion] = await Promise.all(
+      AGENT_ROLES.map(async (role) => {
         emit({ type: "agent_start", role, roleTitle: domain.specialistRoleLabels[role].title });
         const roleStart = Date.now();
-        const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, groundedContextFor(role), domain, invariants) : null;
+        const live = shouldCallLive ? await this.evaluateRoleWithLLM(role, idea, marketContext, domain, invariants) : null;
         if (live?.fallbackReason) {
           emit({ type: "parse_fallback", role, reason: live.fallbackReason });
         }
         const opinion: AgentOpinion = live?.opinion || this.generateHeuristicOpinion(role, idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+        if (role === "redteam" && graveyardMatches.length > 0) {
+          const g = graveyardMatches[0];
+          opinion.fatalFlaws.unshift(
+            `Graveyard Forensic Precedent [${g.companyName} — ${g.burnedCapitalUsd} burned]: ${g.fatalFlaw}`
+          );
+          opinion.mustTestBeforeBuilding.unshift(
+            `Falsify ${g.companyName} Death Trap: ${g.takeaway}`
+          );
+          opinion.score = 28;
+          opinion.verdict = "STRONG_KILL";
+        }
+        if (role === "customer" && itchMatches.length > 0) {
+          const itch = itchMatches[0];
+          opinion.keyAssumptions.unshift(
+            `Verified Buyer Demand (Razorpay Fix My Itch): "${itch.problemStatement}"`
+          );
+        }
+        if (evaluationMode === "HEURISTIC_ENGINE" && !invariants.isPromptInjection && !invariants.isImpossiblePhysics) {
+          opinion.score = Math.max(10, Math.min(100, shrinkTowardBaseRate(opinion.score, domain.archetype)));
+        }
         opinion.telemetryMetadata = {
           latencyMs: Date.now() - roleStart,
           threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE",
-          modelId: live?.opinion ? getLLMStatus().activeModel : "deterministic-heuristics"
+          modelId: evaluationMode === "LIVE_LLM" ? (getLLMStatus().activeModel || "live-llm") : "deterministic-heuristics"
         };
         emit({
           type: "agent_opinion",
@@ -1021,26 +1041,42 @@ ${agentContext}`;
       emit({ type: "crossfire_clash", challenger: clash.challenger, target: clash.target, challengePoint: clash.challengePoint, rebuttal: clash.rebuttal || "", status: clash.status });
     }
 
-    // 05 VERIFY (Sandboxed Python Subprocess & Stanford CS329A Robust Verifier)
-    notify("05 VERIFY", "Verifying sandboxed Python metrics & executing Stanford CS329A Robust Verifier...");
+    // 05 VERIFY (Sandboxed Python Subprocess & Epistemic Robust Verifier)
+    notify("05 VERIFY", "Verifying sandboxed Python metrics & executing Epistemic Robust Verifier...");
 
     // External evidence items are included ONLY when real sources were actually
     // retrieved. When nothing was retrieved, an explicit UNKNOWN item records
     // that absence — the feed never presents heuristic priors as sourced data.
     const externalEvidenceItems: EvidenceItem[] = [];
     let retrievedExternalCount = 0;
-    if (polymarketSignals.marketsFound.length > 0) {
-      const top = polymarketSignals.marketsFound[0];
+    if (unifiedMarkets.signals.length > 0) {
+      const top = unifiedMarkets.signals[0];
+      const consensusNote = unifiedMarkets.consensusGroups.length > 0 && unifiedMarkets.consensusGroups[0].sources.length > 1
+        ? ` Shared cross-market topic "${unifiedMarkets.consensusGroups[0].canonicalQuestion.slice(0, 70)}" priced at ${unifiedMarkets.consensusGroups[0].consensusProbabilityPercent}% across ${unifiedMarkets.consensusGroups[0].sources.join("+")} (spread: ${unifiedMarkets.consensusGroups[0].spreadPercent}%).`
+        : "";
       externalEvidenceItems.push({
         id: "EV-03",
-        claim: `Macro prediction market sentiment: ${polymarketSignals.keyTakeaway} Top correlated market: "${top.title}" at ${top.probabilityYesPercent}%.`,
+        claim: `Macro prediction market sentiment: ${unifiedMarkets.keyTakeaway} Top market: "${top.title}" at ${top.probabilityYesPercent}% on ${top.source}.${consensusNote}`,
         tier: "EXTERNAL_EVIDENCE",
         claimType: "EXTERNAL_EVIDENCE",
-        provenance: `Polymarket Gamma API [${top.marketUrl}]`,
-        indicator: polymarketSignals.macroSentiment === "BEARISH" ? "CONTRADICTING" : "SUPPORTING",
+        provenance: `Prediction Market Oracle (${top.source.toUpperCase()}) [${top.url}]`,
+        indicator: unifiedMarkets.macroSentiment === "BEARISH" ? "CONTRADICTING" : (unifiedMarkets.macroSentiment === "BULLISH" ? "SUPPORTING" : "NEUTRAL"),
         confidencePercent: 75
       });
       retrievedExternalCount++;
+
+      unifiedMarkets.signals.slice(0, 3).forEach((sig, idx) => {
+        externalEvidenceItems.push({
+          id: `EV-03M${idx + 1}`,
+          claim: `${sig.source.toUpperCase()} market: "${sig.title}" at ${sig.probabilityYesPercent}% ($${sig.volumeUsd.toLocaleString()} volume, status: ${sig.status}).`,
+          tier: "EXTERNAL_EVIDENCE",
+          claimType: "EXTERNAL_EVIDENCE",
+          provenance: sig.url,
+          indicator: sig.probabilityYesPercent >= 60 ? "SUPPORTING" : (sig.probabilityYesPercent <= 40 ? "CONTRADICTING" : "NEUTRAL"),
+          confidencePercent: 70
+        });
+        retrievedExternalCount++;
+      });
     }
     if (marketResearch.dataSource === "live-web-recon" && marketResearch.rawResults.length > 0) {
       marketResearch.rawResults.slice(0, 2).forEach((r, i) => {
@@ -1071,6 +1107,143 @@ ${agentContext}`;
       });
       retrievedExternalCount++;
     });
+    for (let i = 0; i < Math.min(newsSignals.articles.length, 2); i++) {
+      const art = newsSignals.articles[i];
+      externalEvidenceItems.push({
+        id: `EV-04N${i + 1}`,
+        claim: `Factual media reporting (${art.source}): "${art.title}"`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: art.url,
+        indicator: "SUPPORTING",
+        confidencePercent: 85
+      });
+      retrievedExternalCount++;
+    }
+    for (const p of openAlexSignals.papers.slice(0, 2)) {
+      externalEvidenceItems.push({
+        id: `EV-03A${openAlexSignals.papers.indexOf(p) + 1}`,
+        claim: `Peer-reviewed grounding: "${p.title}" (${p.year}, ${p.citations} citations, ${p.venue}) — ${p.authors.join(", ")}.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: p.openAccessUrl || "OpenAlex",
+        indicator: "SUPPORTING",
+        confidencePercent: 80
+      });
+      retrievedExternalCount++;
+    }
+    for (const f of edgarSignals.filings.slice(0, 2)) {
+      externalEvidenceItems.push({
+        id: `EV-03E${edgarSignals.filings.indexOf(f) + 1}`,
+        claim: `SEC Form D fundraising: ${f.company} (CIK ${f.cik}) filed ${f.filedDate} — real capital formation in this space.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: f.filingUrl,
+        indicator: "SUPPORTING",
+        confidencePercent: 90
+      });
+      retrievedExternalCount++;
+    }
+    for (const m of hfSignals.models.slice(0, 2)) {
+      externalEvidenceItems.push({
+        id: `EV-03H${hfSignals.models.indexOf(m) + 1}`,
+        claim: `Open-source alternative on HF Hub: "${m.id}" (${m.likes} likes, ${m.downloads} downloads) — commoditization pressure.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: m.modelUrl,
+        indicator: "CONTRADICTING",
+        confidencePercent: 75
+      });
+      retrievedExternalCount++;
+    }
+    for (const s of clinicalSignals.studies.slice(0, 2)) {
+      externalEvidenceItems.push({
+        id: `EV-03C${clinicalSignals.studies.indexOf(s) + 1}`,
+        claim: `Registered trial ${s.nctId}: "${s.title}" — ${s.status}, ${s.phase}, sponsored by ${s.sponsor}.`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: s.studyUrl,
+        indicator: "NEUTRAL",
+        confidencePercent: 85
+      });
+      retrievedExternalCount++;
+    }
+    if (macroSignals.indicators.length > 0) {
+      externalEvidenceItems.push({
+        id: "EV-03W",
+        claim: `Macro grounding (World Bank): ${macroSignals.keyTakeaway}`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: "https://api.worldbank.org/v2",
+        indicator: "NEUTRAL",
+        confidencePercent: 85
+      });
+      retrievedExternalCount++;
+    }
+    for (let i = 0; i < Math.min(reachSignals.gitHubRepos.length, 2); i++) {
+      const repo = reachSignals.gitHubRepos[i];
+      externalEvidenceItems.push({
+        id: `EV-04G${i + 1}`,
+        claim: `Open source developer traction on GitHub (${repo.fullName}): ${repo.stars} stars — "${repo.description || "Active codebase"}".`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: repo.url,
+        indicator: "SUPPORTING",
+        confidencePercent: 88
+      });
+      retrievedExternalCount++;
+    }
+    if (reachSignals.deepScrape) {
+      externalEvidenceItems.push({
+        id: "EV-04J",
+        claim: `Jina Reader deep inspection (${reachSignals.deepScrape.url}): "${reachSignals.deepScrape.title}" ${reachSignals.deepScrape.extractedPricing ? `[Pricing: ${reachSignals.deepScrape.extractedPricing}]` : ""}`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: reachSignals.deepScrape.url,
+        indicator: "NEUTRAL",
+        confidencePercent: 85
+      });
+      retrievedExternalCount++;
+    }
+    for (let i = 0; i < Math.min(reachSignals.regionalDiscussions.length, 2); i++) {
+      const disc = reachSignals.regionalDiscussions[i];
+      externalEvidenceItems.push({
+        id: `EV-04V${i + 1}`,
+        claim: `Regional community discussion (${disc.platform}): "${disc.title}" (${disc.replies || 0} replies)`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: disc.url,
+        indicator: "NEUTRAL",
+        confidencePercent: 80
+      });
+      retrievedExternalCount++;
+    }
+    for (let i = 0; i < itchMatches.length; i++) {
+      const p = itchMatches[i];
+      externalEvidenceItems.push({
+        id: `EV-04F${i + 1}`,
+        claim: `Verified Commercial Demand (Razorpay Fix My Itch - ${p.category}): "${p.problemStatement}" (Target: ${p.targetPersona})`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: p.sourceUrl,
+        indicator: "SUPPORTING",
+        confidencePercent: 90
+      });
+      retrievedExternalCount++;
+    }
+    for (let i = 0; i < graveyardMatches.length; i++) {
+      const g = graveyardMatches[i];
+      externalEvidenceItems.push({
+        id: `EV-04D${i + 1}`,
+        claim: `Startup Graveyard Forensic Precedent (Loot Drop - ${g.companyName}): Burned ${g.burnedCapitalUsd} before death (${g.lifespan}) from ${g.antipattern} — ${g.fatalFlaw}`,
+        tier: "EXTERNAL_EVIDENCE",
+        claimType: "EXTERNAL_EVIDENCE",
+        provenance: g.sourceUrl,
+        indicator: "CONTRADICTING",
+        confidencePercent: 95
+      });
+      retrievedExternalCount++;
+    }
     if (retrievedExternalCount === 0) {
       const reasons = [
         marketResearch.dataSource !== "live-web-recon" ? marketResearch.reconError || "no web recon results" : null,
@@ -1114,7 +1287,9 @@ ${agentContext}`;
         claimType: "MODELLED_ASSUMPTION",
         provenance: "Founder Input & Value Proposition Claim",
         indicator: "CONTRADICTING",
-        confidencePercent: 45
+        confidencePercent: 45,
+        fatal: true,
+        tested: false
       },
       {
         id: "EV-06",
@@ -1158,7 +1333,7 @@ ${agentContext}`;
         : [])
     ];
 
-    const verifier = new StanfordRobustVerifier();
+    const verifier = new EpistemicRobustVerifier();
     const { verifiedOpinions, audit, claimDag } = verifier.verifySwarmOpinions(
       idea,
       domain,
@@ -1188,12 +1363,31 @@ ${agentContext}`;
     );
 
     if (audit.testTimeSelfCorrections > 0) {
-      notify("05 VERIFY [SELF-CORRECTION]", `Stanford CS329A Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`);
+      notify("05 VERIFY [SELF-CORRECTION]", `Epistemic Robust Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`);
       emit({
         type: "audit_correction",
-        detail: `Stanford CS329A Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`,
+        detail: `Epistemic Robust Verifier applied ${audit.testTimeSelfCorrections} test-time reflections to ungrounded scores.`,
         hallucinationsBlocked: audit.hallucinationsBlocked
       });
+    }
+
+    // NLI demote-only pass (async, lazy model): cited external evidence that
+    // contradicts an agent claim appends a CORRECTED audit item. Null-safe.
+    try {
+      const nli = await verifier.verifyWithNli(evidenceFeed, verifiedOpinions);
+      if (nli.demotions > 0) {
+        audit.auditItems.push(...nli.auditItems);
+        audit.testTimeSelfCorrections += nli.demotions;
+        audit.totalClaimsAudited = audit.auditItems.length;
+        notify("05 VERIFY [NLI]", `NLI contradiction pass flagged ${nli.demotions} claim(s) against cited evidence.`);
+        emit({
+          type: "audit_correction",
+          detail: `NLI contradiction pass flagged ${nli.demotions} claim(s) against cited evidence.`,
+          hallucinationsBlocked: audit.hallucinationsBlocked
+        });
+      }
+    } catch {
+      // NLI failure never breaks evaluation
     }
 
     // 06 CONVERGE (Multi-Round Convergence Loop)
@@ -1291,6 +1485,9 @@ ${agentContext}`;
     // capped below the KILL threshold (50) no matter how optimistic the remaining dimensions are.
     if (invariants.isThinWrapper || sandboxSim.metrics.ltvCacRatio < 1) {
       compositeScore = Math.min(compositeScore, 44);
+    }
+    if (graveyardMatches.length > 0) {
+      compositeScore = Math.min(compositeScore, 46);
     }
     if (invariants.isNoMonetization) {
       compositeScore = Math.min(compositeScore, 39);
@@ -1397,7 +1594,8 @@ ${agentContext}`;
     const unknownsCount = evidenceFeed.filter(e => e.tier === "UNKNOWN").length;
     const contradictionsCount = evidenceFeed.filter(e => e.tier === "CONTRADICTED").length;
 
-    const hasUnvalidatedFatalAssumptions = modelledAssumptionsCount > 0 || verifiedOpinions.redteam.score < 50;
+    const fatalUntested = evidenceFeed.filter(e => e.fatal === true && e.tested !== true);
+    const fatalUntestedCount = fatalUntested.length;
     const hasUnresolvedUnknownsOrContradictions = unknownsCount > 0 || contradictionsCount > 0;
 
     const epistemicSummary: EpistemicTaxonomySummary = {
@@ -1408,7 +1606,7 @@ ${agentContext}`;
       inferencesCount,
       unknownsCount,
       contradictionsCount,
-      hasUnvalidatedFatalAssumptions,
+      hasUnvalidatedFatalAssumptions: fatalUntestedCount > 0,
       hasUnresolvedUnknownsOrContradictions
     };
 
@@ -1432,7 +1630,7 @@ ${agentContext}`;
       riskLevel = "MEDIUM";
     } else {
       // compositeScore >= 75
-      if (hasUnvalidatedFatalAssumptions || hasUnresolvedUnknownsOrContradictions) {
+      if (fatalUntestedCount > 0 || hasUnresolvedUnknownsOrContradictions) {
         overallVerdict = "BUILD_IF_VALIDATED";
         riskLevel = "MEDIUM"; // Constrained: never LOW while critical assumptions/unknowns are unresolved
       } else {
@@ -1441,23 +1639,21 @@ ${agentContext}`;
       }
     }
 
-    // Honest swarm-agreement signal (replaces the cosmetic composite+10 confidence):
-    // agreement strength, not idea quality — a split swarm means the verdict needs
-    // human judgment, and that signal must never be averaged away.
-    const killGradeAgents = initialScores.filter((s) => s < 40).length;
-    const avgAgentScore = Math.round(initialScores.reduce((a, b) => a + b, 0) / initialScores.length);
-    const swarmDissent: SwarmDissent = {
-      scoreSpread,
-      killGradeAgents,
-      avgAgentScore,
-      verdictContested: killGradeAgents >= 2 && compositeScore >= 50
-    };
-    const confidenceScore = Math.round(Math.max(25, Math.min(92, 90 - scoreSpread * 0.7 - killGradeAgents * 5)));
-
-    // Outside view: reference-class base rates vs the swarm verdict. Deterministic,
-    // model-independent — quantifies the swarm's optimism premium instead of hiding it.
-    const outsideView = buildOutsideViewPanel(idea, compositeScore);
-    notify("07 VERDICT [OUTSIDE VIEW]", `Reference classes: ${outsideView.matchedClasses.map((c) => c.label).join(", ")} — optimism delta ${outsideView.optimismDelta >= 0 ? "+" : ""}${Math.round(outsideView.optimismDelta * 100)}pts vs base rate.`);
+    // Calibration: P(build-worthy) as an explicit probability for ledger tracking.
+    // Uncalibrated until the ledger holds >= 20 outcomes for this archetype.
+    const agentScores = [
+      verifiedOpinions.analyst.score,
+      verifiedOpinions.customer.score,
+      verifiedOpinions.architect.score,
+      verifiedOpinions.investor.score,
+      verifiedOpinions.redteam.score,
+      verifiedOpinions.expert.score
+    ];
+    const verdictSpread = Math.max(...agentScores) - Math.min(...agentScores);
+    const confidenceScore = Math.min(
+      95,
+      Math.max(55, Math.round(100 - verdictSpread / 2))
+    );
 
     // 08 STRUCTURED EVIDENCE WITH PROVENANCE
     const strongestEvidence = evidenceFeed[0];
@@ -1557,10 +1753,10 @@ ${agentContext}`;
       mustTestBeforeBuilding: [cheapestValidationExperiment.title],
       rationale: `Swarm consensus for [${domain.archetypeLabel}]: Concept has strong technical grounding (${technicalFeasibility}/100) and regulatory fit (${defensibilityAndMoat}/100), but must resolve commercial procurement and habit inertia (${demandAndAdoption}/100) before committing full MVP engineering.`,
       telemetryMetadata: {
+        modelId: evaluationMode === "LIVE_LLM" ? (getLLMStatus().activeModel || "live-llm") : "deterministic-heuristics",
         latencyMs: Date.now() - synthesisStart,
         claimsVerified: evidenceFeed.length,
-        threatSeverity: riskLevel,
-        modelId: evaluationMode === "LIVE_LLM" ? getLLMStatus().activeModel : "deterministic-heuristics"
+        threatSeverity: riskLevel
       }
     };
 
@@ -1611,17 +1807,36 @@ ${agentContext}`;
     const externalEvidenceSources: ExternalEvidenceSource[] = [
       ...marketResearch.rawResults.map(r => ({ title: r.title, url: r.url, provider: marketResearch.reconProvider })),
       ...marketResearch.community.discussions.map(d => ({ title: d.title, url: d.url, provider: d.platform })),
-      ...polymarketSignals.marketsFound.map(m => ({ title: m.title, url: m.marketUrl, provider: "polymarket" })),
-      ...marketResearch.identifiedCompetitors
-        .filter(c => c.url && !marketResearch.rawResults.some(r => r.url === c.url))
-        .map(c => ({ title: `${c.name} (${c.category})`, url: c.url!, provider: "analyst-recon" }))
+      ...unifiedMarkets.signals.map(m => ({ title: `[${m.source.toUpperCase()}] ${m.title.slice(0, 120)}`, url: m.url, provider: m.source })),
+      ...openAlexSignals.papers.slice(0, 3).map(p => ({ title: p.title.slice(0, 120), url: p.openAccessUrl || "https://openalex.org", provider: "openalex" })),
+      ...edgarSignals.filings.map(f => ({ title: `Form D: ${f.company}`, url: f.filingUrl, provider: "sec-edgar" })),
+      ...hfSignals.models.map(m => ({ title: `Hub: ${m.id}`, url: m.modelUrl, provider: "huggingface" })),
+      ...clinicalSignals.studies.map(s => ({ title: `${s.nctId}: ${s.title.slice(0, 100)}`, url: s.studyUrl, provider: "clinicaltrials" })),
+      ...newsSignals.articles.map(a => ({ title: `[NEWS] ${a.title.slice(0, 120)}`, url: a.url, provider: a.source })),
+      ...reachSignals.gitHubRepos.map(g => ({ title: `[GitHub] ${g.fullName} (${g.stars}★): ${g.description.slice(0, 80)}`, url: g.url, provider: "github" })),
+      ...(reachSignals.deepScrape ? [{ title: `[Jina Reader] ${reachSignals.deepScrape.title}`, url: reachSignals.deepScrape.url, provider: "jina-reader" }] : []),
+      ...reachSignals.regionalDiscussions.map(v => ({ title: `[${v.platform.toUpperCase()}] ${v.title.slice(0, 100)}`, url: v.url, provider: v.platform })),
+      ...itchMatches.map(p => ({ title: `[Razorpay Fix My Itch] ${p.problemStatement}`, url: p.sourceUrl, provider: "razorpay-fix-my-itch" })),
+      ...graveyardMatches.map(g => ({ title: `[Loot Drop Graveyard] ${g.companyName} (${g.burnedCapitalUsd} burned): ${g.fatalFlaw.slice(0, 80)}`, url: g.sourceUrl, provider: "loot-drop-graveyard" }))
     ];
+
+    const outsideView = buildOutsideViewPanel(idea, compositeScore);
+    const swarmDissent: SwarmDissent = {
+      scoreSpread: Math.max(...agentScores) - Math.min(...agentScores),
+      killGradeAgents: agentScores.filter(s => s < 40).length,
+      avgAgentScore: Math.round(agentScores.reduce((a, b) => a + b, 0) / agentScores.length),
+      verdictContested: agentScores.filter(s => s < 40).length >= 2 && compositeScore >= 50
+    };
 
     const dossier: IdeaDossier = {
       id: `DOSSIER-${Date.now().toString().slice(-6)}`,
-      dossierCode: `TF-007-${domain.archetype.toUpperCase().slice(0, 3)}`,
+      dossierCode: `DOS-${domain.archetype.toUpperCase().slice(0, 3)}`,
       timestamp: new Date().toISOString(),
       evaluationMode,
+      pSuccess: Math.round(compositeScore) / 100,
+      baseRate: getBaseRate(domain.archetype).baseRate,
+      fatalsResolved: fatalUntestedCount === 0,
+      costUsd: evaluationMode === "LIVE_LLM" ? 0.3 : 0.0,
       externalEvidenceSources,
       identifiedCompetitors: marketResearch.identifiedCompetitors,
       idea,
@@ -1653,7 +1868,19 @@ ${agentContext}`;
       killConditions,
       cheapestValidationExperiment,
       resilienceBreakdown,
-      predictionMarkets: polymarketSignals,
+      predictionMarkets: {
+        source: unifiedMarkets.activeSources.length > 0
+          ? `Unified Prediction Oracle (${unifiedMarkets.activeSources.map(s => s.toUpperCase()).join("/")})`
+          : "Unified Prediction Oracle",
+        macroSentiment: unifiedMarkets.macroSentiment,
+        keyTakeaway: unifiedMarkets.keyTakeaway,
+        marketsFound: unifiedMarkets.signals.map(s => ({
+          title: `[${s.source.toUpperCase()}] ${s.title}`,
+          probabilityYesPercent: s.probabilityYesPercent,
+          volumeUsd: s.volumeUsd,
+          marketUrl: s.url
+        }))
+      },
       debateTrail,
       convergenceRounds,
       debateRoundsExecuted: convergenceRounds,
@@ -1704,15 +1931,20 @@ ${agentContext}`;
         churn,
         cac,
         survival24Mo: mc?.survivalProbability24Mo,
-        ltvCacRatio: sandboxSim.metrics.ltvCacRatio
+        ltvCacRatio: sandboxSim.metrics.ltvCacRatio,
+        graveyardPrecedent: graveyardMatches[0] ? {
+          companyName: graveyardMatches[0].companyName,
+          burnedCapitalUsd: graveyardMatches[0].burnedCapitalUsd,
+          fatalFlaw: graveyardMatches[0].fatalFlaw,
+          takeaway: graveyardMatches[0].takeaway
+        } : undefined
       });
       dossier.mutationProposals = mutationProposals;
       emit({ type: "mutation_proposals", proposals: mutationProposals });
     }
 
     // Calibration ledger: persist dated falsifiable forecasts (kill conditions,
-    // weakest assumption, validation experiment) with verdict-implied probabilities.
-    // The ledger is additive — a persistence failure must never fail an evaluation.
+    // weakest assumption, validation experiment) into the forecast registry.
     try {
       const forecasts = await forecastLedger.persistDossierForecasts(dossier);
       dossier.forecastIds = forecasts.map((f) => f.id);

@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+import dns from "node:dns";
+try {
+  dns.setDefaultResultOrder?.("ipv4first");
+} catch {
+  // Best-effort IPv4 preference
+}
+
 import { Command } from "commander";
 import pc from "picocolors";
 import fs from "node:fs/promises";
@@ -164,6 +171,18 @@ program
         });
       }
     });
+
+    // Unified Prediction Market Consensus
+    if (dossier.predictionMarkets && dossier.predictionMarkets.marketsFound.length > 0) {
+      console.log(pc.bold("\n📊 UNIFIED PREDICTION MARKET ORACLE CONSENSUS:"));
+      console.log(`  ${pc.magenta("•")} ${pc.bold(dossier.predictionMarkets.keyTakeaway)}`);
+      console.log(`    ${pc.dim("Source:")} ${dossier.predictionMarkets.source} | ${pc.dim("Macro Sentiment:")} ${dossier.predictionMarkets.macroSentiment}`);
+      dossier.predictionMarkets.marketsFound.slice(0, 5).forEach(m => {
+        const probColor = m.probabilityYesPercent >= 60 ? pc.green : (m.probabilityYesPercent <= 40 ? pc.red : pc.yellow);
+        console.log(`    ${pc.cyan("→")} ${m.title} : ${probColor(`${m.probabilityYesPercent}%`)} ${pc.dim(`($${m.volumeUsd.toLocaleString()} vol)`)}`);
+        console.log(`      ${pc.dim("URL:")} ${m.marketUrl}`);
+      });
+    }
 
     // Domain Specialist Agents
     console.log(pc.bold("\n👥 DOMAIN SPECIALIST ASSESSMENTS:"));

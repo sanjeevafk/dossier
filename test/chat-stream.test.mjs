@@ -6,6 +6,8 @@ import http from "node:http";
 delete process.env.ORCAROUTER_API_KEY;
 delete process.env.OPENAI_API_KEY;
 delete process.env.GEMINI_API_KEY;
+delete process.env.GROQ_API_KEY;
+delete process.env.OPENROUTER_API_KEY;
 delete process.env.LOCAL_LLM_URL;
 delete process.env.OLLAMA_URL;
 // Force API-only so the keyless agy-CLI fallback (installed on some hosts)

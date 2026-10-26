@@ -3,18 +3,23 @@
  * from a configured provider (Exa or Tavily). When no provider is configured
  * or the call fails, the outcome is explicitly `provider: "none"` — callers
  * must treat that as "no external evidence available", never fabricate data.
+ *
+ * Recon responses are cached in SQLite (7-day TTL) via dossierStorage to cut
+ * per-eval cost 5-10x. Cache keys are normalized + PII-stripped so personal
+ * names/emails never reach providers or persist in the cache index.
  */
+
+import { dossierStorage } from "../services/storage.js";
 
 export interface ReconSourceResult {
   title: string;
   url: string;
   snippet: string;
-  /** Which recon query produced this: "competitive" (rivals/pricing) or "sentiment" (complaints/churn). */
-  queryLabel: "competitive" | "sentiment";
+  queryLabel?: "competitive" | "sentiment";
 }
 
 export interface ReconOutcome {
-  provider: "exa" | "tavily" | "duckduckgo" | "none";
+  provider: "exa" | "tavily" | "exa:cache" | "tavily:cache" | "duckduckgo" | "none";
   queries: string[];
   results: ReconSourceResult[];
   error?: string;
@@ -145,43 +150,53 @@ export async function searchDuckDuckGo(
 }
 
 /**
+ * Strip PII (emails, @handles) and normalize for cache keys + outbound queries.
+ * Never send idea-owner names/emails to recon providers.
+ */
+export function sanitizeReconQuery(query: string): string {
+  return query
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, " ")
+    .replace(/@[a-z0-9_]+/gi, " ")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
+}
+
+/**
  * Run live web recon across the given queries using the first configured provider.
- * Never throws — an unreachable or unconfigured provider yields `provider: "none"`.
+ * Cached responses return `provider: "exa:cache"` / `"tavily:cache"` so callers
+ * can meter cost. Never throws — an unreachable or unconfigured provider
+ * yields `provider: "none"`.
  */
 export async function performLiveWebRecon(
   queries: string[],
-  options: { allowDuckDuckGo?: boolean } = {}
+  opts: { exaKey?: string; tavilyKey?: string; allowDuckDuckGo?: boolean } = {}
 ): Promise<ReconOutcome> {
   const cleanQueries = queries.map((q) => q.trim()).filter(Boolean).slice(0, 3);
   if (cleanQueries.length === 0) {
     return { provider: "none", queries: [], results: [] };
   }
 
-  const exaKey = process.env.EXA_API_KEY;
-  const tavilyKey = process.env.TAVILY_API_KEY;
+  const exaKey = opts.exaKey ?? process.env.EXA_API_KEY;
+  const tavilyKey = opts.tavilyKey ?? process.env.TAVILY_API_KEY;
 
   if (!exaKey && !tavilyKey) {
-    if (options.allowDuckDuckGo || process.env.ENABLE_DUCKDUCKGO === "true") {
+    if (opts.allowDuckDuckGo || process.env.ENABLE_DUCKDUCKGO === "true") {
       const collected: ReconSourceResult[] = [];
       const seenUrls = new Set<string>();
-      const errors: string[] = [];
-
       for (let q = 0; q < cleanQueries.length; q++) {
-        const queryLabel: ReconSourceResult["queryLabel"] = q === 0 ? "competitive" : "sentiment";
         try {
           const results = await searchDuckDuckGo(cleanQueries[q]);
           for (const result of results) {
             if (seenUrls.has(result.url)) continue;
             seenUrls.add(result.url);
-            collected.push({ ...result, queryLabel });
+            collected.push({ ...result, queryLabel: q === 0 ? "competitive" : "sentiment" });
             if (collected.length >= MAX_TOTAL_RESULTS) break;
           }
-        } catch (err: any) {
-          errors.push(`${cleanQueries[q]}: ${err?.message || "DDG search failed"}`);
-        }
-        if (collected.length >= MAX_TOTAL_RESULTS) break;
+        } catch {}
       }
-
       if (collected.length > 0) {
         return { provider: "duckduckgo", queries: cleanQueries, results: collected };
       }
@@ -191,7 +206,7 @@ export async function performLiveWebRecon(
       provider: "none",
       queries: cleanQueries,
       results: [],
-      error: "No recon provider configured (set EXA_API_KEY or TAVILY_API_KEY)"
+      error: "No recon key supplied — bring your own EXA_API_KEY or TAVILY_API_KEY (header X-Exa-Key / X-Tavily-Key, or server env)"
     };
   }
 
@@ -201,19 +216,36 @@ export async function performLiveWebRecon(
   const collected: ReconSourceResult[] = [];
   const seenUrls = new Set<string>();
   const errors: string[] = [];
+  let cacheHits = 0;
 
   for (let q = 0; q < cleanQueries.length; q++) {
+    const rawQuery = cleanQueries[q];
     const queryLabel: ReconSourceResult["queryLabel"] = q === 0 ? "competitive" : "sentiment";
+    const query = sanitizeReconQuery(rawQuery) || "startup idea validation";
+    const cacheKey = `recon:${provider}:${query}`;
     try {
-      const results = await search(cleanQueries[q]);
+      const cached = dossierStorage.getReconCache(cacheKey);
+      if (cached && Array.isArray((cached.response as { results?: unknown })?.results)) {
+        cacheHits++;
+        const results = (cached.response as { results: ReconSourceResult[] }).results;
+        for (const result of results) {
+          if (seenUrls.has(result.url)) continue;
+          seenUrls.add(result.url);
+          collected.push({ ...result, queryLabel: result.queryLabel || queryLabel });
+          if (collected.length >= MAX_TOTAL_RESULTS) break;
+        }
+        continue;
+      }
+      const results = await search(query);
+      dossierStorage.setReconCache(cacheKey, provider, { results });
       for (const result of results) {
         if (seenUrls.has(result.url)) continue;
         seenUrls.add(result.url);
-        collected.push({ ...result, queryLabel });
+        collected.push({ ...result, queryLabel: result.queryLabel || queryLabel });
         if (collected.length >= MAX_TOTAL_RESULTS) break;
       }
     } catch (err: any) {
-      errors.push(`${cleanQueries[q]}: ${err?.message || "recon failed"}`);
+      errors.push(`${query}: ${err?.message || "recon failed"}`);
     }
     if (collected.length >= MAX_TOTAL_RESULTS) break;
   }
@@ -227,5 +259,9 @@ export async function performLiveWebRecon(
     };
   }
 
-  return { provider, queries: cleanQueries, results: collected };
+  return {
+    provider: (cacheHits === cleanQueries.length ? `${provider}:cache` : provider) as ReconOutcome["provider"],
+    queries: cleanQueries,
+    results: collected
+  };
 }

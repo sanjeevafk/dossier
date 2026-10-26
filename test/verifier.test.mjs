@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { StanfordRobustVerifier } from "../dist/core/verifier.js";
+import { EpistemicRobustVerifier, StanfordRobustVerifier } from "../dist/core/verifier.js";
 import { classifyIdeaDomain } from "../dist/core/classifier.js";
 
-test("Stanford CS329A Robust Verifier audits subagents and applies test-time self-correction", () => {
-  const verifier = new StanfordRobustVerifier();
+test("Epistemic Robust Verifier (and StanfordRobustVerifier alias) audits subagents and applies test-time self-correction", () => {
+  assert.equal(StanfordRobustVerifier, EpistemicRobustVerifier, "StanfordRobustVerifier must be an alias for EpistemicRobustVerifier");
+  const verifier = new EpistemicRobustVerifier();
   const idea = {
     title: "AI Clinical Triage Assistant",
     summary: "Clinical triage app for rural clinics with WHO IMCI rules.",
@@ -126,7 +127,7 @@ test("Stanford CS329A Robust Verifier audits subagents and applies test-time sel
     []
   );
 
-  assert.equal(audit.verifierProtocol, "STANFORD_CS329A_ROBUST_VERIFIER");
+  assert.equal(audit.verifierProtocol, "EPISTEMIC_ROBUST_VERIFIER");
   assert.ok(audit.testTimeSelfCorrections > 0, "Must apply self-corrections to ungrounded scores");
   assert.ok(audit.hallucinationsBlocked > 0, "Must block mathematical and prior hallucinations");
   assert.ok(verifiedOpinions.investor.score <= 70, "Investor score must be corrected downward due to 2.0x LTV/CAC");

@@ -7,7 +7,10 @@ import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 
-const html = fs.readFileSync(path.join(process.cwd(), "public", "index.html"), "utf-8");
+const htmlPath = fs.existsSync(path.join(process.cwd(), "public", "app.js"))
+  ? path.join(process.cwd(), "public", "app.js")
+  : path.join(process.cwd(), "public", "index.html");
+const html = fs.readFileSync(htmlPath, "utf-8");
 
 function extract(name) {
   const start = html.indexOf(`function ${name}(`);

@@ -1,17 +1,25 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import pino from "pino";
 import path from "node:path";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
 import { generateAgentTurn, streamAgentTurn, getLLMStatus } from "./services/llm.js";
 import { dossierStorage } from "./services/storage.js";
 import { forecastLedger } from "./services/forecastLedger.js";
+import { summarizeCalibration } from "./services/calibration.js";
 import { SWARM_ROLES } from "./config/prompts.js";
 import { IdeaInput, SwarmRole } from "./types/index.js";
+
+const log = pino({ name: "dossier-server" });
 
 const app: Application = express();
 const port = process.env.PORT || 3000;
 
+app.use(helmet({ contentSecurityPolicy: false }));
+app.disable("x-powered-by");
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
   : ["http://localhost:3000", "http://127.0.0.1:3000"];
@@ -33,30 +41,66 @@ app.use(express.static(path.join(process.cwd(), "public")));
 
 function requireAuth(req: Request, res: Response, next: () => void) {
   const secret = process.env.DOSSIER_API_KEY;
-  // Node reports IPv4 loopback as ::ffff:127.0.0.1 when the socket is IPv6 —
-  // normalize before the loopback check or dev-machine requests get 401s.
-  const ip = (req.ip || "").replace(/^::ffff:/, "");
-  const isLoopback = ip === "127.0.0.1" || ip === "::1" || req.hostname === "localhost";
-  if (!secret && process.env.NODE_ENV !== "production" && isLoopback) {
+  if (!secret) {
+    if (process.env.REQUIRE_AUTH === "true") {
+      return res.status(503).json({ error: "Server misconfigured: DOSSIER_API_KEY is required but not set" });
+    }
     return next();
   }
   const authHeader = req.headers.authorization;
-  if (secret && authHeader === `Bearer ${secret}`) {
+  const apiKeyHeader = req.headers["x-api-key"];
+  if (authHeader === `Bearer ${secret}` || apiKeyHeader === secret) {
     return next();
   }
-  return res.status(401).json({ error: "Unauthorized: valid Bearer token required for action gates" });
+  return res.status(401).json({ error: "Unauthorized: valid Bearer token or x-api-key required" });
 }
 
+// Bounded Concurrency Guard (protects single-vCPU/512MB instances from OOM starvation)
+let activeEvaluations = 0;
+const MAX_CONCURRENT_EVALS = parseInt(process.env.MAX_CONCURRENT_EVALS || "3", 10);
+
+function tryAcquireEvaluationSlot(): boolean {
+  if (activeEvaluations >= MAX_CONCURRENT_EVALS) return false;
+  activeEvaluations++;
+  return true;
+}
+
+function releaseEvaluationSlot(): void {
+  activeEvaluations = Math.max(0, activeEvaluations - 1);
+}
+
+const evaluateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Rate limit exceeded: max 10 evaluations per hour per IP" }
+});
+
+app.use("/api/evaluate", evaluateLimiter);
+app.use("/api/chat", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Rate limit exceeded: max 60 chat messages per hour per IP" }
+}));
 const orchestrator = new IdeaSwarmOrchestrator();
 
-// Health check with detailed telemetry
+// Health check with detailed telemetry & capacity stats
 app.get("/health", (req: Request, res: Response) => {
   const llmStatus = getLLMStatus();
   res.json({
     status: "ok",
-    service: "dossier-trueforge",
+    service: "dossier-intelligence",
     timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.round(process.uptime()),
+    memoryUsageMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
     llm: llmStatus,
+    concurrency: {
+      activeEvaluations,
+      maxConcurrent: MAX_CONCURRENT_EVALS
+    },
     sandbox: { provider: process.env.SANDBOX_PROVIDER || "local", runtime: "python3-subprocess" }
   });
 });
@@ -87,7 +131,7 @@ app.get("/api/dossiers/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Export dossier as Markdown or JSON
+// Export dossier as Markdown, JSON, or Playwright-rendered PDF
 app.get("/api/dossiers/:id/export", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
@@ -102,6 +146,24 @@ app.get("/api/dossiers/:id/export", async (req: Request, res: Response) => {
       res.setHeader("Content-Disposition", `attachment; filename="dossier_${id}.json"`);
       res.setHeader("Content-Type", "application/json");
       res.send(JSON.stringify(dossier, null, 2));
+    } else if (format === "pdf") {
+      // Execute headless Playwright PDF export script
+      const { execFile } = await import("child_process");
+      const path = await import("path");
+      const scriptPath = path.resolve(process.cwd(), "scripts/export_pdf.py");
+      const currentPort = port;
+
+      execFile("python3", [scriptPath, id, String(currentPort)], { maxBuffer: 30 * 1024 * 1024, encoding: "buffer" }, (error, stdout, stderr) => {
+        if (error) {
+          log.error({ err: error, stderr: stderr.toString() }, "Playwright PDF export failed");
+          res.status(500).json({ success: false, error: "Failed to generate PDF report via Playwright" });
+          return;
+        }
+
+        res.setHeader("Content-Disposition", `attachment; filename="dossier_${id}.pdf"`);
+        res.setHeader("Content-Type", "application/pdf");
+        res.send(stdout);
+      });
     } else {
       const markdown = dossierStorage.exportDossierMarkdown(dossier);
       res.setHeader("Content-Disposition", `attachment; filename="dossier_${id}.md"`);
@@ -114,15 +176,24 @@ app.get("/api/dossiers/:id/export", async (req: Request, res: Response) => {
 });
 
 // Evaluate endpoint
-app.post("/api/evaluate", async (req: Request, res: Response) => {
+app.post("/api/evaluate", requireAuth, async (req: Request, res: Response) => {
+  const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
+
+  if (!title || !summary) {
+    res.status(400).json({ error: "Missing required fields: 'title' and 'summary'" });
+    return;
+  }
+
+  if (!tryAcquireEvaluationSlot()) {
+    res.status(429).json({
+      success: false,
+      error: "Server busy: maximum concurrent evaluations in progress. Please retry in a few moments.",
+      retryAfter: 5
+    });
+    return;
+  }
+
   try {
-    const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
-
-    if (!title || !summary) {
-      res.status(400).json({ error: "Missing required fields: 'title' and 'summary'" });
-      return;
-    }
-
     const ideaInput: IdeaInput = {
       title,
       summary,
@@ -130,15 +201,122 @@ app.post("/api/evaluate", async (req: Request, res: Response) => {
       monetization: monetization || "$49/month SaaS"
     };
 
+    // BYOK recon: per-request keys ride headers; server env is the fallback.
+    // MIT codebase — no paywall, callers pay their own provider directly.
+    const exaKey = typeof req.headers["x-exa-key"] === "string" ? req.headers["x-exa-key"] : undefined;
+    const tavilyKey = typeof req.headers["x-tavily-key"] === "string" ? req.headers["x-tavily-key"] : undefined;
     const dossier = await orchestrator.evaluateIdea(ideaInput, {
       pricingMonthlyUsd: pricingMonthlyUsd ? parseFloat(pricingMonthlyUsd) : undefined,
       estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined,
-      useLiveLLM: useLiveLLM !== false
+      useLiveLLM: useLiveLLM !== false,
+      exaKey,
+      tavilyKey
     });
 
-    res.json({ success: true, dossier, llmStatus: getLLMStatus() });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message || "Evaluation failed" });
+    res.json({ success: true, dossier, llmStatus: getLLMStatus(), costUsd: dossier.evaluationMode === "LIVE_LLM" ? 0.3 : 0.0 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Evaluation failed";
+    res.status(500).json({ success: false, error: message });
+  } finally {
+    releaseEvaluationSlot();
+  }
+});
+
+// Evaluate with Real-Time Server-Sent Events (SSE) Stream
+app.post("/api/evaluate/stream", requireAuth, async (req: Request, res: Response) => {
+  const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
+
+  if (!title || !summary) {
+    res.status(400).json({ error: "Missing required fields: 'title' and 'summary'" });
+    return;
+  }
+
+  if (!tryAcquireEvaluationSlot()) {
+    res.status(429).json({
+      error: "Server busy: maximum concurrent evaluations in progress. Please retry in a few moments.",
+      retryAfter: 5
+    });
+    return;
+  }
+
+  // Set SSE response headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  let isClientConnected = true;
+  res.on("close", () => {
+    isClientConnected = false;
+  });
+
+  const sendSSE = (event: string, data: any) => {
+    if (!isClientConnected) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    if (typeof (res as any).flush === "function") {
+      (res as any).flush();
+    }
+  };
+
+  const ideaInput: IdeaInput = {
+    title,
+    summary,
+    targetAudience: targetAudience || "General Founders / Businesses",
+    monetization: monetization || "$49/month SaaS"
+  };
+
+  try {
+    sendSSE("init", { service: "dossier-stream", timestamp: new Date().toISOString() });
+
+    const dossier = await orchestrator.evaluateIdea(ideaInput, {
+      pricingMonthlyUsd: pricingMonthlyUsd ? parseFloat(pricingMonthlyUsd) : undefined,
+      estimatedCacUsd: estimatedCacUsd ? parseFloat(estimatedCacUsd) : undefined,
+      useLiveLLM: useLiveLLM !== false,
+      exaKey: typeof req.headers["x-exa-key"] === "string" ? req.headers["x-exa-key"] : undefined,
+      tavilyKey: typeof req.headers["x-tavily-key"] === "string" ? req.headers["x-tavily-key"] : undefined,
+      onProgress: (stage, detail) => {
+        sendSSE("progress", { stage, detail, timestamp: new Date().toISOString() });
+      },
+      onEvent: (event) => {
+        sendSSE(event.type, event);
+      }
+    });
+
+    sendSSE("done", { success: true, dossierId: dossier.id });
+    res.end();
+  } catch (error: unknown) {
+    log.error({ err: error }, "evaluateIdea stream error");
+    sendSSE("error", { error: error instanceof Error ? error.message : "Evaluation stream failed" });
+    res.end();
+  } finally {
+    releaseEvaluationSlot();
+  }
+});
+
+// Calibration metrics: Brier / ECE / veto rate from the ledger.
+// Uncalibrated (n/a) until >= 20 resolved outcomes — never sigma-gated.
+app.get("/metrics", async (_req: Request, res: Response) => {
+  try {
+    const rows = dossierStorage.listLedger() as Array<{
+      dossier_id: string; score: number; archetype: string; outcome: string | null;
+    }>; 
+    const alerts = dossierStorage.listMonitorAlerts(undefined, 10);
+    const byArchetype = new Map<string, Array<{ score: number; outcome: string | null }>>();
+    for (const r of rows) {
+      const key = String(r.archetype || "general_startup");
+      if (!byArchetype.has(key)) byArchetype.set(key, []);
+      byArchetype.get(key)!.push({ score: Number(r.score ?? 0), outcome: r.outcome });
+    }
+    const archetypes: Record<string, ReturnType<typeof summarizeCalibration>> = {};
+    for (const [key, list] of byArchetype) {
+      archetypes[key] = summarizeCalibration(list);
+    }
+    const overall = summarizeCalibration(rows.map(r => ({ score: Number(r.score ?? 0), outcome: r.outcome })));
+    res.json({ success: true, overall, archetypes, recentAlerts: alerts, note: "Brier/ECE are n/a until >= 20 resolved outcomes per scope" });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "metrics failed";
+    res.status(500).json({ success: false, error: message });
   }
 });
 
@@ -227,6 +405,29 @@ app.post("/api/approval/:actionId", requireAuth, async (req: Request, res: Respo
   });
 });
 
+// Ledger outcome ingestion: resolves fatal assumptions for calibration.
+// Body: { outcome: "built" | "killed" | "pivoted", revenueUsd?, pilots? }
+app.post("/api/dossiers/:id/outcome", requireAuth, async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { outcome, revenueUsd, pilots } = req.body;
+  if (!["built", "killed", "pivoted"].includes(outcome)) {
+    res.status(400).json({ error: "outcome must be one of: built | killed | pivoted" });
+    return;
+  }
+  const dossier = await dossierStorage.getDossier(id);
+  if (!dossier) {
+    res.status(404).json({ success: false, error: `Dossier '${id}' not found` });
+    return;
+  }
+  const updated = dossierStorage.updateOutcome(
+    dossier.id,
+    outcome,
+    typeof revenueUsd === "number" ? revenueUsd : undefined,
+    typeof pilots === "number" ? pilots : undefined
+  );
+  res.json({ success: updated, dossierId: dossier.id, outcome });
+});
+
 // ======================= B1 — Calibration ledger endpoints =======================
 
 // List forecasts (optionally filter by resolution status and domain archetype).
@@ -267,7 +468,7 @@ app.get("/api/calibration", (req: Request, res: Response) => {
 });
 
 // Interactive Playground / Swarm Chat endpoint
-app.post("/api/chat", async (req: Request, res: Response) => {
+app.post("/api/chat", requireAuth, async (req: Request, res: Response) => {
   try {
     const { message, role = "all", ideaContext } = req.body;
 
@@ -490,10 +691,29 @@ function generateHeuristicChatReply(
   };
 }
 
+let server: any;
 if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => {
-    console.log(`⚡ Dossier Intelligence Server listening on http://localhost:${port}`);
+  server = app.listen(port, () => {
+    log.info(`Dossier Intelligence Server listening on http://localhost:${port}`);
   });
+
+  const shutdown = (signal: string) => {
+    log.info(`${signal} received: closing HTTP server gracefully...`);
+    if (server) {
+      server.close(() => {
+        log.info("HTTP server closed cleanly. Exiting process.");
+        process.exit(0);
+      });
+      // Force exit after 10s if hanging requests remain
+      setTimeout(() => {
+        log.warn("Forceful shutdown timeout reached. Terminating process.");
+        process.exit(1);
+      }, 10000).unref();
+    }
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 export default app;

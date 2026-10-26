@@ -1,6 +1,6 @@
 ---
 name: dossier
-description: Adversarial multi-agent idea intelligence and stress testing for startup concepts, product features, and technical proposals. Uses a 6-agent swarm, Stanford CS329A epistemic verification, isolated Python unit economics sandbox, and dual-key human approval checkpoints.
+description: Adversarial multi-agent idea intelligence and stress testing for startup concepts, product features, and technical proposals. Uses a 6-agent swarm, epistemic robustness verification, isolated Python unit economics sandbox, and dual-key human approval checkpoints.
 ---
 
 # Dossier: Adversarial Idea Intelligence Agent Skill
@@ -90,11 +90,11 @@ Runs the 5-invariant adversarial stress suite evaluating prompt injection defens
 Executes an isolated Python 3 subprocess in a sandboxed runtime to deterministically calculate LTV, CAC, and payback bounds.
 
 ### 4. `verify_claims_epistemics`
-Audits an array of claims against the 7 Stanford CS329A epistemic states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
+Audits an array of claims against the 7 epistemic states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
 
 ---
 
-## 7-Tier Epistemic Standard (Stanford CS329A)
+## 7-Tier Epistemic Standard
 
 Dossier enforces a strict epistemic taxonomy:
 1. `VERIFIED_FACT`: Backed by reputable, verified external primary records.

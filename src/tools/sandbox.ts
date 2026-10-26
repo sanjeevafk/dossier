@@ -28,10 +28,13 @@ export interface SandboxExecutionResult {
 
 export interface EconomicsSimulationOptions {
   churnStd?: number;
+  churnDecay?: number;
   cacStd?: number;
   grossMarginTarget?: number;
   iterations?: number;
   startingCashUsd?: number;
+  runwayMonths?: number;
+  seed?: number;
 }
 
 /**
@@ -64,13 +67,23 @@ export async function runEconomicsSimulation(
     pricing_monthly: cleanPricing,
     churn_mean: cleanChurn,
     churn_std: Math.max(0.002, typeof options.churnStd === "number" ? Math.min(0.35, Math.abs(options.churnStd)) : cleanChurn * 0.25),
+    churn_decay: typeof options.churnDecay === "number" ? Math.max(0.9, Math.min(1.0, options.churnDecay)) : 0.98,
     cac: cleanCac,
     cac_std: Math.max(1, typeof options.cacStd === "number" ? Math.abs(options.cacStd) : cleanCac * 0.30),
     users_m12: cleanUsers,
     tokens_per_req: cleanTokens,
     reqs_monthly: cleanReqs,
+    runway_months: typeof options.runwayMonths === "number" ? Math.max(1, Math.min(60, options.runwayMonths)) : 18,
     iterations: Math.max(1000, Math.min(50000, Math.round(options.iterations ?? 10000)))
   };
+  if (typeof options.seed === "number") {
+    inputPayload.seed = Math.round(Math.abs(options.seed));
+  } else {
+    let hash = 0;
+    const key = `${cleanPricing}|${cleanChurn}|${cleanCac}|${cleanUsers}`;
+    for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    inputPayload.seed = hash;
+  }
   if (typeof options.grossMarginTarget === "number") {
     inputPayload.gross_margin_target = Math.max(0.1, Math.min(0.98, options.grossMarginTarget));
   }
@@ -166,20 +179,21 @@ export async function runEconomicsSimulation(
       stderr: stderr.trim(),
       metrics
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Fallback calculation if python runtime execution fails
     const grossMargin = 0.80;
     const arpu = cleanPricing * grossMargin;
     const ltv = arpu > 0 ? Number((arpu / cleanChurn).toFixed(2)) : 0;
     const ltvCacRatio = cleanCac > 0 ? Number(Math.min(ltv / cleanCac, 99.9).toFixed(2)) : 99.9;
     const payback = arpu > 0 ? Number(Math.min(cleanCac / arpu, 999.0).toFixed(1)) : 999.0;
-    const numericExitCode = typeof error.code === "number" ? error.code : 1;
+    const execErr = error as { code?: unknown; stdout?: string; message?: string };
+    const numericExitCode = typeof execErr.code === "number" ? execErr.code : 1;
 
     return {
       runtime: "fallback-embedded-sandbox",
       exitCode: numericExitCode,
-      stdout: error.stdout || "",
-      stderr: error.message || "",
+      stdout: typeof execErr.stdout === "string" ? execErr.stdout : "",
+      stderr: execErr.message ?? "",
       metrics: {
         cacEstimateUsd: cleanCac,
         ltvEstimateUsd: ltv,
