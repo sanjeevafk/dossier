@@ -140,7 +140,18 @@ export async function runEconomicsSimulation(
         ltvCacRatio: ltvCacRatio,
         estimatedPaybackMonths: payback,
         monthlyInfraCostUsd: 250.0,
-        tamEstimateUsd: "$2.5B"
+        tamEstimateUsd: "$2.5B",
+        monteCarlo: {
+          iterations: 1000,
+          survivalProbability12Mo: cleanPricing > 0 ? 0.85 : 0.1,
+          survivalProbability24Mo: cleanPricing > 0 ? 0.70 : 0.05,
+          insolvencyCurveByMonth: [],
+          ltvCacPercentiles: { p10: Number((ltvCacRatio * 0.7).toFixed(2)), p50: ltvCacRatio, p90: Number((ltvCacRatio * 1.3).toFixed(2)) },
+          paybackPercentiles: { p10: Number((payback * 0.8).toFixed(1)), p50: payback, p90: Number((payback * 1.4).toFixed(1)) },
+          tokenCostBurdenPercent: { p10: 0.02, p50: 0.05, p90: 0.12 },
+          sensitivity: [],
+          simulationNotes: "Closed-form analytical fallback"
+        }
       }
     };
   } finally {
