@@ -42,14 +42,31 @@ app.use(express.static(path.join(process.cwd(), "public")));
 function requireAuth(req: Request, res: Response, next: () => void) {
   const secret = process.env.DOSSIER_API_KEY;
   if (!secret) {
-    if (process.env.NODE_ENV !== "production") return next();
-    return res.status(503).json({ error: "Server misconfigured: DOSSIER_API_KEY is not set" });
-  }
-  const authHeader = req.headers.authorization;
-  if (authHeader === `Bearer ${secret}`) {
+    if (process.env.REQUIRE_AUTH === "true") {
+      return res.status(503).json({ error: "Server misconfigured: DOSSIER_API_KEY is required but not set" });
+    }
     return next();
   }
-  return res.status(401).json({ error: "Unauthorized: valid Bearer token required" });
+  const authHeader = req.headers.authorization;
+  const apiKeyHeader = req.headers["x-api-key"];
+  if (authHeader === `Bearer ${secret}` || apiKeyHeader === secret) {
+    return next();
+  }
+  return res.status(401).json({ error: "Unauthorized: valid Bearer token or x-api-key required" });
+}
+
+// Bounded Concurrency Guard (protects single-vCPU/512MB instances from OOM starvation)
+let activeEvaluations = 0;
+const MAX_CONCURRENT_EVALS = parseInt(process.env.MAX_CONCURRENT_EVALS || "3", 10);
+
+function tryAcquireEvaluationSlot(): boolean {
+  if (activeEvaluations >= MAX_CONCURRENT_EVALS) return false;
+  activeEvaluations++;
+  return true;
+}
+
+function releaseEvaluationSlot(): void {
+  activeEvaluations = Math.max(0, activeEvaluations - 1);
 }
 
 const evaluateLimiter = rateLimit({
@@ -71,14 +88,20 @@ app.use("/api/chat", rateLimit({
 
 const orchestrator = new IdeaSwarmOrchestrator();
 
-// Health check with detailed telemetry
+// Health check with detailed telemetry & capacity stats
 app.get("/health", (req: Request, res: Response) => {
   const llmStatus = getLLMStatus();
   res.json({
     status: "ok",
     service: "dossier-trueforge",
     timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.round(process.uptime()),
+    memoryUsageMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
     llm: llmStatus,
+    concurrency: {
+      activeEvaluations,
+      maxConcurrent: MAX_CONCURRENT_EVALS
+    },
     sandbox: { provider: process.env.SANDBOX_PROVIDER || "local", runtime: "python3-subprocess" }
   });
 });
@@ -137,14 +160,23 @@ app.get("/api/dossiers/:id/export", async (req: Request, res: Response) => {
 
 // Evaluate endpoint
 app.post("/api/evaluate", requireAuth, async (req: Request, res: Response) => {
+  const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
+
+  if (!title || !summary) {
+    res.status(400).json({ error: "Missing required fields: 'title' and 'summary'" });
+    return;
+  }
+
+  if (!tryAcquireEvaluationSlot()) {
+    res.status(429).json({
+      success: false,
+      error: "Server busy: maximum concurrent evaluations in progress. Please retry in a few moments.",
+      retryAfter: 5
+    });
+    return;
+  }
+
   try {
-    const { title, summary, targetAudience, monetization, pricingMonthlyUsd, estimatedCacUsd, useLiveLLM } = req.body;
-
-    if (!title || !summary) {
-      res.status(400).json({ error: "Missing required fields: 'title' and 'summary'" });
-      return;
-    }
-
     const ideaInput: IdeaInput = {
       title,
       summary,
@@ -168,6 +200,8 @@ app.post("/api/evaluate", requireAuth, async (req: Request, res: Response) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Evaluation failed";
     res.status(500).json({ success: false, error: message });
+  } finally {
+    releaseEvaluationSlot();
   }
 });
 
@@ -177,6 +211,14 @@ app.post("/api/evaluate/stream", requireAuth, async (req: Request, res: Response
 
   if (!title || !summary) {
     res.status(400).json({ error: "Missing required fields: 'title' and 'summary'" });
+    return;
+  }
+
+  if (!tryAcquireEvaluationSlot()) {
+    res.status(429).json({
+      error: "Server busy: maximum concurrent evaluations in progress. Please retry in a few moments.",
+      retryAfter: 5
+    });
     return;
   }
 
@@ -230,6 +272,8 @@ app.post("/api/evaluate/stream", requireAuth, async (req: Request, res: Response
     log.error({ err: error }, "evaluateIdea stream error");
     sendSSE("error", { error: error instanceof Error ? error.message : "Evaluation stream failed" });
     res.end();
+  } finally {
+    releaseEvaluationSlot();
   }
 });
 
@@ -438,10 +482,29 @@ function generateHeuristicChatReply(
   };
 }
 
+let server: any;
 if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => {
+  server = app.listen(port, () => {
     log.info(`Dossier Intelligence Server listening on http://localhost:${port}`);
   });
+
+  const shutdown = (signal: string) => {
+    log.info(`${signal} received: closing HTTP server gracefully...`);
+    if (server) {
+      server.close(() => {
+        log.info("HTTP server closed cleanly. Exiting process.");
+        process.exit(0);
+      });
+      // Force exit after 10s if hanging requests remain
+      setTimeout(() => {
+        log.warn("Forceful shutdown timeout reached. Terminating process.");
+        process.exit(1);
+      }, 10000).unref();
+    }
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 export default app;
