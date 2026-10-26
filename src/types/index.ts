@@ -108,6 +108,8 @@ export interface EvidenceItem {
   indicator: "SUPPORTING" | "CONTRADICTING" | "NEUTRAL";
   confidencePercent: number; // 0 to 100
   falsificationCriteria?: string;
+  fatal?: boolean; // true when this assumption blocks BUILD until tested via ledger outcome
+  tested?: boolean; // true once a ledger outcome or LOI evidence resolves it
 }
 
 export interface ScoreFactor {
@@ -256,7 +258,7 @@ export interface VerificationAuditItem {
 }
 
 export interface VerificationAudit {
-  verifierProtocol: "STANFORD_CS329A_ROBUST_VERIFIER";
+  verifierProtocol: "EPISTEMIC_ROBUST_VERIFIER" | "STANFORD_CS329A_ROBUST_VERIFIER";
   totalClaimsAudited: number;
   hallucinationsBlocked: number;
   testTimeSelfCorrections: number;
@@ -318,6 +320,14 @@ export interface IdeaDossier {
   timestamp: string;
   /** Which engine produced this dossier: live LLM swarm or the deterministic heuristic engine. */
   evaluationMode?: "LIVE_LLM" | "HEURISTIC_ENGINE";
+  /** P(build-worthy) — killScore mapped to a probability for calibration tracking. */
+  pSuccess?: number;
+  /** Archetype reference-class base rate shown alongside the score. */
+  baseRate?: number;
+  /** True once a ledger outcome resolves every fatal assumption (gates BUILD). */
+  fatalsResolved?: boolean;
+  /** Estimated marginal run cost in USD (recon queries + LLM tokens). */
+  costUsd?: number;
   /** Actually-retrieved external sources backing this dossier (empty when no recon provider ran). */
   externalEvidenceSources?: ExternalEvidenceSource[];
   /** Competitors discovered through Market Analyst live web recon. */

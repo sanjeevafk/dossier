@@ -12,6 +12,12 @@ export interface MutationContext {
   cac: number;
   survival24Mo?: number;
   ltvCacRatio?: number;
+  graveyardPrecedent?: {
+    companyName: string;
+    burnedCapitalUsd: string;
+    fatalFlaw: string;
+    takeaway: string;
+  };
 }
 
 function titleCase(words: string[]): string {
@@ -41,11 +47,15 @@ export function buildMutationProposals(
     ? `P50 LTV/CAC ${context.ltvCacRatio.toFixed(2)}x${context.survival24Mo !== undefined ? `, 24-mo survival ${(context.survival24Mo * 100).toFixed(0)}%` : ""}`
     : "collapsed unit economics";
 
+  const graveNote = context.graveyardPrecedent
+    ? `[Graveyard Avoidance (${context.graveyardPrecedent.companyName} burned ${context.graveyardPrecedent.burnedCapitalUsd})]: ${context.graveyardPrecedent.takeaway} `
+    : "";
+
   const wedge: MutationProposal = {
     id: "MUT-01",
     strategy: "WEDGE_PIVOT",
     label: "The Wedge Pivot",
-    rationale: `Kill the broad go-to-market that produced ${failureCurve}. ${context.fatalFlaw} Narrow the audience by ~80% to one vertical with dense budget and zero committee friction, where a 6-8 seat pilot closes in days, then expand horizontally with proven proof.`,
+    rationale: `${graveNote}Kill the broad go-to-market that produced ${failureCurve}. ${context.fatalFlaw} Narrow the audience by ~80% to one vertical with dense budget and zero committee friction, where a 6-8 seat pilot closes in days, then expand horizontally with proven proof.`,
     mutatedIdea: {
       title: `${baseTitle} Wedge — ${titleCase(idea.targetAudience.split(/[,&]/)[0].split(" "))} edition`,
       summary: `Focused single-vertical master of ONE workflow from "${idea.summary.slice(0, 80)}..." for ${wedgeAudience}. The wedge deliberately avoids the failure mode that collapsed the original: ${context.fatalFlaw} Deepens on-boarding to under 2 minutes and prices against the incumbent spreadsheet cost, generating reference-able proof before any expansion.`,

@@ -60,6 +60,7 @@ local
 *.sqlite
 *.sqlite3
 /data/
+!src/data/
 storage/
 logs/
 *.log

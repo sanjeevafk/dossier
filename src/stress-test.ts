@@ -1,7 +1,7 @@
 import pc from "picocolors";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { runEconomicsSimulation } from "./tools/sandbox.js";
-import { StanfordRobustVerifier } from "./core/verifier.js";
+import { EpistemicRobustVerifier } from "./core/verifier.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -200,7 +200,7 @@ export async function runStressTestSuite() {
 
 Dossier was subjected to a battery of **5 high-severity adversarial stress tests** designed to probe for prompt injections, impossible technical claims, malicious sandbox payloads, economic parameter fuzzing, and heavy concurrency burst load.
 
-All **5 invariants held with 100% pass rate**, proving the robustness of the **Dual-Key Human Approval Gate**, **Stanford CS329A Robust Verifier**, and **Isolated Python Subprocess Sandbox**.
+All **5 invariants held with 100% pass rate**, proving the robustness of the **Dual-Key Human Approval Gate**, **Epistemic Robust Verifier**, and **Isolated Python Subprocess Sandbox**.
 
 ---
 

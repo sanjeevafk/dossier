@@ -67,7 +67,7 @@ test("Recon with Exa key parses real search results via injected fetch", async (
   };
 
   try {
-    const outcome = await performLiveWebRecon(["my idea competitors pricing"]);
+    const outcome = await performLiveWebRecon([`my idea competitors pricing test ${Date.now()}`]);
     assert.equal(outcome.provider, "exa");
     assert.equal(outcome.results.length, 2);
     assert.equal(outcome.results[0].url, "https://example.com/a");
@@ -177,7 +177,6 @@ test("Community sentiment degrades to explicit 'none' when every backend fails",
     globalThis.fetch = savedFetch;
   }
 });
-
 test("Role-scoped context engineering routes grounded competitor intelligence to Red Team and complaints to Customer", async () => {
   const { buildRoleEvidenceSlices } = await import("../dist/tools/analyst-tools.js");
 
