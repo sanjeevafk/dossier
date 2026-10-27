@@ -4,6 +4,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
 import path from "node:path";
+import fs from "node:fs";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { classifyIdeaDomain } from "./core/classifier.js";
 import { generateAgentTurn, streamAgentTurn, getLLMStatus } from "./services/llm.js";
@@ -93,7 +94,15 @@ app.use("/api/chat", rateLimit({
 const orchestrator = new IdeaSwarmOrchestrator();
 
 // Health check with detailed telemetry & capacity stats
-const GIT_REVISION = process.env.DEPLOYED_REVISION || process.env.GIT_COMMIT || "896dc05";
+function getRevision(): string {
+  if (process.env.DEPLOYED_REVISION) return process.env.DEPLOYED_REVISION;
+  if (process.env.GIT_COMMIT) return process.env.GIT_COMMIT;
+  try {
+    const versionPath = path.resolve(import.meta.dirname, ".version");
+    if (fs.existsSync(versionPath)) return fs.readFileSync(versionPath, "utf-8").trim();
+  } catch {}
+  return "main";
+}
 
 app.get("/health", (req: Request, res: Response) => {
   const llmStatus = getLLMStatus();
@@ -101,7 +110,7 @@ app.get("/health", (req: Request, res: Response) => {
     status: "ok",
     service: "dossier-intelligence",
     version: "0.1.0",
-    revision: GIT_REVISION,
+    revision: getRevision(),
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
     memoryUsageMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),

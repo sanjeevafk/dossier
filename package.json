@@ -13,7 +13,7 @@
   },
   "scripts": {
     "compile": "tsc",
-    "build": "tsc && cp src/tools/decision_model.py dist/tools/ && mkdir -p dist/scripts && cp scripts/simulate_monte_carlo.py scripts/simulate_sobol.py scripts/export_pdf.py dist/scripts/ || node -e 'if (!require(\"fs\").existsSync(\"dist/server.js\")) process.exit(1); console.log(\"Using pre-built dist\")'",
+    "build": "tsc && (git rev-parse --short HEAD > dist/.version 2>/dev/null || true) && cp src/tools/decision_model.py dist/tools/ && mkdir -p dist/scripts && cp scripts/simulate_monte_carlo.py scripts/simulate_sobol.py scripts/export_pdf.py dist/scripts/ || node -e 'if (!require(\"fs\").existsSync(\"dist/server.js\")) process.exit(1); console.log(\"Using pre-built dist\")'",
     "start": "node dist/server.js",
     "dev": "tsx src/server.ts",
     "start:prod": "node dist/server.js",
