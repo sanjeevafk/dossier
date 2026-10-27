@@ -8,6 +8,7 @@ scripts/temp_video/
 dossier_demo.mp4
 
 # Python
+.python_deps
 __pycache__/
 *.py[cod]
 *$py.class
@@ -76,3 +77,4 @@ BLOG_POST_LOCAL.md
 node_modules
 reports/forecast_ledger.jsonl
 package-lock.json
+video/

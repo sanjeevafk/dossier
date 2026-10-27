@@ -1,10 +1,10 @@
 import { performLiveWebRecon, ReconSourceResult } from "./recon.js";
 import { queryCommunitySentiment, CommunityDiscussion } from "./community.js";
 import { rerank } from "./rerank.js";
-import { MarketCompetitor } from "../types/index.js";
+import type { MarketCompetitor } from "../types/index.js";
 import nlp from "compromise";
 
-export { MarketCompetitor };
+export type { MarketCompetitor };
 
 export interface ResearchFindings {
   query: string;

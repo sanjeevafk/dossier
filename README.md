@@ -1,24 +1,14 @@
 # Dossier
 
-[![Live Service](https://img.shields.io/badge/Production-dossier.sanjeevkumar.me-0078D4?logo=cloudflare&logoColor=white)](https://dossier.sanjeevkumar.me)
-[![Health Check](https://img.shields.io/badge/Health-200%20OK-brightgreen)](https://dossier.sanjeevkumar.me/health)
-[![UptimeRobot](https://img.shields.io/badge/UptimeRobot-Monitored-blue)](https://dossier.sanjeevkumar.me/health)
+Live Deployment: https://dossier.sanjeevkumar.me
 
-Adversarial multi-agent platform that stress-tests startup ideas, product features, and technical proposals before capital or engineering effort is spent.
+Dossier is an adversarial multi-agent evaluation platform that stress-tests startup concepts, product features, and technical proposals before engineering effort or capital is committed.
 
----
-
-## 🚀 Live Deployment
-- **Web Dashboard:** [https://dossier.sanjeevkumar.me](https://dossier.sanjeevkumar.me) (Backup: [https://dossier-ai.azurewebsites.net](https://dossier-ai.azurewebsites.net))
-- **Health Check:** [https://dossier.sanjeevkumar.me/health](https://dossier.sanjeevkumar.me/health)
-- **Hosting Tier:** Azure App Service (`B1` Basic, Central India) with Cloudflare Edge SSL
-- **Keep-Alive:** Continuous 300s synthetic health polling via UptimeRobot
+Instead of surface-level encouragement, Dossier deploys specialized adversarial agents to challenge assumptions, run quantitative unit economics simulations in an isolated Python sandbox, verify factual claims against empirical sources, and generate concrete validation roadmaps guarded by human approval checkpoints.
 
 ---
 
-## Overview
-
-Dossier stress-tests startup concepts, product features, and technical proposals before capital or engineering effort is spent. Instead of offering generic feedback, the platform deploys specialized adversarial subagents to challenge core assumptions, run quantitative unit economics simulations in an isolated sandbox, and propose validation steps guarded by human approval checkpoints.
+## Overview & Architecture
 
 ```
                            +----------------------+
@@ -26,117 +16,128 @@ Dossier stress-tests startup concepts, product features, and technical proposals
                            +----------+-----------+
                                       |
                                       v
-                      +-------------------------------+
-                      | Agent Harness Runtime       |
-                      +---------------+---------------+
-                                      |
-          +---------------------------+---------------------------+
-          |               |                       |               |
-          v               v                       v               v
-   +--------------+ +--------------+       +--------------+ +--------------+
-   |   Analyst    | |   Investor   |  ...  |  Architect   | |   RedTeam    |
-   +------+-------+ +------+-------+       +------+-------+ +------+-------+
-          \               /                       \               /
-           \             /                         \             /
-            v           v                           v           v
-       +--------------------+                   +--------------------+
-       | Cross-Examination  |                   | Isolated Sandbox   |
-       | Adversarial Debate |                   | Python Sim (CAC/LTV|
-       +----------+---------+                   +---------+----------+
-                  |                                       |
-                  +-------------------+-------------------+
-                                      |
-                                      v
-                      +-------------------------------+
-                      | Human Approval Gate (Safety)  |
-                      |   [Approve / Reject Action]   |
-                      +---------------+---------------+
-                                      |
-                                      v
-                      +-------------------------------+
-                      |  Final Idea Resilience Dossier|
-                      +-------------------------------+
+                       +-------------------------------+
+                       |     Agent Harness Runtime     |
+                       +---------------+---------------+
+                                       |
+           +---------------------------+---------------------------+
+           |               |                       |               |
+           v               v                       v               v
+    +--------------+ +--------------+       +--------------+ +--------------+
+    |   Analyst    | |   Customer   |  ...  |  Architect   | |   Red Team   |
+    +------+-------+ +------+-------+       +------+-------+ +------+-------+
+           \               /                       \               /
+            \             /                         \             /
+             v           v                           v           v
+        +--------------------+                   +--------------------+
+        | Cross-Examination  |                   | Isolated Sandbox   |
+        | Adversarial Debate |                   | Python Sim (CAC/LTV|
+        +----------+---------+                   +---------+----------+
+                   |                                       |
+                   +-------------------+-------------------+
+                                       |
+                                       v
+                       +-------------------------------+
+                       | Human Approval Gate (Safety)  |
+                       |   [Approve / Reject Action]   |
+                       +---------------+---------------+
+                                       |
+                                       v
+                       +-------------------------------+
+                       | Final Idea Resilience Dossier |
+                       | (Score 0-100, Verdict, Plan)  |
+                       +-------------------------------+
 ```
 
 ---
 
-## Swarm Perspectives (code: `src/config/prompts.ts:SWARM_ROLES`, `src/types/index.ts:SwarmRole`)
+## Swarm Perspectives
 
-- **Analyst (01):** Competition mapping, market size, whitespace, search signals.
-- **Customer Advocate (02):** User pain, adoption friction, switching costs, habit inertia.
-- **Technical Architect (03):** Engineering feasibility, compute/token unit economics, sandbox safety.
-- **Investor (04):** Business model viability, defensibility, pricing power, venture margins.
-- **Red Team (05, Chief Adversary):** Fatal flaws, churn traps, regulatory risks, distribution death traps. `STRONG_KILL` vetoes BUILD.
-- **Domain Expert (06):** Industry-specific compliance, standards, operational benchmarks.
-- **Synthesizer (00):** Resolves contradictions, computes the Resilience Score (0–100), formulates the 7-day validation plan.
-
----
-
-## Architecture & Safety Guarantees
-
-- **Harness Runtime:** Provides session persistence and subagent delegation.
-- **Tool Protocol:** Leverages Model Context Protocol (MCP) for market intelligence and competitor discovery.
-- **Sandboxed Execution:** Executes financial modeling and compute cost calculations inside an isolated Python subprocess.
-- **Human Approval Checkpoints:** Pauses turn execution before external outreach (cold validation emails, landing page deployment) until approved by an operator.
+- **Synthesizer (00):** Resolves contradictions across perspectives, computes the Resilience Score (0–100), and structures the 7-day validation plan.
+- **Analyst (01):** Competitor landscape mapping, addressable market sizing, search intent signals, and whitespace identification.
+- **Customer Advocate (02):** User friction, switching costs, habit inertia, and willingness-to-pay realities.
+- **Technical Architect (03):** Feasibility, compute/token operational economics, infrastructure bottlenecks, and sandbox safety.
+- **Investor (04):** Business model viability, gross margins, defensibility, and capital efficiency.
+- **Red Team (05, Chief Adversary):** Identifies fatal flaws, churn traps, regulatory exposure, and distribution failure points. Holds veto authority (`STRONG_KILL`) over affirmative verdicts.
+- **Domain Expert (06):** Sector-specific compliance, standards, and operational benchmarks.
 
 ---
 
-## 🔍 Intelligence Sources & Capabilities
+## Core Capabilities
 
-Dossier grounds every evaluation in empirical data and live market telemetry across three distinct layers:
-
-| Layer | Source / Provider | Scope & Role | Setup Required |
-|:---|:---|:---|:---|
-| **Community Sentiment** | **Hacker News (Algolia API)** | Real developer discussions, Show HN launches, negative sentiment threads | Zero-config (Open API) |
-| **Neural Web Recon** | **Exa AI (`api.exa.ai`)** | Real-time web search, competitor analysis, indexed Twitter/X tech updates | `EXA_API_KEY` in `.env` |
-| **Prediction Odds** | **Polymarket (Gamma API)** | Live real-money betting odds and macro sentiment trends | Zero-config (Public API) |
-| **Web Fallback** | **DuckDuckGo HTML Recon** | Free-form competitor search and live URL discovery | Zero-config |
-| **Social Updates** | **Twitter / X Bridge** | Curated tech handle timelines (`@sama`, `@ycombinator`, etc.) and feeds | Local `twitter` CLI or X API Bearer Token |
-| **Outside View Priors** | **Census BFS, PitchBook, Stanford AI Index, HBS, CB Insights** | 16 empirical reference classes with 24-month survival ranges and root failure causes | Built-in (Deterministic data table) |
-| **Unit Economics** | **NumPy Vectorized Sandbox** | 10,000-run Monte Carlo simulation for cash runway, LTV/CAC, and payback percentiles | Python 3 + `numpy` (built-in) |
+- **Sandboxed Unit Economics:** Runs isolated Python subprocesses with vectorized NumPy Monte Carlo simulations (10,000 iterations) to model cash runway, LTV/CAC ratios, and payback percentiles under parameter uncertainty.
+- **Epistemic Verification (Stanford CS329A):** Classifies assertions into 7 discrete evidence states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`) to separate empirical evidence from assumptions.
+- **Real-World Intelligence Sources:**
+  - *Hacker News (Algolia API):* Developer discussions, Show HN launches, and negative sentiment threads.
+  - *Exa AI:* Web search, competitor discovery, and indexed technical updates.
+  - *Polymarket (Gamma API):* Public prediction market probabilities and macro sentiment trends.
+  - *Historical Reference Classes:* 16 empirical distributions (Census BFS, PitchBook, Stanford AI Index, CB Insights) for baseline survival and failure distributions.
+- **Human Approval Gates:** Actions with real-world impact (such as outbound email dispatch or landing page deployment) require explicit operator sign-off before execution.
+- **Zero-Fabrication Contract:** If an external intelligence source is unavailable or unconfigured, Dossier reports zero results and marks the provider as unconfigured rather than generating synthetic citations.
 
 ---
 
-## ⚠️ Limitations & Honesty Contract
-
-Dossier enforces a strict zero-hallucination contract across all subagents:
-
-1. **Zero-Fabrication Fallback**:
-   - If an external intelligence source (Exa, Polymarket, Twitter) is unconfigured, unreachable, or rate-limited, Dossier **never fabricates plausible-sounding discussions or URLs**.
-   - It explicitly returns `discussions: []`, marks `provider: "none"`, and surfaces the absence to the reviewer rather than inventing synthetic citations.
-2. **Twitter/X Platform Constraints**:
-   - Cookie-based Twitter scraping is fragile due to frequent upstream GraphQL endpoint rotations.
-   - For real-time Twitter/X sentiment, Dossier relies on **Exa neural search** (which indexes X posts cleanly over HTTP without cookie overhead). Self-hosters can optionally connect official X API access via `TWITTER_BEARER_TOKEN`.
-3. **Prediction Market Specificity**:
-   - Polymarket odds only exist for broad macro or public-market events. Specific niche B2B tools or early-stage ideas will have zero liquid prediction markets; Dossier explicitly reports zero markets rather than forcing loose fuzzy matches.
-4. **Reference-Class Guidance**:
-   - Outside-view base rates (e.g. 21% 24-month survival for B2B Enterprise SaaS) represent industry-wide historical distributions, not individual company verdicts. They counteract subjective founder optimism, but do not replace user interviews.
-5. **Human Approval Gates**:
-   - Dossier will never auto-dispatch external outreach, landing pages, or cold emails without explicit operator sign-off via its Dual-Key Approval Gates.
-
----
-
-## Getting Started
+## Self-Hosting & Quickstart
 
 ### Prerequisites
-- Node.js `>= 22.0.0`
-- Python `3.x` (for sandbox simulations)
-- pnpm or npm
+- Node.js >= 22.0.0
+- Python 3.10+ (with `numpy` for sandbox simulations)
+- pnpm (recommended) or npm
+- (Optional) Docker
 
-### Installation
+### 1. One-Command Setup (Makefile)
+
+The Makefile handles dependency checks, environment setup, build steps, and startup:
+
 ```bash
 git clone https://github.com/sanjeevafk/dossier.git
 cd dossier
-pnpm install
+make
 ```
 
-### Run the Web Dashboard
+The default `make` (or `make run`) target checks `.env`, installs Node and Python dependencies, builds the TypeScript project, and starts the server on `http://localhost:3000`.
+
+To start in development mode with auto-reload:
 ```bash
+make dev
+```
+
+Additional targets:
+- `make test`: Run unit tests and decision model test suite (92 tests).
+- `make benchmark`: Run the 10-concept domain resilience benchmark.
+- `make clean`: Remove build artifacts and temporary cache files.
+
+### 2. Manual Setup
+
+```bash
+git clone https://github.com/sanjeevafk/dossier.git
+cd dossier
+
+# Install dependencies
+pnpm install
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+
+# Build and start
+pnpm run build
 pnpm start
 ```
-Open [http://localhost:3000](http://localhost:3000) (or access the live production instance at [https://dossier-ai.azurewebsites.net](https://dossier-ai.azurewebsites.net)) in your browser.
 
-### Run via CLI
+Open `http://localhost:3000` in your browser.
+
+### 3. Docker Setup
+
+```bash
+docker build -t dossier .
+docker run -p 3000:3000 --env-file .env dossier
+```
+
+### 4. CLI Evaluation
+
+Evaluate an idea directly from the terminal:
+
 ```bash
 pnpm cli evaluate \
   --title "Autonomous Micro-SaaS Agent" \
@@ -147,22 +148,32 @@ pnpm cli evaluate \
   --cac 200
 ```
 
-### Run Tests & Adversarial Stress Suite
-```bash
-pnpm test          # Node.js standard test suite
-pnpm run test:stress # 5-invariant adversarial harness exploit suite
-pnpm run benchmark   # 10-concept domain resilience benchmark
-```
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` to configure optional and required settings:
+
+| Variable | Description | Default |
+|:---|:---|:---|
+| `OPENAI_API_KEY` | OpenAI API key for LLM evaluations | Optional |
+| `ANTHROPIC_API_KEY` | Anthropic API key | Optional |
+| `GEMINI_API_KEY` | Google Gemini API key | Optional |
+| `DOSSIER_LLM_BACKEND` | LLM runtime selection: `api` (direct keys) or `agy` (CLI harness) | `auto` |
+| `EXA_API_KEY` | Exa AI neural search key for competitor reconnaissance | Optional |
+| `DOSSIER_API_KEY` | Authentication key required for production non-GET endpoints | Optional |
+| `PORT` | HTTP server port | `3000` |
+| `DOSSIER_DATA_DIR` | SQLite database and generated PDF export storage directory | `./data` |
 
 ---
 
 ## Model Context Protocol (MCP) & Agent Skill
 
-Dossier is packaged as both a **standalone MCP server** and an **Agent Skill** (`skills/dossier/SKILL.md`) that any agent framework can plug into.
+Dossier can be operated as a standalone MCP server or installed as an agent skill.
 
 ### 1. Connecting via MCP (`dossier.mcp.json`)
 
-Add Dossier to your Claude Desktop config (`claude_desktop_config.json`) or harness MCP settings:
+Add Dossier to your Claude Desktop or agent harness configuration:
 
 ```json
 {
@@ -171,30 +182,39 @@ Add Dossier to your Claude Desktop config (`claude_desktop_config.json`) or harn
       "command": "node",
       "args": ["/path/to/dossier/dist/mcp-server.js"],
       "env": {
-        "ORCAROUTER_API_KEY": "your_api_key_here",
-        "MODEL_NAME": "openai/gpt-4o-mini"
+        "OPENAI_API_KEY": "your_api_key_here"
       }
     }
   }
 }
 ```
 
-#### Exposed MCP Tools:
-- **`evaluate_idea`**: Deploys the 6-agent domain swarm, runs epistemic robustness verification, isolated Python unit economics simulation, and compiles full intelligence dossiers.
-- **`stress_test_concept`**: Evaluates prompt injection defense, impossible physics detection, and sandbox isolation.
-- **`run_sandbox_economics`**: Executes isolated Python 3 subprocesses to deterministically compute LTV, CAC, and payback bounds.
-- **`verify_claims_epistemics`**: Classifies claims into the 7 epistemic states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
+Exposed MCP Tools:
+- `evaluate_idea`: Deploys the 6-agent swarm, epistemic verification, Python unit economics, and returns a structured dossier.
+- `stress_test_concept`: Evaluates prompt injection defense and sandbox constraints.
+- `run_sandbox_economics`: Executes isolated Python subprocess simulations for LTV, CAC, and payback bounds.
+- `verify_claims_epistemics`: Classifies claims across the 7 epistemic tiers.
 
 ### 2. Installing the Agent Skill
 
-To install Dossier as a native skill in your agent environment:
+To install Dossier into an agent environment:
+
 ```bash
 cp -r skills/dossier ~/.agents/skills/
 ```
 
 ---
 
+## Testing
+
+```bash
+make test            # Full unit and decision model test suite (92 tests)
+pnpm run test:stress # 5-invariant adversarial harness exploit suite
+pnpm run benchmark   # 10-concept domain resilience benchmark
+```
+
+---
+
 ## License
 
-MIT
-
+Licensed under the Apache License, Version 2.0 (the "License"). 
