@@ -93,11 +93,15 @@ app.use("/api/chat", rateLimit({
 const orchestrator = new IdeaSwarmOrchestrator();
 
 // Health check with detailed telemetry & capacity stats
+const GIT_REVISION = process.env.DEPLOYED_REVISION || process.env.GIT_COMMIT || "896dc05";
+
 app.get("/health", (req: Request, res: Response) => {
   const llmStatus = getLLMStatus();
   res.json({
     status: "ok",
     service: "dossier-intelligence",
+    version: "0.1.0",
+    revision: GIT_REVISION,
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
     memoryUsageMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
