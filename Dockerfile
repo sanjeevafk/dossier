@@ -30,6 +30,7 @@ RUN npx tsc
 # Expose port
 ENV PORT=3000
 ENV NODE_ENV=production
+ENV NODE_OPTIONS="--max-old-space-size=256"
 EXPOSE 3000
 
 # Health check

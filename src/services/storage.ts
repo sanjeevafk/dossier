@@ -39,8 +39,19 @@ type SqliteDb = {
 
 export class DossierStorageService {
   private static instance: DossierStorageService;
+  private static readonly MAX_CACHE_SIZE = 25;
   private memoryCache: Map<string, IdeaDossier> = new Map();
   private db: SqliteDb | null = null;
+
+  private setCache(id: string, dossier: IdeaDossier): void {
+    if (this.memoryCache.has(id)) {
+      this.memoryCache.delete(id);
+    } else if (this.memoryCache.size >= DossierStorageService.MAX_CACHE_SIZE) {
+      const oldestKey = this.memoryCache.keys().next().value;
+      if (oldestKey) this.memoryCache.delete(oldestKey);
+    }
+    this.memoryCache.set(id, dossier);
+  }
 
   private constructor() {}
 
@@ -208,7 +219,7 @@ export class DossierStorageService {
    */
   public async saveDossier(dossier: IdeaDossier): Promise<void> {
     await this.ensureStorageDir();
-    this.memoryCache.set(dossier.id, dossier);
+    this.setCache(dossier.id, dossier);
 
     try {
       this.getDb()
@@ -248,7 +259,11 @@ export class DossierStorageService {
    */
   public async getDossier(id: string): Promise<IdeaDossier | null> {
     if (this.memoryCache.has(id)) {
-      return this.memoryCache.get(id)!;
+      const cached = this.memoryCache.get(id)!;
+      // Refresh MRU position
+      this.memoryCache.delete(id);
+      this.memoryCache.set(id, cached);
+      return cached;
     }
 
     try {
@@ -257,7 +272,7 @@ export class DossierStorageService {
         .get(id, id) as { dossier_json: string } | undefined;
       if (row?.dossier_json) {
         const dossier: IdeaDossier = JSON.parse(row.dossier_json);
-        this.memoryCache.set(dossier.id, dossier);
+        this.setCache(dossier.id, dossier);
         return dossier;
       }
     } catch {
@@ -271,7 +286,7 @@ export class DossierStorageService {
     try {
       const data = await fs.readFile(filePath, "utf-8");
       const dossier: IdeaDossier = JSON.parse(data);
-      this.memoryCache.set(id, dossier);
+      this.setCache(id, dossier);
       return dossier;
     } catch {
       // Also search through all json files in reports/
@@ -283,7 +298,7 @@ export class DossierStorageService {
           const parsed = JSON.parse(content);
           const target = parsed.dossier || parsed;
           if (target.id === id || target.dossierCode === id) {
-            this.memoryCache.set(id, target);
+            this.setCache(id, target);
             return target;
           }
         } catch {}
@@ -365,7 +380,7 @@ export class DossierStorageService {
 
           if (d && d.id && !seenIds.has(d.id)) {
             seenIds.add(d.id);
-            this.memoryCache.set(d.id, d);
+            this.setCache(d.id, d);
             summaries.push({
               id: d.id,
               dossierCode: d.dossierCode || "TF-001",

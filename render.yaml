@@ -19,6 +19,10 @@ services:
         value: 3000
       - key: NODE_ENV
         value: production
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=256"
+      - key: HF_OFFLINE
+        value: "1"
       - key: DOSSIER_DATA_DIR
         value: /app/data
       - key: ORCAROUTER_API_KEY
