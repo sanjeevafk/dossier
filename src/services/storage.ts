@@ -3,6 +3,7 @@ import fsSync from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { IdeaDossier, ApprovalAction } from "../types/index.js";
+import { seedDossiers } from "../data/seedDossiers.js";
 
 const require = createRequire(import.meta.url);
 
@@ -107,7 +108,37 @@ export class DossierStorageService {
       );
     `);
     this.db = db;
+    this.seedDefaultDossiersIfEmpty(db);
     return db;
+  }
+
+  private seedDefaultDossiersIfEmpty(db: SqliteDb): void {
+    if (process.env.NODE_ENV === "test") return;
+    try {
+      const row = db.prepare("SELECT count(*) as count FROM dossiers").get() as { count?: number } | undefined;
+      if (!row || Number(row.count) === 0) {
+        const insert = db.prepare(
+          "INSERT OR IGNORE INTO dossiers (id, code, title, archetype, verdict, score, risk, mode, created_at, dossier_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        );
+        for (const d of seedDossiers) {
+          insert.run(
+            d.id,
+            d.dossierCode,
+            d.idea?.title ?? "Untitled Concept",
+            d.domainClassification?.archetype ?? "general_startup",
+            d.overallVerdict,
+            d.killScore,
+            d.riskLevel,
+            (d as { evaluationMode?: string }).evaluationMode ?? "HEURISTIC_ENGINE",
+            d.timestamp,
+            JSON.stringify(d)
+          );
+          this.recordLedger(d);
+        }
+      }
+    } catch {
+      // Non-blocking best-effort seed
+    }
   }
 
   public getReconCache(queryKey: string): { provider: string; response: unknown } | null {
