@@ -20,7 +20,9 @@ function offline(): boolean {
   return (
     process.env.HF_OFFLINE === "1" ||
     process.env.NODE_ENV === "test" ||
-    process.env.LOW_MEMORY_MODE === "1"
+    process.env.LOW_MEMORY_MODE === "1" ||
+    process.env.RENDER === "true" ||
+    Boolean(process.env.RENDER)
   );
 }
 
