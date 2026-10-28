@@ -66,7 +66,35 @@ function resolveProviders(): LLMProviderConfig[] {
   const forceApi = backend === "api" || backend === "llm";
 
   if (!forceCli) {
-    // 1. Google Gemini via OpenAI-compatible endpoint
+    // 1. Groq ultra-low-latency LPU (Primary)
+    if (process.env.GROQ_API_KEY) {
+      const groqModel = process.env.GROQ_MODEL ||
+        (process.env.MODEL_NAME?.startsWith("openai/") || process.env.MODEL_NAME?.startsWith("qwen/")
+          ? process.env.MODEL_NAME
+          : "openai/gpt-oss-120b");
+      providers.push({
+        name: "groq",
+        apiKey: process.env.GROQ_API_KEY,
+        baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
+        defaultModel: groqModel
+      });
+    }
+
+    // 2. OpenRouter gateway (Fallback)
+    if (process.env.OPENROUTER_API_KEY) {
+      providers.push({
+        name: "openrouter",
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: "https://openrouter.ai/api/v1",
+        defaultModel: process.env.OPENROUTER_MODEL || "openrouter/free",
+        extraHeaders: {
+          "HTTP-Referer": "https://github.com/sanjeevafk/dossier",
+          "X-Title": "Dossier"
+        }
+      });
+    }
+
+    // 3. Google Gemini via OpenAI-compatible endpoint
     if (process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.startsWith("AQ.")) {
       const geminiModel = process.env.GEMINI_MODEL ||
         (process.env.MODEL_NAME?.startsWith("gemini") ? process.env.MODEL_NAME : "gemini-2.5-flash");
@@ -78,7 +106,7 @@ function resolveProviders(): LLMProviderConfig[] {
       });
     }
 
-    // 2. OpenAI direct
+    // 4. OpenAI direct
     if (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes("dummy")) {
       const openaiModel = process.env.OPENAI_MODEL ||
         (process.env.MODEL_NAME?.startsWith("gpt") ? process.env.MODEL_NAME : "gpt-4o-mini");
@@ -90,7 +118,7 @@ function resolveProviders(): LLMProviderConfig[] {
       });
     }
 
-    // 3. OrcaRouter gateway (ORCAROUTER_MODEL can pin the free tier, e.g. orcarouter/free)
+    // 5. OrcaRouter gateway (ORCAROUTER_MODEL can pin the free tier, e.g. orcarouter/free)
     if (process.env.ORCAROUTER_API_KEY && !process.env.ORCAROUTER_API_KEY.includes("dummy")) {
       const orcaModel = process.env.ORCAROUTER_MODEL ||
         (process.env.MODEL_NAME && process.env.MODEL_NAME !== "orcarouter/auto" ? process.env.MODEL_NAME : "orcarouter/free");
@@ -99,30 +127,6 @@ function resolveProviders(): LLMProviderConfig[] {
         apiKey: process.env.ORCAROUTER_API_KEY,
         baseURL: "https://api.orcarouter.ai/v1",
         defaultModel: orcaModel
-      });
-    }
-
-    // 4. Groq free tier (OpenAI-compatible)
-    if (process.env.GROQ_API_KEY) {
-      providers.push({
-        name: "groq",
-        apiKey: process.env.GROQ_API_KEY,
-        baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
-        defaultModel: process.env.GROQ_MODEL || "llama-3.3-70b-versatile"
-      });
-    }
-
-    // 5. OpenRouter free models (":free" models; attribution headers per OpenRouter policy)
-    if (process.env.OPENROUTER_API_KEY) {
-      providers.push({
-        name: "openrouter",
-        apiKey: process.env.OPENROUTER_API_KEY,
-        baseURL: "https://openrouter.ai/api/v1",
-        defaultModel: process.env.OPENROUTER_MODEL || "openrouter/free",
-        extraHeaders: {
-          "HTTP-Referer": "https://github.com/sanjeevafk/dossier",
-          "X-Title": "Dossier"
-        }
       });
     }
 

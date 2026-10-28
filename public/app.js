@@ -264,25 +264,41 @@ function handleStreamEvent(event, data) {
       const detail = data.detail || '';
       appendStreamLog(`[${elapsed}s] ${stage}: ${detail}`);
 
-      if (stage.includes('01 INGEST')) {
+      if (stage.includes('01 INGEST') || stage.includes('01 CLASSIFY') || stage.includes('01 GATED')) {
         setStepActive('ingest', detail);
-      } else if (stage.includes('02 RECON') || stage.includes('MARKET')) {
+      } else if (stage.includes('02 RECON') || stage.includes('02 DECOMPOSE') || stage.includes('MARKET')) {
         setStepComplete('ingest');
         setStepActive('recon', detail);
-      } else if (stage.includes('03 SWARM')) {
+      } else if (stage.includes('03 SWARM') || stage.includes('03 INVESTIGATE')) {
+        setStepComplete('ingest');
         setStepComplete('recon');
         setStepActive('swarm', detail);
-      } else if (stage.includes('04 DEBATE') || stage.includes('CROSSFIRE')) {
+      } else if (stage.includes('04 DEBATE') || stage.includes('04 ATTACK') || stage.includes('CROSSFIRE')) {
+        setStepComplete('ingest');
+        setStepComplete('recon');
         setStepComplete('swarm');
         setStepActive('debate', detail);
       } else if (stage.includes('05 VERIFY')) {
+        setStepComplete('ingest');
+        setStepComplete('recon');
+        setStepComplete('swarm');
         setStepComplete('debate');
         setStepActive('verify', detail);
+      } else if (stage.includes('06 COMPILE') || stage.includes('06 CONVERGE') || stage.includes('07 VERDICT') || stage.includes('SYNTHESIS')) {
+        setStepComplete('ingest');
+        setStepComplete('recon');
+        setStepComplete('swarm');
+        setStepComplete('debate');
+        setStepComplete('verify');
+        setStepActive('compile', detail);
       }
       break;
     }
 
     case 'agent_start': {
+      setStepComplete('ingest');
+      setStepComplete('recon');
+      setStepActive('swarm', `Deploying ${data.roleTitle || data.role}...`);
       appendStreamLog(`[${elapsed}s] Agent deployed: ${data.roleTitle || data.role}`);
       break;
     }

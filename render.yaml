@@ -25,6 +25,12 @@ services:
         value: "1"
       - key: DOSSIER_DATA_DIR
         value: /app/data
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
       - key: ORCAROUTER_API_KEY
         sync: false
       - key: GEMINI_API_KEY
