@@ -17,7 +17,11 @@ type ExtractorPipeline = (text: string, opts?: Record<string, unknown>) => Promi
 let embedderPromise: Promise<Embedder | null> | null = null;
 
 function offline(): boolean {
-  return process.env.HF_OFFLINE === "1" || process.env.NODE_ENV === "test";
+  return (
+    process.env.HF_OFFLINE === "1" ||
+    process.env.NODE_ENV === "test" ||
+    process.env.LOW_MEMORY_MODE === "1"
+  );
 }
 
 async function loadEmbedder(): Promise<Embedder | null> {
