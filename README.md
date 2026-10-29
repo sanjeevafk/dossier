@@ -174,11 +174,12 @@ Dossier can be operated as a standalone MCP server, invoked via `npx`, installed
 ### 1. Installation via GitHub Packages
 
 ```bash
-# Install globally
-npm install -g @sanjeevafk/dossier --registry=https://npm.pkg.github.com
+# Option 1: Configure scoped registry once in ~/.npmrc
+npm config set @sanjeevafk:registry https://npm.pkg.github.com
+npm install -g @sanjeevafk/dossier
 
-# Or run directly via npx without local install
-npx --registry=https://npm.pkg.github.com @sanjeevafk/dossier evaluate --title "My Idea"
+# Option 2: Run directly via npx without local install
+npx -y --@sanjeevafk:registry=https://npm.pkg.github.com @sanjeevafk/dossier evaluate --title "My Idea"
 ```
 
 ### 2. Connecting via MCP (`dossier.mcp.json`)
@@ -191,7 +192,7 @@ Add Dossier to your Claude Desktop (`claude_desktop_config.json`) or agent harne
   "mcpServers": {
     "dossier": {
       "command": "npx",
-      "args": ["-y", "--registry=https://npm.pkg.github.com", "@sanjeevafk/dossier", "mcp"],
+      "args": ["-y", "--@sanjeevafk:registry=https://npm.pkg.github.com", "@sanjeevafk/dossier", "mcp"],
       "env": {
         "OPENAI_API_KEY": "your_api_key_here"
       }
