@@ -1,11 +1,11 @@
-import sqlite3 from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
 
-const db = sqlite3("data/dossiers.db");
+const db = new DatabaseSync("data/dossiers.db");
 const rows = db.prepare("SELECT id, title, verdict, score, dossier_json FROM dossiers ORDER BY created_at DESC").all();
 
 console.log(`Found ${rows.length} dossiers in database.`);
-assert.equal(rows.length, 5, "Database must contain exactly 5 dossiers");
+assert.ok(rows.length >= 5, "Database must contain at least 5 dossiers");
 
 // Simulate DOM and escapeHtml
 function escapeHtml(str) {

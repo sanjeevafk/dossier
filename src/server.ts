@@ -1,8 +1,4 @@
 import express, { Application, Request, Response } from "express";
-import cors from "cors";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-import pino from "pino";
 import path from "node:path";
 import fs from "node:fs";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
@@ -14,13 +10,44 @@ import { summarizeCalibration } from "./services/calibration.js";
 import { SWARM_ROLES } from "./config/prompts.js";
 import { IdeaInput, SwarmRole } from "./types/index.js";
 
-const log = pino({ name: "dossier-server" });
+const log = {
+  info: (msgOrObj: unknown, msg?: string) => {
+    if (typeof msgOrObj === "string") {
+      console.log(`[${new Date().toISOString()}] INFO: ${msgOrObj}`);
+    } else {
+      console.log(`[${new Date().toISOString()}] INFO: ${msg || ""} ${JSON.stringify(msgOrObj)}`);
+    }
+  },
+  warn: (msgOrObj: unknown, msg?: string) => {
+    if (typeof msgOrObj === "string") {
+      console.warn(`[${new Date().toISOString()}] WARN: ${msgOrObj}`);
+    } else {
+      console.warn(`[${new Date().toISOString()}] WARN: ${msg || ""} ${JSON.stringify(msgOrObj)}`);
+    }
+  },
+  error: (msgOrObj: unknown, msg?: string) => {
+    if (typeof msgOrObj === "string") {
+      console.error(`[${new Date().toISOString()}] ERROR: ${msgOrObj}`);
+    } else {
+      console.error(`[${new Date().toISOString()}] ERROR: ${msg || ""} ${JSON.stringify(msgOrObj)}`);
+    }
+  }
+};
 
 const app: Application = express();
 const port = process.env.PORT || 3000;
 
-app.use(helmet({ contentSecurityPolicy: false }));
 app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
+  res.setHeader("X-DNS-Prefetch-Control", "off");
+  res.setHeader("X-Download-Options", "noopen");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
   : [
@@ -30,18 +57,19 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       "https://dossier.sanjeevkumar.me"
     ];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== "production") {
-        callback(null, true);
-      } else {
-        callback(new Error("Blocked by CORS policy"));
-      }
-    },
-    credentials: true
-  })
-);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== "production") {
+    if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  } else {
+    return res.status(403).send("Blocked by CORS policy");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-API-Key,X-Exa-Key,X-Tavily-Key");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 app.use(express.json());
 app.use(express.static(path.join(process.cwd(), "public")));
 
@@ -75,22 +103,42 @@ function releaseEvaluationSlot(): void {
   activeEvaluations = Math.max(0, activeEvaluations - 1);
 }
 
-const evaluateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Rate limit exceeded: max 10 evaluations per hour per IP" }
-});
+function createRateLimiter(windowMs: number, maxHits: number, message: string) {
+  const hits = new Map<string, { count: number; resetAt: number }>();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of hits) {
+      if (entry.resetAt <= now) hits.delete(ip);
+    }
+  }, 300_000).unref();
+
+  return (req: Request, res: Response, next: () => void) => {
+    const ip = req.ip || req.socket.remoteAddress || "global";
+    const now = Date.now();
+    const entry = hits.get(ip);
+    if (!entry || entry.resetAt <= now) {
+      hits.set(ip, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    if (entry.count >= maxHits) {
+      return res.status(429).json({ error: message });
+    }
+    entry.count++;
+    next();
+  };
+}
+
+const evaluateLimiter = createRateLimiter(
+  60 * 60 * 1000,
+  10,
+  "Rate limit exceeded: max 10 evaluations per hour per IP"
+);
 
 app.use("/api/evaluate", evaluateLimiter);
-app.use("/api/chat", rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Rate limit exceeded: max 60 chat messages per hour per IP" }
-}));
+app.use(
+  "/api/chat",
+  createRateLimiter(60 * 60 * 1000, 60, "Rate limit exceeded: max 60 chat messages per hour per IP")
+);
 const orchestrator = new IdeaSwarmOrchestrator();
 
 // Health check with detailed telemetry & capacity stats

@@ -1,4 +1,4 @@
-import pc from "picocolors";
+import { pc } from "./utils/colors.js";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { runEconomicsSimulation } from "./tools/sandbox.js";
 import { EpistemicRobustVerifier } from "./core/verifier.js";

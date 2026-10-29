@@ -29,6 +29,7 @@ function offline(): boolean {
 async function loadEmbedder(): Promise<Embedder | null> {
   if (offline()) return null;
   try {
+    // @ts-ignore
     const { pipeline } = await import("@xenova/transformers");
     const pipe = (await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
       quantized: true

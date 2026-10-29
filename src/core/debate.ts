@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { AgentOpinion, DebateChallenge, SwarmRole } from "../types/index.js";
 import { generateAgentTurn } from "../services/llm.js";
 
@@ -9,20 +8,35 @@ export interface DebateTrailInput {
   sandboxMetrics: { ltvCacRatio: number; estimatedPaybackMonths: number };
 }
 
-const LLM_DEBATE_SCHEMA = z.object({
-  clashes: z
-    .array(
-      z.object({
-        challenger: z.enum(["analyst", "customer", "architect", "investor", "redteam", "expert"]),
-        target: z.enum(["analyst", "customer", "architect", "investor", "redteam", "expert"]),
-        challengePoint: z.string().min(1),
-        rebuttal: z.string().min(1),
-        status: z.enum(["OPEN", "REBUTTED", "CONCEDED"])
-      })
-    )
-    .min(3)
-    .max(4)
-});
+type DebateRole = "analyst" | "customer" | "architect" | "investor" | "redteam" | "expert";
+type DebateStatus = "OPEN" | "REBUTTED" | "CONCEDED";
+
+interface LlmClash {
+  challenger: DebateRole;
+  target: DebateRole;
+  challengePoint: string;
+  rebuttal: string;
+  status: DebateStatus;
+}
+
+const VALID_ROLES = new Set<string>(["analyst", "customer", "architect", "investor", "redteam", "expert"]);
+const VALID_STATUSES = new Set<string>(["OPEN", "REBUTTED", "CONCEDED"]);
+
+function validateDebateClashes(input: unknown): { success: true; data: { clashes: LlmClash[] } } | { success: false } {
+  if (!input || typeof input !== "object" || !("clashes" in input) || !Array.isArray((input as any).clashes)) {
+    return { success: false };
+  }
+  const clashes = (input as any).clashes;
+  if (clashes.length < 3 || clashes.length > 4) return { success: false };
+  for (const c of clashes) {
+    if (!c || typeof c !== "object") return { success: false };
+    if (!VALID_ROLES.has(c.challenger) || !VALID_ROLES.has(c.target)) return { success: false };
+    if (typeof c.challengePoint !== "string" || !c.challengePoint.trim()) return { success: false };
+    if (typeof c.rebuttal !== "string" || !c.rebuttal.trim()) return { success: false };
+    if (!VALID_STATUSES.has(c.status)) return { success: false };
+  }
+  return { success: true, data: { clashes } };
+}
 
 function claimOf(opinion: AgentOpinion): string {
   return (
@@ -116,7 +130,7 @@ Six agent opinions: ${opinionsJson}`,
 
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    const parsed = LLM_DEBATE_SCHEMA.safeParse(JSON.parse(match[0]));
+    const parsed = validateDebateClashes(JSON.parse(match[0]));
     if (!parsed.success) return null;
 
     const clashes = parsed.data.clashes.filter((c) => c.challenger !== c.target);
