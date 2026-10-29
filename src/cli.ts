@@ -21,7 +21,7 @@ function printHelp(): void {
   console.log(`
 Usage: dossier [command] [options]
 
-Domain-Aware Adversarial Multi-Agent Idea Intelligence Platform (v0.2.0)
+Domain-Aware Adversarial Multi-Agent Idea Intelligence Platform (v0.2.1)
 
 Commands:
   evaluate (default)                        Compile an evidence-first intelligence dossier on an idea
@@ -33,6 +33,7 @@ Commands:
   forecast-list                             List calibration-ledger forecasts
   forecast-resolve <forecastId> <outcome>   Resolve a forecast (outcome: HIT | MISS)
   forecast-score                            Brier-score resolved forecasts
+  mcp                                       Start Model Context Protocol (MCP) server over stdio
 
 Options:
   -v, --version                             Display version
@@ -56,7 +57,7 @@ async function main() {
   const firstArg = rawArgs[0];
 
   if (firstArg === "-v" || firstArg === "--version") {
-    console.log("0.2.0");
+    console.log("0.2.1");
     return;
   }
 
@@ -74,7 +75,8 @@ async function main() {
     "stress-test",
     "forecast-list",
     "forecast-resolve",
-    "forecast-score"
+    "forecast-score",
+    "mcp"
   ]);
 
   const command = firstArg && subcommands.has(firstArg) ? firstArg : "evaluate";
@@ -506,6 +508,11 @@ async function main() {
     }
     console.log();
     return;
+  }
+
+  if (command === "mcp") {
+    await import("./mcp-server.js");
+    return new Promise(() => {});
   }
 }
 

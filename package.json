@@ -1,7 +1,14 @@
 {
-  "name": "dossier-ai",
-  "version": "0.2.0",
+  "name": "@sanjeevafk/dossier",
+  "version": "0.2.1",
   "description": "Adversarial Multi-Agent Idea Intelligence Platform",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sanjeevafk/dossier.git"
+  },
   "main": "dist/index.js",
   "files": [
     "dist",

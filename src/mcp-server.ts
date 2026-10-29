@@ -27,7 +27,7 @@ class DossierMCPServer {
     this.server = new Server(
       {
         name: "dossier-adversarial-intelligence",
-        version: "0.2.0"
+        version: "0.2.1"
       },
       {
         capabilities: {

@@ -169,12 +169,52 @@ Copy `.env.example` to `.env` to configure optional and required settings:
 
 ## Model Context Protocol (MCP) & Agent Skill
 
-Dossier can be operated as a standalone MCP server or installed as an agent skill.
+Dossier can be operated as a standalone MCP server, invoked via `npx`, installed globally, or installed as an agent skill.
 
-### 1. Connecting via MCP (`dossier.mcp.json`)
+### 1. Installation via GitHub Packages
 
-Add Dossier to your Claude Desktop or agent harness configuration:
+```bash
+# Install globally
+npm install -g @sanjeevafk/dossier --registry=https://npm.pkg.github.com
 
+# Or run directly via npx without local install
+npx --registry=https://npm.pkg.github.com @sanjeevafk/dossier evaluate --title "My Idea"
+```
+
+### 2. Connecting via MCP (`dossier.mcp.json`)
+
+Add Dossier to your Claude Desktop (`claude_desktop_config.json`) or agent harness configuration:
+
+**Option A: Direct via `npx` (Recommended)**
+```json
+{
+  "mcpServers": {
+    "dossier": {
+      "command": "npx",
+      "args": ["-y", "--registry=https://npm.pkg.github.com", "@sanjeevafk/dossier", "mcp"],
+      "env": {
+        "OPENAI_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+**Option B: Global binary (`dossier-mcp`)**
+```json
+{
+  "mcpServers": {
+    "dossier": {
+      "command": "dossier-mcp",
+      "env": {
+        "OPENAI_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+**Option C: Local source**
 ```json
 {
   "mcpServers": {
@@ -195,7 +235,7 @@ Exposed MCP Tools:
 - `run_sandbox_economics`: Executes isolated Python subprocess simulations for LTV, CAC, and payback bounds.
 - `verify_claims_epistemics`: Classifies claims across the 7 epistemic tiers.
 
-### 2. Installing the Agent Skill
+### 3. Installing the Agent Skill
 
 To install Dossier into an agent environment:
 
