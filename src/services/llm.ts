@@ -1,14 +1,33 @@
-import OpenAI from "openai";
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import fs from "node:fs";
-import dotenv from "dotenv";
 
-dotenv.config();
+function loadEnvFile(envPath: string) {
+  if (!fs.existsSync(envPath)) return;
+  try {
+    const content = fs.readFileSync(envPath, "utf-8");
+    for (const rawLine of content.split("\n")) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+      const eqIdx = line.indexOf("=");
+      if (eqIdx === -1) continue;
+      const key = line.slice(0, eqIdx).trim();
+      let val = line.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (!(key in process.env)) {
+        process.env[key] = val;
+      }
+    }
+  } catch {}
+}
+
+loadEnvFile(path.resolve(process.cwd(), ".env"));
 const packageEnv = path.resolve(import.meta.dirname, "..", "..", ".env");
 if (fs.existsSync(packageEnv)) {
-  dotenv.config({ path: packageEnv, override: false });
+  loadEnvFile(packageEnv);
 }
 
 const execFileAsync = promisify(execFile);
@@ -227,7 +246,7 @@ async function runAgyCliTurn(
   throw lastErr;
 }
 
-// Backward-compatible default client
+// Backward-compatible default client stub
 const defaultProviders = resolveProviders();
 const primary = defaultProviders[0] || {
   name: "fallback",
@@ -236,12 +255,10 @@ const primary = defaultProviders[0] || {
   defaultModel: "orcarouter/auto"
 };
 
-export const llmClient = new OpenAI({
+export const llmClient = {
   baseURL: primary.baseURL || "https://api.orcarouter.ai/v1",
-  apiKey: primary.apiKey,
-  timeout: 15000,
-  maxRetries: 1
-});
+  apiKey: primary.apiKey
+};
 
 // Rotation state: free tiers enforce per-minute limits, so consecutive turns
 // spread across the healthy provider chain instead of hammering the first one.
@@ -267,6 +284,123 @@ function rotationOrder(providers: LLMProviderConfig[]): LLMProviderConfig[] {
   const start = rotationCursor % healthy.length;
   rotationCursor = (rotationCursor + 1) % Math.max(1, healthy.length);
   return [...healthy.slice(start), ...healthy.slice(0, start), ...cooling];
+}
+
+async function fetchChatCompletion(
+  provider: LLMProviderConfig,
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+  options: LLMGenerateOptions
+): Promise<string> {
+  const url = `${provider.baseURL.replace(/\/+$/, "")}/chat/completions`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${provider.apiKey}`,
+      ...(provider.extraHeaders || {})
+    },
+    body: JSON.stringify({
+      model,
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.maxTokens || 2500,
+      response_format: options.jsonMode ? { type: "json_object" } : undefined,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ]
+    }),
+    signal: AbortSignal.timeout(25000)
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`LLM ${provider.name} (${res.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const json: any = await res.json();
+  return json.choices?.[0]?.message?.content || "";
+}
+
+async function fetchChatStream(
+  provider: LLMProviderConfig,
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+  options: LLMGenerateOptions,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const url = `${provider.baseURL.replace(/\/+$/, "")}/chat/completions`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${provider.apiKey}`,
+      ...(provider.extraHeaders || {})
+    },
+    body: JSON.stringify({
+      model,
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.maxTokens || 2500,
+      stream: true,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ]
+    }),
+    signal: AbortSignal.timeout(25000)
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`LLM ${provider.name} (${res.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body to stream");
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let full = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (data === "[DONE]") return full;
+      try {
+        const parsed = JSON.parse(data);
+        const delta = parsed.choices?.[0]?.delta?.content || "";
+        if (delta) {
+          full += delta;
+          onChunk(delta);
+        }
+      } catch {}
+    }
+  }
+
+  if (buffer.trim().startsWith("data:")) {
+    const data = buffer.trim().slice(5).trim();
+    if (data !== "[DONE]") {
+      try {
+        const parsed = JSON.parse(data);
+        const delta = parsed.choices?.[0]?.delta?.content || "";
+        if (delta) {
+          full += delta;
+          onChunk(delta);
+        }
+      } catch {}
+    }
+  }
+
+  return full;
 }
 
 /**
@@ -299,37 +433,11 @@ export async function streamAgentTurn(
         throw new Error("agy returned empty response");
       }
 
-      const client = new OpenAI({
-        baseURL: provider.baseURL,
-        apiKey: provider.apiKey,
-        timeout: 25000,
-        maxRetries: 1,
-        defaultHeaders: provider.extraHeaders
-      });
       const model = (options.model && (options.model.startsWith(provider.name) || !options.model.includes("/")))
         ? options.model
         : provider.defaultModel;
-      const temperature = options.temperature ?? 0.7;
 
-      const stream = await client.chat.completions.create({
-        model,
-        temperature,
-        max_tokens: options.maxTokens || 2500,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        stream: true
-      });
-
-      let full = "";
-      for await (const part of stream) {
-        const delta = part.choices?.[0]?.delta?.content || "";
-        if (delta) {
-          full += delta;
-          onChunk(delta);
-        }
-      }
+      const full = await fetchChatStream(provider, model, systemPrompt, userPrompt, options, onChunk);
       if (full.trim()) return full;
       throw new Error(`provider ${provider.name} streamed nothing`);
     } catch (err: any) {
@@ -365,31 +473,11 @@ export async function generateAgentTurn(
       if (provider.kind === "cli") {
         content = await runAgyCliTurn(provider, systemPrompt, userPrompt, options);
       } else {
-        const client = new OpenAI({
-          baseURL: provider.baseURL,
-          apiKey: provider.apiKey,
-          timeout: 25000,
-          maxRetries: 1,
-          defaultHeaders: provider.extraHeaders
-        });
-
         const model = (options.model && (options.model.startsWith(provider.name) || !options.model.includes("/")))
           ? options.model
           : provider.defaultModel;
-        const temperature = options.temperature ?? 0.7;
 
-        const response = await client.chat.completions.create({
-          model,
-          temperature,
-          max_tokens: options.maxTokens || 2500,
-          response_format: options.jsonMode ? { type: "json_object" } : undefined,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ]
-        });
-
-        content = response.choices[0]?.message?.content || "";
+        content = await fetchChatCompletion(provider, model, systemPrompt, userPrompt, options);
       }
 
       if (content.trim()) {

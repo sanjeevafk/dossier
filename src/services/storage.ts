@@ -1,11 +1,11 @@
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
+import { DatabaseSync } from "node:sqlite";
 import { IdeaDossier, ApprovalAction } from "../types/index.js";
 import { seedDossiers } from "../data/seedDossiers.js";
 
-const require = createRequire(import.meta.url);
+
 
 const DATA_DIR = process.env.DOSSIER_DATA_DIR
   ? path.resolve(process.env.DOSSIER_DATA_DIR)
@@ -66,8 +66,7 @@ export class DossierStorageService {
   private getDb(): SqliteDb {
     if (this.db) return this.db;
     fsSync.mkdirSync(DATA_DIR, { recursive: true });
-    const Database = require("better-sqlite3");
-    const db: SqliteDb = new Database(DB_PATH);
+    const db: SqliteDb = new DatabaseSync(DB_PATH) as unknown as SqliteDb;
     db.exec(`
       CREATE TABLE IF NOT EXISTS dossiers (
         id TEXT PRIMARY KEY,

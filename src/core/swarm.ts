@@ -56,7 +56,6 @@ import { findMatchingGraveyardPrecedents } from "../data/graveyardAntipatterns.j
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
 import { dossierStorage } from "../services/storage.js";
 import { getBaseRate, shrinkTowardBaseRate } from "./baseRates.js";
-import { z } from "zod";
 
 export interface SwarmExecutionOptions {
   onProgress?: (stage: string, detail: string) => void;
@@ -88,15 +87,46 @@ function detectAdversarialInvariants(idea: IdeaInput, pricing: number, decisionE
 
 type AdversarialInvariants = ReturnType<typeof detectAdversarialInvariants>;
 
-const AGENT_OUTPUT_SCHEMA = z.object({
-  verdict: z.enum(["STRONG_KILL", "LEAN_KILL", "PIVOT_REQUIRED", "VIABLE_WITH_RISK", "STRONG_PURSUE"]),
-  score: z.number().min(0).max(100),
-  fatalFlaws: z.array(z.string()).optional(),
-  keyAssumptions: z.array(z.string()).optional(),
-  competitiveRisks: z.array(z.string()).optional(),
-  mustTestBeforeBuilding: z.array(z.string()).optional(),
-  rationale: z.string().optional()
-});
+interface AgentOutputData {
+  verdict: "STRONG_KILL" | "LEAN_KILL" | "PIVOT_REQUIRED" | "VIABLE_WITH_RISK" | "STRONG_PURSUE";
+  score: number;
+  fatalFlaws?: string[];
+  keyAssumptions?: string[];
+  competitiveRisks?: string[];
+  mustTestBeforeBuilding?: string[];
+  rationale?: string;
+}
+
+const VALID_VERDICTS = new Set(["STRONG_KILL", "LEAN_KILL", "PIVOT_REQUIRED", "VIABLE_WITH_RISK", "STRONG_PURSUE"]);
+
+function validateAgentOutput(val: unknown): { success: true; data: AgentOutputData } | { success: false; error: { issues: { path: string[]; message: string }[] } } {
+  if (!val || typeof val !== "object") {
+    return { success: false, error: { issues: [{ path: ["<root>"], message: "Expected object" }] } };
+  }
+  const obj = val as Record<string, unknown>;
+  if (!VALID_VERDICTS.has(obj.verdict as string)) {
+    return { success: false, error: { issues: [{ path: ["verdict"], message: `Invalid verdict: ${obj.verdict}` }] } };
+  }
+  if (typeof obj.score !== "number" || isNaN(obj.score) || obj.score < 0 || obj.score > 100) {
+    return { success: false, error: { issues: [{ path: ["score"], message: `Score must be 0-100, got ${obj.score}` }] } };
+  }
+  const toStrArr = (arr: unknown): string[] | undefined => {
+    if (!Array.isArray(arr)) return undefined;
+    return arr.map(String);
+  };
+  return {
+    success: true,
+    data: {
+      verdict: obj.verdict as AgentOutputData["verdict"],
+      score: obj.score,
+      fatalFlaws: toStrArr(obj.fatalFlaws),
+      keyAssumptions: toStrArr(obj.keyAssumptions),
+      competitiveRisks: toStrArr(obj.competitiveRisks),
+      mustTestBeforeBuilding: toStrArr(obj.mustTestBeforeBuilding),
+      rationale: typeof obj.rationale === "string" ? obj.rationale : undefined
+    }
+  };
+}
 
 const WRAPPER_KILL_CEILINGS: Partial<Record<SwarmRole, { score: number; verdict: Verdict }>> = {
   analyst: { score: 35, verdict: "PIVOT_REQUIRED" },
@@ -130,16 +160,33 @@ const VOI_EXPERIMENT_MAP: Record<string, { title: string; description: string }>
   }
 };
 
-const CROSS_EXAM_SCHEMA = z.object({
-  crossExam: z.string().min(1),
-  targetClaim: z.string().optional()
-});
+function validateCrossExam(val: unknown): { success: true; data: { crossExam: string; targetClaim?: string } } | { success: false } {
+  if (!val || typeof val !== "object") return { success: false };
+  const obj = val as Record<string, unknown>;
+  if (typeof obj.crossExam !== "string" || !obj.crossExam.trim()) return { success: false };
+  return {
+    success: true,
+    data: {
+      crossExam: obj.crossExam,
+      targetClaim: typeof obj.targetClaim === "string" ? obj.targetClaim : undefined
+    }
+  };
+}
 
-const CROSSFIRE_DEFENSE_SCHEMA = z.object({
-  defense: z.string().min(1),
-  revisedScore: z.number().min(0).max(100),
-  concedes: z.boolean()
-});
+function validateCrossfireDefense(val: unknown): { success: true; data: { defense: string; revisedScore: number; concedes: boolean } } | { success: false } {
+  if (!val || typeof val !== "object") return { success: false };
+  const obj = val as Record<string, unknown>;
+  if (typeof obj.defense !== "string" || !obj.defense.trim()) return { success: false };
+  if (typeof obj.revisedScore !== "number" || isNaN(obj.revisedScore) || obj.revisedScore < 0 || obj.revisedScore > 100) return { success: false };
+  return {
+    success: true,
+    data: {
+      defense: obj.defense,
+      revisedScore: obj.revisedScore,
+      concedes: Boolean(obj.concedes)
+    }
+  };
+}
 
 // Structured domain drag so feasibility and expert confidence reflect the domain's
 // genuine engineering/compliance burden instead of route-independent constants.
@@ -241,7 +288,7 @@ Market & Prediction Signals: ${marketContext}`;
         return { opinion: null, fallbackReason: "model returned no JSON object" };
       }
 
-      const validated = AGENT_OUTPUT_SCHEMA.safeParse(JSON.parse(jsonMatch[0]));
+      const validated = validateAgentOutput(JSON.parse(jsonMatch[0]));
       if (!validated.success) {
         const issues = validated.error.issues
           .map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`)
@@ -340,7 +387,7 @@ Market & Prediction Signals: ${marketContext}`;
           { temperature: 0.4, maxTokens: 800, jsonMode: true }
         );
         const examMatch = skepticTurn.match(/\{[\s\S]*\}/);
-        const parsedExam = CROSS_EXAM_SCHEMA.safeParse(JSON.parse(examMatch ? examMatch[0] : "{}"));
+        const parsedExam = validateCrossExam(JSON.parse(examMatch ? examMatch[0] : "{}"));
         if (parsedExam.success) {
           crossExamText = parsedExam.data.crossExam;
           debateHistory.push(`Skeptic cross-examination: ${crossExamText}`);
@@ -352,7 +399,7 @@ Market & Prediction Signals: ${marketContext}`;
           { temperature: 0.4, maxTokens: 1200, jsonMode: true }
         );
         const defMatch = defenderTurn.match(/\{[\s\S]*\}/);
-        const parsedDefense = CROSSFIRE_DEFENSE_SCHEMA.safeParse(JSON.parse(defMatch ? defMatch[0] : "{}"));
+        const parsedDefense = validateCrossfireDefense(JSON.parse(defMatch ? defMatch[0] : "{}"));
         if (parsedDefense.success) {
           newScore = Math.min(parsedDefense.data.revisedScore, originalScore);
           if (parsedDefense.data.concedes) {

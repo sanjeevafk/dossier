@@ -2,7 +2,6 @@ import { performLiveWebRecon, ReconSourceResult } from "./recon.js";
 import { queryCommunitySentiment, CommunityDiscussion } from "./community.js";
 import { rerank } from "./rerank.js";
 import type { MarketCompetitor } from "../types/index.js";
-import nlp from "compromise";
 
 export type { MarketCompetitor };
 
@@ -92,7 +91,29 @@ export async function performMarketResearch(
 }
 
 /**
- * Extract candidate competitor names via compromise org/product noun phrases.
+ * Extract candidate organization names from title strings.
+ */
+function extractOrgsFromTitle(title: string): string[] {
+  const orgs: string[] = [];
+  const corpRegex = /\b([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)*(?:\s+(?:Corp|Corporation|Inc|Incorporated|Ltd|LLC|Technologies|Labs|AI|App|Software|Group|Co)))\b/gi;
+  let match: RegExpExecArray | null;
+  while ((match = corpRegex.exec(title)) !== null) {
+    orgs.push(match[1]);
+  }
+  const leadRegex = /^([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)?)\s+(?:launches|raises|announces|releases|unveils|builds|introduces|competes|vs)\b/i;
+  const leadMatch = leadRegex.exec(title);
+  if (leadMatch) {
+    orgs.push(leadMatch[1]);
+  }
+  const sepMatch = /^([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)?)\s*[:|—–-]\s+/i.exec(title);
+  if (sepMatch) {
+    orgs.push(sepMatch[1]);
+  }
+  return orgs;
+}
+
+/**
+ * Extract candidate competitor names via title noun phrases & corporate entities.
  * Dedupes case-insensitively, caps at 5, requires a URL-bearing source title.
  */
 export function extractCompetitors(results: ReconSourceResult[]): MarketCompetitor[] {
@@ -100,7 +121,7 @@ export function extractCompetitors(results: ReconSourceResult[]): MarketCompetit
   const competitors: MarketCompetitor[] = [];
   for (const r of results) {
     try {
-      const orgs = nlp(r.title).organizations().out("array") as string[];
+      const orgs = extractOrgsFromTitle(r.title);
       const terms = (Array.isArray(orgs) ? orgs : [])
         .map((o) => String(o).trim())
         .filter((o) => o.length >= 2 && o.length <= 40);

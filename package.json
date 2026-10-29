@@ -1,8 +1,17 @@
 {
   "name": "dossier-ai",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Adversarial Multi-Agent Idea Intelligence Platform",
   "main": "dist/index.js",
+  "files": [
+    "dist",
+    "public",
+    "scripts/*.py",
+    "skills",
+    "dossier.mcp.json",
+    "LICENSE",
+    "README.md"
+  ],
   "bin": {
     "dossier": "./dist/cli.js",
     "dossier-mcp": "./dist/mcp-server.js"
@@ -41,24 +50,9 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.0",
-    "@xenova/transformers": "^2.17.2",
-    "better-sqlite3": "^13.0.3",
-    "commander": "^13.1.0",
-    "compromise": "^14.19.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "express-rate-limit": "^8.7.1",
-    "helmet": "^8.3.0",
-    "onnxruntime-node": "1.14.0",
-    "openai": "^7.5.0",
-    "p-queue": "^10.0.0",
-    "picocolors": "^1.1.1",
-    "pino": "^10.4.0",
-    "zod": "^3.25.76"
+    "express": "^4.21.2"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.5",
     "tsx": "^4.19.3",
