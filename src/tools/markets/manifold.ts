@@ -1,5 +1,5 @@
 import { UnifiedMarketSignal, FetchImpl } from "./types.js";
-import { getSearchQueryCandidates, extractDomainTokens } from "../queryTokens.js";
+import { getSearchQueryCandidates, extractDomainTokens, isMarketTitleCorrelated } from "../queryTokens.js";
 
 /**
  * Query Manifold Markets' search API for open binary prediction markets correlated with the concept.
@@ -39,8 +39,7 @@ export async function queryManifoldUnified(
           for (const m of data) {
             if (m?.outcomeType !== "BINARY" || m?.isResolved) continue;
             const question = String(m.question || "");
-            const titleLower = question.toLowerCase();
-            if (queryTokens.length > 0 && !queryTokens.some((t) => titleLower.includes(t.replace(/[^a-z0-9]/g, "")))) {
+            if (!isMarketTitleCorrelated(question, queryTokens, m?.groupTickets?.[0]?.name)) {
               continue;
             }
             const prob = Number(m.probability);

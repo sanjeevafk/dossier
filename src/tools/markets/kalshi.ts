@@ -1,5 +1,5 @@
 import { UnifiedMarketSignal, FetchImpl } from "./types.js";
-import { getSearchQueryCandidates, extractDomainTokens } from "../queryTokens.js";
+import { getSearchQueryCandidates, extractDomainTokens, isMarketTitleCorrelated } from "../queryTokens.js";
 
 /**
  * Query Kalshi's CFTC-regulated prediction markets (v2 trade API, keyless public endpoint)
@@ -47,19 +47,12 @@ export async function queryKalshiMarkets(
 
       for (const m of markets) {
         if (m.market_type && m.market_type !== "binary") continue;
-        const marketText = `${m.title || ""} ${m.rules_primary || ""}`.toLowerCase();
-        const combined = `${eventText} ${marketText}`;
+        const marketText = `${m.title || ""} ${m.rules_primary || ""}`;
+        const combined = `${ev.title || ""} ${marketText}`;
 
-        // Check if query tokens match the event or market text using whole word / token inclusion
-        const matches = queryTokens.length > 0 && queryTokens.some((t) => {
-          const cleanToken = t.replace(/[^a-z0-9]/g, "");
-          if (cleanToken.length < 3) return false;
-          // Look for token as a distinct word or prominent substring
-          const regex = new RegExp(`\\b${cleanToken}`, "i");
-          return regex.test(combined);
-        });
-
-        if (!matches) continue;
+        if (!isMarketTitleCorrelated(combined, queryTokens, ev.category)) {
+          continue;
+        }
 
         // Extract probability from last_price_dollars or yes_bid_dollars/yes_ask_dollars
         let prob = parseFloat(m.last_price_dollars || "");
