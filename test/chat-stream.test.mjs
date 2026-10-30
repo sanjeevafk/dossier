@@ -10,8 +10,10 @@ delete process.env.GROQ_API_KEY;
 delete process.env.OPENROUTER_API_KEY;
 delete process.env.LOCAL_LLM_URL;
 delete process.env.OLLAMA_URL;
-// Force API-only so the keyless agy-CLI fallback (installed on some hosts)
-// doesn't turn this into a live-LLM test.
+delete process.env.LLM_BASE_URL;
+delete process.env.LLM_API_KEY;
+delete process.env.LLM_CLI_CMD;
+// Force API-only so no CLI runner turns this into a live-LLM test.
 process.env.DOSSIER_LLM_BACKEND = "api";
 
 process.env.NODE_ENV = "test";
@@ -27,6 +29,9 @@ test("Chat stream serves SSE chunks + done with honest heuristic fallback", asyn
   delete process.env.OPENROUTER_API_KEY;
   delete process.env.LOCAL_LLM_URL;
   delete process.env.OLLAMA_URL;
+  delete process.env.LLM_BASE_URL;
+  delete process.env.LLM_API_KEY;
+  delete process.env.LLM_CLI_CMD;
   process.env.DOSSIER_LLM_BACKEND = "api";
 
   const server = http.createServer(app);

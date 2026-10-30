@@ -1,6 +1,6 @@
 # Dossier Historical Startup Backtest Report
 
-**Execution Date:** 2026-10-30T10:08:22.913Z  
+**Execution Date:** 2026-10-30T10:21:29.282Z  
 **Evaluator:** Dossier Adversarial Intelligence Swarm  
 **Sample Set:** 9 Iconic Startups with Verified Real-World Outcomes (4 Billion-Dollar Successes, 5 Famous Failures)  
 **Overall Prediction Accuracy:** **89%** (8/9)  
@@ -11,7 +11,7 @@
 
 | Company | Era | Domain Category | Known Real Outcome | Dossier Verdict | Kill Score | LTV/CAC | Match? |
 | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Stripe** | 2010 | FinTech / Developer Infrastructure | `SUCCESS` | **REFINE** | 68/100 | 35.1x | ✅ PASS |
+| **Stripe** | 2010 | FinTech / Developer Infrastructure | `SUCCESS` | **REFINE** | 66/100 | 35.1x | ✅ PASS |
 | **Figma** | 2015 | Design / Collaborative SaaS | `SUCCESS` | **REFINE** | 68/100 | 4.9x | ✅ PASS |
 | **Vanta** | 2018 | B2B Enterprise Compliance SaaS | `SUCCESS` | **REFINE** | 73/100 | 9.3x | ✅ PASS |
 | **Airbnb** | 2008 | Consumer Marketplace | `SUCCESS` | **KILL** | 39/100 | 21.4x | ❌ FAIL |
@@ -27,7 +27,7 @@
 
 ### Stripe (2010) — 🏆 Successful Venture
 - **Historical Outcome:** Scaled to >$65B valuation by removing payment integration friction for developers.
-- **Dossier Score & Verdict:** `68/100` — **REFINE** (Risk: `MEDIUM`)
+- **Dossier Score & Verdict:** `66/100` — **REFINE** (Risk: `MEDIUM`)
 - **Top Red Team Flaw Identified:** *"Distribution Desert: Lack of an asymmetric, proprietary top-of-funnel acquisition channel leads to zero-traction stagnation."*
 - **Weakest Assumption:** *"N/A"*
 

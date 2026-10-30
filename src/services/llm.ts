@@ -48,43 +48,55 @@ export interface LLMGenerateOptions {
   jsonMode?: boolean;
 }
 
-const AGY_PRINT_TIMEOUT_S = Number.parseInt(process.env.AGY_PRINT_TIMEOUT_S || "120", 10) || 120;
-let agyAvailableCache: boolean | null = null;
+let cliAvailableCache: boolean | null = null;
 
 /**
- * Detect the authenticated `agy` CLI once; result is cached for the process.
+ * Detect if a generic external CLI command is configured and available in PATH.
  */
-function agyAvailable(): boolean {
-  if (agyAvailableCache !== null) return agyAvailableCache;
+function cliAvailable(): boolean {
+  const cliCmd = process.env.LLM_CLI_CMD;
+  if (!cliCmd) return false;
+  if (cliAvailableCache !== null) return cliAvailableCache;
+  const binary = cliCmd.trim().split(/\s+/)[0];
   try {
-    execFileSyncSafe();
-    agyAvailableCache = true;
+    execFileSync(binary, ["--version"], { timeout: 3000, stdio: "ignore" });
+    cliAvailableCache = true;
   } catch {
-    agyAvailableCache = false;
+    try {
+      execFileSync("which", [binary], { timeout: 3000, stdio: "ignore" });
+      cliAvailableCache = true;
+    } catch {
+      cliAvailableCache = false;
+    }
   }
-  return agyAvailableCache;
-}
-
-function execFileSyncSafe(): void {
-  // Minimal spawn probe: throws if the binary is missing or unusable.
-  execFileSync("agy", ["--help"], { timeout: 10000, stdio: "ignore" });
+  return cliAvailableCache;
 }
 
 /**
  * Resolve ordered candidate providers from environment variables.
  *
  * Backend selection via DOSSIER_LLM_BACKEND:
- *  - "agy"      → force the authenticated agy CLI (subscription quota, no API keys)
- *  - "api"      → force API-key providers only
- *  - unset      → API keys if present, otherwise agy CLI if installed, otherwise heuristic
+ *  - "cli"      → force generic CLI provider (configured via LLM_CLI_CMD)
+ *  - "api"      → force HTTP API-key providers only
+ *  - unset      → API keys if present, otherwise generic CLI if configured, otherwise heuristic
  */
 function resolveProviders(): LLMProviderConfig[] {
   const providers: LLMProviderConfig[] = [];
   const backend = (process.env.DOSSIER_LLM_BACKEND || "").trim().toLowerCase();
-  const forceCli = backend === "agy";
+  const forceCli = backend === "cli";
   const forceApi = backend === "api" || backend === "llm";
 
   if (!forceCli) {
+    // 0. Generic OpenAI-compatible endpoint (vLLM, LiteLLM, LMStudio, Ollama, custom proxy)
+    if (process.env.LLM_BASE_URL) {
+      providers.push({
+        name: "custom-api",
+        apiKey: process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || "no-key",
+        baseURL: process.env.LLM_BASE_URL,
+        defaultModel: process.env.LLM_MODEL || process.env.MODEL_NAME || "default"
+      });
+    }
+
     // 1. Groq ultra-low-latency LPU (Primary)
     if (process.env.GROQ_API_KEY) {
       const groqModel = process.env.GROQ_MODEL ||
@@ -160,13 +172,13 @@ function resolveProviders(): LLMProviderConfig[] {
     }
   }
 
-  // 7. Authenticated agy CLI — works with zero API keys or acts as fallback when APIs are cooling
-  if ((forceCli || !forceApi) && agyAvailable()) {
+  // 7. Generic pluggable CLI bridge — executes external command if configured
+  if ((forceCli || !forceApi) && cliAvailable()) {
     providers.push({
-      name: "agy-cli",
+      name: "custom-cli",
       apiKey: "none",
       baseURL: "",
-      defaultModel: process.env.AGY_MODEL || "gemini-3.8-flash-low",
+      defaultModel: process.env.LLM_MODEL || "custom-cli-model",
       kind: "cli"
     });
   }
@@ -201,49 +213,37 @@ export function getLLMStatus(): {
 }
 
 /**
- * Execute one completion turn through the authenticated agy CLI.
- * The system prompt and user prompt are merged into a single print-mode prompt;
- * JSON discipline comes from the caller's prompts (swarm extracts the {...} block).
+ * Execute one completion turn through a generic external CLI command.
+ * The command is configured via LLM_CLI_CMD (e.g. `ollama run llama3`).
+ * The combined prompt is passed as an argument.
  */
-async function runAgyCliTurn(
+async function runGenericCliTurn(
   provider: LLMProviderConfig,
   systemPrompt: string,
   userPrompt: string,
   options: LLMGenerateOptions
 ): Promise<string> {
   const prompt = `${systemPrompt.trim()}\n\n---\n\n${userPrompt.trim()}`;
-  const targetModel = options.model || provider.defaultModel;
-  const fallbackModels = ["gemini-3.8-flash-medium", "gemini-3.8-flash-high", "gpt-oss-120b-medium"];
-  const candidateModels = [targetModel, ...fallbackModels.filter(m => m !== targetModel)];
-
-  let lastErr: any = null;
-  for (const model of candidateModels) {
-    try {
-      const args = [
-        "-p", prompt,
-        "--disable-slash-commands",
-        "--print-timeout", `${AGY_PRINT_TIMEOUT_S}s`,
-        "--model", model
-      ];
-      const { stdout } = await execFileAsync("agy", args, {
-        timeout: (AGY_PRINT_TIMEOUT_S + 30) * 1000,
-        maxBuffer: 8 * 1024 * 1024
-      });
-      if (stdout && stdout.trim()) {
-        lastSuccessfulModel = model;
-        return stdout;
-      }
-    } catch (err: any) {
-      lastErr = err;
-      const errMsg = String(err?.message || "");
-      if (errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("quota reached") || errMsg.includes("429")) {
-        // Quota exhausted on this model — seamlessly try next candidate model
-        continue;
-      }
-      throw err;
-    }
+  const cliCmd = process.env.LLM_CLI_CMD;
+  if (!cliCmd) {
+    throw new Error("No LLM_CLI_CMD configured for CLI execution");
   }
-  throw lastErr;
+
+  const timeoutS = Number.parseInt(process.env.LLM_CLI_TIMEOUT_S || "120", 10) || 120;
+  const parts = cliCmd.trim().split(/\s+/);
+  const binary = parts[0];
+  const baseArgs = parts.slice(1);
+
+  const { stdout } = await execFileAsync(binary, [...baseArgs, prompt], {
+    timeout: (timeoutS + 15) * 1000,
+    maxBuffer: 8 * 1024 * 1024
+  });
+
+  if (stdout && stdout.trim()) {
+    lastSuccessfulModel = options.model || provider.defaultModel;
+    return stdout;
+  }
+  throw new Error("CLI LLM command returned empty response");
 }
 
 // Backward-compatible default client stub
@@ -405,7 +405,7 @@ async function fetchChatStream(
 
 /**
  * Streaming variant: emits text deltas via onChunk as they arrive and returns
- * the full text. CLI (agy) providers stream as one buffered chunk; API providers
+ * the full text. CLI providers stream as one buffered chunk; API providers
  * stream token-by-token.
  */
 export async function streamAgentTurn(
@@ -417,7 +417,7 @@ export async function streamAgentTurn(
   const providers = resolveProviders();
 
   if (providers.length === 0) {
-    throw new Error("No live LLM configured (API keys, LOCAL_LLM_URL, or authenticated `agy` CLI)");
+    throw new Error("No live LLM configured (API keys, LLM_BASE_URL, LOCAL_LLM_URL, or LLM_CLI_CMD)");
   }
 
   let lastError: Error | null = null;
@@ -425,12 +425,12 @@ export async function streamAgentTurn(
   for (const provider of rotationOrder(providers)) {
     try {
       if (provider.kind === "cli") {
-        const text = await runAgyCliTurn(provider, systemPrompt, userPrompt, options);
+        const text = await runGenericCliTurn(provider, systemPrompt, userPrompt, options);
         if (text.trim()) {
           onChunk(text);
           return text;
         }
-        throw new Error("agy returned empty response");
+        throw new Error("CLI provider returned empty response");
       }
 
       const model = (options.model && (options.model.startsWith(provider.name) || !options.model.includes("/")))
@@ -462,7 +462,7 @@ export async function generateAgentTurn(
   const providers = resolveProviders();
 
   if (providers.length === 0) {
-    throw new Error("No live LLM configured (API keys, LOCAL_LLM_URL, or authenticated `agy` CLI)");
+    throw new Error("No live LLM configured (API keys, LLM_BASE_URL, LOCAL_LLM_URL, or LLM_CLI_CMD)");
   }
 
   let lastError: Error | null = null;
@@ -471,7 +471,7 @@ export async function generateAgentTurn(
     try {
       let content: string;
       if (provider.kind === "cli") {
-        content = await runAgyCliTurn(provider, systemPrompt, userPrompt, options);
+        content = await runGenericCliTurn(provider, systemPrompt, userPrompt, options);
       } else {
         const model = (options.model && (options.model.startsWith(provider.name) || !options.model.includes("/")))
           ? options.model

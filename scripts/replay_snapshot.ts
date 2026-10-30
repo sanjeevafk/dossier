@@ -5,7 +5,7 @@
  *
  * Usage:
  *   DOSSIER_REPLAY_LABEL=orcarouter-baseline pnpm replay:snapshot
- *   DOSSIER_LLM_BACKEND=agy pnpm replay:snapshot
+ *   DOSSIER_LLM_BACKEND=cli LLM_CLI_CMD="ollama run llama3" pnpm replay:snapshot
  *
  * Snapshots land in reports/replay/ (gitignored). Pair with replay:diff to see
  * exactly which verdicts flip when prompts, models, or backends change.

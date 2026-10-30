@@ -139,7 +139,7 @@ renderValidationPriority({});
 assert.ok(el("vpSection"), "no crash on empty dossier");
 
 // --- positive-case check for the validation priority panel (synthetic EVPI data;
-//     avoids running a full evaluation while heavy agy benchmark load is active —
+//     avoids running a full evaluation while heavy live benchmark load is active —
 //     the real-data path is identical code and covered by test/quant.test.mjs) ---
 renderValidationPriority({
   validationPriority: [

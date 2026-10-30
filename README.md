@@ -1,14 +1,14 @@
 # Dossier
 
-Live Deployment: https://dossier.sanjeevkumar.me
-
 Dossier is an adversarial multi-agent evaluation platform that stress-tests startup concepts, product features, and technical proposals before engineering effort or capital is committed.
 
-Instead of surface-level encouragement, Dossier deploys specialized adversarial agents to challenge assumptions, run quantitative unit economics simulations in an isolated Python sandbox, verify factual claims against empirical sources, and generate concrete validation roadmaps guarded by human approval checkpoints.
+The platform deploys seven specialized analytical perspectives to challenge assumptions, runs quantitative unit economics simulations in an isolated Python sandbox, verifies factual claims against empirical sources, and outputs a concrete 7-day falsification roadmap.
+
+Live Deployment: https://dossier.sanjeevkumar.me
 
 ---
 
-## Overview & Architecture
+## Architecture
 
 ```
                            +----------------------+
@@ -16,98 +16,73 @@ Instead of surface-level encouragement, Dossier deploys specialized adversarial 
                            +----------+-----------+
                                       |
                                       v
-                       +-------------------------------+
-                       |     Agent Harness Runtime     |
-                       +---------------+---------------+
-                                       |
-           +---------------------------+---------------------------+
-           |               |                       |               |
-           v               v                       v               v
-    +--------------+ +--------------+       +--------------+ +--------------+
-    |   Analyst    | |   Customer   |  ...  |  Architect   | |   Red Team   |
-    +------+-------+ +------+-------+       +------+-------+ +------+-------+
-           \               /                       \               /
-            \             /                         \             /
-             v           v                           v           v
-        +--------------------+                   +--------------------+
-        | Cross-Examination  |                   | Isolated Sandbox   |
-        | Adversarial Debate |                   | Python Sim (CAC/LTV|
-        +----------+---------+                   +---------+----------+
-                   |                                       |
-                   +-------------------+-------------------+
-                                       |
-                                       v
-                       +-------------------------------+
-                       | Human Approval Gate (Safety)  |
-                       |   [Approve / Reject Action]   |
-                       +---------------+---------------+
-                                       |
-                                       v
-                       +-------------------------------+
-                       | Final Idea Resilience Dossier |
-                       | (Score 0-100, Verdict, Plan)  |
-                       +-------------------------------+
+                       +------------------------------+
+                       |    Orchestration Harness     |
+                       +--------------+---------------+
+                                      |
+          +---------------------------+---------------------------+
+          |               |                       |               |
+          v               v                       v               v
+   +--------------+ +--------------+       +--------------+ +--------------+
+   |   Analyst    | |   Customer   |  ...  |  Architect   | |   Red Team   |
+   +------+-------+ +------+-------+       +------+-------+ +------+-------+
+          \               /                       \               /
+           \             /                         \             /
+            v           v                           v           v
+       +--------------------+                   +--------------------+
+       | Cross-Examination  |                   | Isolated Sandbox   |
+       | Adversarial Debate |                   | Python Sim (CAC/LTV|
+       +----------+---------+                   | Sobol EVPI Matrix) |
+                  |                             +---------+----------+
+                  +-------------------+-------------------+
+                                      |
+                                      v
+                      +--------------------------------+
+                      |     Epistemic Verification     |
+                      |   7-Tier Claim Classification  |
+                      +---------------+----------------+
+                                      |
+                                      v
+                      +--------------------------------+
+                      |  Final Idea Resilience Dossier |
+                      |   Score (0-100), Kill Flags,   |
+                      |  7-Day Falsification Roadmap   |
+                      +--------------------------------+
 ```
 
 ---
 
 ## Swarm Perspectives
 
-- **Synthesizer (00):** Resolves contradictions across perspectives, computes the Resilience Score (0–100), and structures the 7-day validation plan.
-- **Analyst (01):** Competitor landscape mapping, addressable market sizing, search intent signals, and whitespace identification.
-- **Customer Advocate (02):** User friction, switching costs, habit inertia, and willingness-to-pay realities.
-- **Technical Architect (03):** Feasibility, compute/token operational economics, infrastructure bottlenecks, and sandbox safety.
-- **Investor (04):** Business model viability, gross margins, defensibility, and capital efficiency.
-- **Red Team (05, Chief Adversary):** Identifies fatal flaws, churn traps, regulatory exposure, and distribution failure points. Holds veto authority (`STRONG_KILL`) over affirmative verdicts.
-- **Domain Expert (06):** Sector-specific compliance, standards, and operational benchmarks.
+- **Synthesizer (Agent 00):** Resolves perspective contradictions, computes the composite Resilience Score (0–100), and structures the 7-day falsification plan.
+- **Analyst (Agent 01):** Maps competitor landscapes, addressable market sizing, organic search intent, and whitespace opportunities.
+- **Customer Advocate (Agent 02):** Evaluates user friction, switching costs, workflow disruption, and empirical willingness to pay.
+- **Technical Architect (Agent 03):** Audits engineering feasibility, compute and token unit economics, and architectural bottlenecks.
+- **Investor (Agent 04):** Models gross margins, capital efficiency, defensibility, and market timing.
+- **Red Team (Agent 05, Chief Adversary):** Identifies fatal flaws, churn traps, regulatory exposure, and distribution failure points. Holds affirmative veto authority (`STRONG_KILL`).
+- **Domain Expert (Agent 06):** Verifies vertical-specific regulatory compliance, standard contracts, and sector benchmarks.
 
 ---
 
-## Core Capabilities
+## Core Systems
 
-- **Sandboxed Unit Economics:** Runs isolated Python subprocesses with vectorized NumPy Monte Carlo simulations (10,000 iterations) to model cash runway, LTV/CAC ratios, and payback percentiles under parameter uncertainty.
-- **Epistemic Verification (Stanford CS329A):** Classifies assertions into 7 discrete evidence states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`) to separate empirical evidence from assumptions.
-- **Real-World Intelligence Sources:**
-  - *Hacker News (Algolia API):* Developer discussions, Show HN launches, and negative sentiment threads.
-  - *Exa AI:* Web search, competitor discovery, and indexed technical updates.
-  - *Polymarket (Gamma API):* Public prediction market probabilities and macro sentiment trends.
-  - *Historical Reference Classes:* 16 empirical distributions (Census BFS, PitchBook, Stanford AI Index, CB Insights) for baseline survival and failure distributions.
-- **Human Approval Gates:** Actions with real-world impact (such as outbound email dispatch or landing page deployment) require explicit operator sign-off before execution.
-- **Zero-Fabrication Contract:** If an external intelligence source is unavailable or unconfigured, Dossier reports zero results and marks the provider as unconfigured rather than generating synthetic citations.
+- **Sandboxed Unit Economics:** Executes isolated Python subprocesses with vectorized NumPy Monte Carlo simulations (10,000 runs) to model cash runway, LTV/CAC ratios, and payback percentiles under parameter uncertainty.
+- **Global Sensitivity & VOI:** Calculates first-order Sobol indices and Expected Value of Perfect Information (EVPI) to rank which uncertain metrics carry the highest financial risk.
+- **Epistemic Claim Verification:** Classifies factual assertions into seven discrete evidence tiers (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
+- **Empirical Grounding & Graveyard Precedents:** Cross-references queries against curated failure case studies (Startup Graveyard) and real market evidence (Exa AI, Hacker News, Google News, prediction markets, SEC EDGAR filings, and US Census base rates).
+- **7-Day Falsification Roadmaps:** Replaces arbitrary approval gates with verifiable, low-cost empirical experiments designed to invalidate core assumptions before capital expenditure.
+- **Zero-Fabrication Contract:** When external providers are unconfigured or unavailable, Dossier records explicit empty signals rather than generating synthetic citations.
 
 ---
 
-## Self-Hosting & Quickstart
+## Quickstart
 
-### Prerequisites
+### System Requirements
 - Node.js >= 22.0.0
 - Python 3.10+ (with `numpy` for sandbox simulations)
 - pnpm (recommended) or npm
-- (Optional) Docker
 
-### 1. One-Command Setup (Makefile)
-
-The Makefile handles dependency checks, environment setup, build steps, and startup:
-
-```bash
-git clone https://github.com/sanjeevafk/dossier.git
-cd dossier
-make
-```
-
-The default `make` (or `make run`) target checks `.env`, installs Node and Python dependencies, builds the TypeScript project, and starts the server on `http://localhost:3000`.
-
-To start in development mode with auto-reload:
-```bash
-make dev
-```
-
-Additional targets:
-- `make test`: Run unit tests and decision model test suite (92 tests).
-- `make benchmark`: Run the 10-concept domain resilience benchmark.
-- `make clean`: Remove build artifacts and temporary cache files.
-
-### 2. Manual Setup
+### Installation
 
 ```bash
 git clone https://github.com/sanjeevafk/dossier.git
@@ -117,31 +92,33 @@ cd dossier
 pnpm install
 pip install -r requirements.txt
 
-# Configure environment
+# Configure environment variables
 cp .env.example .env
 
-# Build and start
+# Build TypeScript
 pnpm run build
+
+# Start the native HTTP server
 pnpm start
 ```
 
 Open `http://localhost:3000` in your browser.
 
-### 3. Docker Setup
+### Docker
 
 ```bash
 docker build -t dossier .
 docker run -p 3000:3000 --env-file .env dossier
 ```
 
-### 4. CLI Evaluation
+### Terminal CLI Evaluation
 
-Evaluate an idea directly from the terminal:
+Evaluate a concept directly from the command line:
 
 ```bash
 pnpm cli evaluate \
   --title "Autonomous Micro-SaaS Agent" \
-  --summary "AI agent that handles customer support and initiates database backups automatically." \
+  --summary "AI agent that handles customer support and triggers database migrations automatically." \
   --audience "Shopify Merchants" \
   --monetization "$99/month" \
   --pricing 99 \
@@ -152,70 +129,48 @@ pnpm cli evaluate \
 
 ## Configuration
 
-Copy `.env.example` to `.env` to configure optional and required settings:
+Dossier is fully pluggable and model-agnostic. It can connect to any OpenAI-compatible API endpoint, local inference server, or generic CLI harness. If no live LLM is configured, Dossier automatically falls back to an offline heuristic engine.
 
 | Variable | Description | Default |
 |:---|:---|:---|
-| `OPENAI_API_KEY` | OpenAI API key for LLM evaluations | Optional |
-| `ANTHROPIC_API_KEY` | Anthropic API key | Optional |
+| `LLM_BASE_URL` | Base URL for any OpenAI-compatible inference endpoint (vLLM, Ollama, LiteLLM, LM Studio) | None |
+| `LLM_API_KEY` | API key corresponding to `LLM_BASE_URL` | None |
+| `LLM_MODEL` | Target model name for custom endpoint or CLI runner | `default` |
+| `LLM_CLI_CMD` | External CLI execution command for pluggable runner (e.g. `ollama run llama3`) | None |
+| `DOSSIER_LLM_BACKEND` | Runtime selection: `api` (HTTP endpoints) or `cli` (external subprocess) | `auto` |
+| `GROQ_API_KEY` | Groq LPU API key | Optional |
+| `OPENROUTER_API_KEY` | OpenRouter gateway API key | Optional |
+| `OPENAI_API_KEY` | OpenAI direct API key | Optional |
 | `GEMINI_API_KEY` | Google Gemini API key | Optional |
-| `DOSSIER_LLM_BACKEND` | LLM runtime selection: `api` (direct keys) or `agy` (CLI harness) | `auto` |
 | `EXA_API_KEY` | Exa AI neural search key for competitor reconnaissance | Optional |
-| `DOSSIER_API_KEY` | Authentication key required for production non-GET endpoints | Optional |
+| `DOSSIER_API_KEY` | Authentication bearer token required in production for non-GET endpoints | Optional |
 | `PORT` | HTTP server port | `3000` |
 | `DOSSIER_DATA_DIR` | SQLite database and generated PDF export storage directory | `./data` |
 
 ---
 
-## Model Context Protocol (MCP) & Agent Skill
+## REST & Streaming API Reference
 
-Dossier can be operated as a standalone MCP server, invoked via `npx`, installed globally, or installed as an agent skill.
+The server runs on native Node.js HTTP (`node:http`) with zero Express dependencies.
 
-### 1. Installation via GitHub Packages
+- `GET /health` - Health check and LLM provider status.
+- `GET /metrics` - Prometheus metrics (request counters, latencies, memory usage).
+- `POST /api/evaluate` - Synchronous complete dossier evaluation.
+- `POST /api/evaluate/stream` - Server-Sent Events (SSE) streaming evaluation with per-agent deltas.
+- `POST /api/chat/stream` - Interactive adversary chat turn streaming.
+- `GET /api/dossiers` - List persisted evaluation dossiers.
+- `GET /api/dossiers/:id` - Fetch dossier record by ID.
+- `GET /api/dossiers/:id/export/markdown` - Export evaluation report as GitHub-flavored markdown.
+- `GET /api/dossiers/:id/export/pdf` - Export evaluation report as formatted PDF.
 
-```bash
-# Option 1: Configure scoped registry once in ~/.npmrc
-npm config set @sanjeevafk:registry https://npm.pkg.github.com
-npm install -g @sanjeevafk/dossier
+---
 
-# Option 2: Run directly via npx without local install
-npx -y --@sanjeevafk:registry=https://npm.pkg.github.com @sanjeevafk/dossier evaluate --title "My Idea"
-```
+## Model Context Protocol (MCP) Integration
 
-### 2. Connecting via MCP (`dossier.mcp.json`)
+Dossier includes a certified Model Context Protocol (MCP) server for integration with Cursor, Claude Desktop, and autonomous coding agents.
 
-Add Dossier to your Claude Desktop (`claude_desktop_config.json`) or agent harness configuration:
+### Configuration (`claude_desktop_config.json`)
 
-**Option A: Direct via `npx` (Recommended)**
-```json
-{
-  "mcpServers": {
-    "dossier": {
-      "command": "npx",
-      "args": ["-y", "--@sanjeevafk:registry=https://npm.pkg.github.com", "@sanjeevafk/dossier", "mcp"],
-      "env": {
-        "OPENAI_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
-```
-
-**Option B: Global binary (`dossier-mcp`)**
-```json
-{
-  "mcpServers": {
-    "dossier": {
-      "command": "dossier-mcp",
-      "env": {
-        "OPENAI_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
-```
-
-**Option C: Local source**
 ```json
 {
   "mcpServers": {
@@ -223,39 +178,48 @@ Add Dossier to your Claude Desktop (`claude_desktop_config.json`) or agent harne
       "command": "node",
       "args": ["/path/to/dossier/dist/mcp-server.js"],
       "env": {
-        "OPENAI_API_KEY": "your_api_key_here"
+        "LLM_BASE_URL": "http://localhost:11434/v1",
+        "LLM_MODEL": "llama3"
       }
     }
   }
 }
 ```
 
-Exposed MCP Tools:
-- `evaluate_idea`: Deploys the 6-agent swarm, epistemic verification, Python unit economics, and returns a structured dossier.
-- `stress_test_concept`: Evaluates prompt injection defense and sandbox constraints.
-- `run_sandbox_economics`: Executes isolated Python subprocess simulations for LTV, CAC, and payback bounds.
-- `verify_claims_epistemics`: Classifies claims across the 7 epistemic tiers.
-
-### 3. Installing the Agent Skill
-
-To install Dossier into an agent environment:
-
-```bash
-cp -r skills/dossier ~/.agents/skills/
-```
+### Available MCP Tools
+- `evaluate_idea`: Deploys the full 7-agent swarm, epistemic verification, and unit economics simulation.
+- `run_sandbox_economics`: Executes an isolated Python Monte Carlo run for LTV, CAC, runway, and Sobol EVPI.
+- `verify_claims_epistemics`: Audits assertions across the 7-tier epistemic evidence ledger.
+- `stress_test_concept`: Evaluates adversarial resilience, prompt injection resistance, and domain boundaries.
 
 ---
 
-## Testing
+## Verification & Benchmarks
+
+The codebase maintains rigorous automated test suites covering decision model invariants, statistical bounds, and empirical startup outcomes:
 
 ```bash
-make test            # Full unit and decision model test suite (92 tests)
-pnpm run test:stress # 5-invariant adversarial harness exploit suite
-pnpm run benchmark   # 10-concept domain resilience benchmark
+# Run unit and decision model test suite (86 tests)
+npm test
+
+# Run adversarial exploit harness (stress-testing 5 core invariants)
+npm run test:stress
+
+# Run historical startup backtest against 9 known successes and failures
+npx tsx scripts/backtest_real_startups.ts
+
+# Run domain resilience benchmark suite
+pnpm run benchmark
 ```
+
+### Historical Backtest Results
+When benchmarked against 9 documented startup launches (Stripe, Figma, Vanta, Airbnb, Quibi, Fast, Juicero, Theranos, Zume Pizza):
+- **Overall Accuracy:** 89% (8/9 correct)
+- **Failure Flagging Rate:** 100% Specificity (5/5 failed ventures flagged as fatal `KILL`)
+- **Success Identification:** 75% Sensitivity (3/4 successes recommended for `REFINE` or `BUILD`)
 
 ---
 
 ## License
 
-Licensed under the Apache License, Version 2.0 (the "License"). 
+Licensed under the Apache License, Version 2.0.
