@@ -1,5 +1,5 @@
 import { UnifiedMarketSignal, FetchImpl } from "./types.js";
-import { getSearchQueryCandidates, extractDomainTokens } from "../queryTokens.js";
+import { getSearchQueryCandidates, extractDomainTokens, isMarketTitleCorrelated } from "../queryTokens.js";
 
 const FALSE_POSITIVE_PHRASES = [
   "regulation time",
@@ -49,11 +49,13 @@ export async function queryPolymarketUnified(
           const signals: UnifiedMarketSignal[] = [];
 
           for (const event of events.slice(0, 15)) {
-            const titleLower = String(event.title || "").toLowerCase();
+            const title = String(event.title || "");
+            const titleLower = title.toLowerCase();
             if (FALSE_POSITIVE_PHRASES.some((phrase) => titleLower.includes(phrase))) {
               continue;
             }
-            if (queryTokens.length > 0 && !queryTokens.some((t) => titleLower.includes(t.replace(/[^a-z0-9]/g, "")))) {
+            const category = event.tags?.[0]?.label || "";
+            if (!isMarketTitleCorrelated(title, queryTokens, category)) {
               continue;
             }
             const firstMarket = event.markets?.[0];

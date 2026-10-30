@@ -51,6 +51,7 @@ import { queryEdgarFormD } from "../tools/edgar.js";
 import { queryHuggingFace } from "../tools/huggingface.js";
 import { queryClinicalEvidence } from "../tools/clinical.js";
 import { queryMacroData } from "../tools/macro.js";
+import { queryFloviaIntelligence } from "../tools/flovia.js";
 import { findMatchingItchProblems } from "../data/fixMyItchProblems.js";
 import { findMatchingGraveyardPrecedents } from "../data/graveyardAntipatterns.js";
 import { generateAgentTurn, getLLMStatus } from "../services/llm.js";
@@ -875,7 +876,8 @@ Market & Prediction Signals: ${marketContext}`;
     const itchMatches = findMatchingItchProblems(combinedIdeaText);
     const graveyardMatches = findMatchingGraveyardPrecedents(combinedIdeaText);
     const isHealthcare = domain.archetype === "healthcare_clinical";
-    const [marketResearch, unifiedMarkets, newsSignals, reachSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, sandboxSim, stressSim] = await Promise.all([
+    const isWeb3 = domain.archetype === "web3_defi";
+    const [marketResearch, unifiedMarkets, newsSignals, reachSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, floviaSignals, sandboxSim, stressSim] = await Promise.all([
       performMarketResearch(idea.title, [
         idea.targetAudience,
         idea.monetization,
@@ -892,6 +894,7 @@ Market & Prediction Signals: ${marketContext}`;
       queryHuggingFace(idea.title),
       queryClinicalEvidence(idea.title, isHealthcare),
       queryMacroData(idea.targetAudience),
+      queryFloviaIntelligence(idea.title, { isWeb3OrCrypto: isWeb3 }),
       runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30),
       // Pessimistic stress run feeding the crossfire tool traces (plan 2.2 ReAct evidence)
       runEconomicsSimulation(pricing * 0.85, Math.min(1, churn * 1.6), cac * 1.6, 500, 1500, 30)
@@ -968,6 +971,11 @@ Market & Prediction Signals: ${marketContext}`;
     if (macroSignals.indicators.length > 0) {
       reconSourceParts.push(
         `Macro grounding (World Bank): ${macroSignals.keyTakeaway}`
+      );
+    }
+    if (floviaSignals.active && floviaSignals.signals.length > 0) {
+      reconSourceParts.push(
+        `On-chain liquidity & asset ground truth (${floviaSignals.source}): ${floviaSignals.keyTakeaway}`
       );
     }
     reconSourceParts.push(
@@ -1226,6 +1234,20 @@ Market & Prediction Signals: ${marketContext}`;
         confidencePercent: 85
       });
       retrievedExternalCount++;
+    }
+    if (floviaSignals.active && floviaSignals.signals.length > 0) {
+      floviaSignals.signals.forEach((sig, idx) => {
+        externalEvidenceItems.push({
+          id: `EV-03F${idx + 1}`,
+          claim: `On-chain market pricing (${floviaSignals.source}): ${sig.asset} trading at $${sig.priceUsd.toLocaleString()}${sig.change24hPercent !== undefined ? ` (${sig.change24hPercent > 0 ? "+" : ""}${sig.change24hPercent}% 24h)` : ""}.`,
+          tier: "EXTERNAL_EVIDENCE",
+          claimType: "EXTERNAL_EVIDENCE",
+          provenance: "https://api.flovia.dev/mcp",
+          indicator: "SUPPORTING",
+          confidencePercent: 90
+        });
+        retrievedExternalCount++;
+      });
     }
     for (let i = 0; i < Math.min(reachSignals.gitHubRepos.length, 2); i++) {
       const repo = reachSignals.gitHubRepos[i];
@@ -1859,6 +1881,7 @@ Market & Prediction Signals: ${marketContext}`;
       ...edgarSignals.filings.map(f => ({ title: `Form D: ${f.company}`, url: f.filingUrl, provider: "sec-edgar" })),
       ...hfSignals.models.map(m => ({ title: `Hub: ${m.id}`, url: m.modelUrl, provider: "huggingface" })),
       ...clinicalSignals.studies.map(s => ({ title: `${s.nctId}: ${s.title.slice(0, 100)}`, url: s.studyUrl, provider: "clinicaltrials" })),
+      ...floviaSignals.signals.map(s => ({ title: `[Flovia / CoinGecko] ${s.asset}: $${s.priceUsd.toLocaleString()}`, url: "https://api.flovia.dev/mcp", provider: "flovia" })),
       ...newsSignals.articles.map(a => ({ title: `[NEWS] ${a.title.slice(0, 120)}`, url: a.url, provider: a.source })),
       ...reachSignals.gitHubRepos.map(g => ({ title: `[GitHub] ${g.fullName} (${g.stars}★): ${g.description.slice(0, 80)}`, url: g.url, provider: "github" })),
       ...(reachSignals.deepScrape ? [{ title: `[Jina Reader] ${reachSignals.deepScrape.title}`, url: reachSignals.deepScrape.url, provider: "jina-reader" }] : []),

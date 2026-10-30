@@ -1,4 +1,4 @@
-import { getSearchQueryCandidates, extractDomainTokens } from "./queryTokens.js";
+import { getSearchQueryCandidates, extractDomainTokens, isMarketTitleCorrelated } from "./queryTokens.js";
 
 export interface PredictionMarketSignal {
   id: string;
@@ -63,9 +63,10 @@ export async function queryPolymarketMarkets(
           const signals: PredictionMarketSignal[] = [];
 
           for (const event of events.slice(0, 10)) {
-            const titleLower = String(event.title || "").toLowerCase();
-            if (queryTokens.length > 0 && !queryTokens.some((t) => titleLower.includes(t.replace(/[^a-z0-9]/g, "")))) {
-              continue; // Title shares no significant token with the concept — not correlated evidence.
+            const title = String(event.title || "");
+            const category = event.tags?.[0]?.label || "";
+            if (!isMarketTitleCorrelated(title, queryTokens, category)) {
+              continue; // Title shares insufficient significant correlation — not correlated evidence.
             }
             const firstMarket = event.markets?.[0];
             if (!firstMarket?.outcomePrices) {
