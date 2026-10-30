@@ -877,6 +877,7 @@ Market & Prediction Signals: ${marketContext}`;
     const graveyardMatches = findMatchingGraveyardPrecedents(combinedIdeaText);
     const isHealthcare = domain.archetype === "healthcare_clinical";
     const isWeb3 = domain.archetype === "web3_defi";
+    const isAcademicOrDeeptech = domain.archetype === "deeptech_research" || domain.archetype === "healthcare_clinical" || domain.archetype === "hardware_robotics";
     const [marketResearch, unifiedMarkets, newsSignals, reachSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, floviaSignals, sandboxSim, stressSim] = await Promise.all([
       performMarketResearch(idea.title, [
         idea.targetAudience,
@@ -889,10 +890,14 @@ Market & Prediction Signals: ${marketContext}`;
         isTechSoftware: domain.archetype === "b2b_saas" || domain.archetype === "deeptech_research" || domain.archetype === "web3_defi",
         preferredChannels: geo.preferredCommunityChannels
       }),
-      queryOpenAlex(`${idea.title} ${domain.archetypeLabel}`),
+      isAcademicOrDeeptech
+        ? queryOpenAlex(`${idea.title} ${domain.archetypeLabel}`)
+        : Promise.resolve({ query: idea.title, source: "OpenAlex (skipped for commercial archetype)", totalWorks: 0, papers: [], keyTakeaway: "Skipped academic literature search for non-research archetype." }),
       queryEdgarFormD(idea.title),
       queryHuggingFace(idea.title),
-      queryClinicalEvidence(idea.title, isHealthcare),
+      isHealthcare
+        ? queryClinicalEvidence(idea.title, true)
+        : Promise.resolve({ query: idea.title, source: "ClinicalTrials.gov (skipped non-healthcare)", totalStudies: 0, studies: [], clearances: [], keyTakeaway: "Non-clinical archetype — clinical trial search skipped." }),
       queryMacroData(idea.targetAudience),
       queryFloviaIntelligence(idea.title, { isWeb3OrCrypto: isWeb3 }),
       runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30),
