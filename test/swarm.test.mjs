@@ -73,8 +73,8 @@ test("Dossier Orchestrator evaluates idea and generates complete intelligence do
   assert.ok(dossier.contradictions.length > 0, "Contradictions must be populated");
   assert.ok(dossier.evidenceFeed.length > 0, "Evidence feed must be populated");
   assert.ok(dossier.debateTrail.length >= 3, "Round 1 debate trail must be populated");
-  assert.ok(dossier.approvalGates.length > 0, "Human approval gates must be defined");
-  assert.equal(dossier.approvalGates[0].status, "PENDING_HUMAN_APPROVAL");
+  assert.ok(dossier.cheapestValidationExperiment, "Cheapest validation experiment must be defined");
+  assert.ok(dossier.cheapestValidationExperiment.title, "Validation experiment must have a title");
 
   // Honesty invariants: no fabricated external evidence, no synthetic telemetry.
   const evidenceText = dossier.evidenceFeed.map((e) => `${e.provenance} ${e.claim}`).join(" ");

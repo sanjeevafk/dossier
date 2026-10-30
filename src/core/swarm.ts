@@ -11,7 +11,6 @@ import {
   AgentOpinion,
   DebateChallenge,
   Verdict,
-  ApprovalAction,
   SwarmRole,
   KeyAssumption,
   Contradiction,
@@ -1849,34 +1848,6 @@ Market & Prediction Signals: ${marketContext}`;
           }))
       : undefined;
 
-    const approvalGates: ApprovalAction[] = [
-      {
-        id: "GATE-01",
-        actionType: "PILOT_LOI_DRAFT",
-        summary: `Dispatch 10 tailored pilot Letter of Intent (LOI) requests to verified design partners in ${domain.primaryCustomer}.`,
-        payload: {
-          concept: idea.title,
-          domain: domain.archetypeLabel,
-          targetAudience: idea.targetAudience,
-          experiment: cheapestValidationExperiment.title
-        },
-        requiresApproval: true,
-        status: "PENDING_HUMAN_APPROVAL"
-      },
-      {
-        id: "GATE-02",
-        actionType: "SMOKE_TEST_LANDING_PAGE",
-        summary: `Deploy targeted one-page live demonstration request portal for "${idea.title}".`,
-        payload: {
-          url: "https://dossier-eval.internal/smoke-test",
-          targetAudience: idea.targetAudience,
-          budgetCapUsd: 50
-        },
-        requiresApproval: true,
-        status: "PENDING_HUMAN_APPROVAL"
-      }
-    ];
-
     const externalEvidenceSources: ExternalEvidenceSource[] = [
       ...marketResearch.rawResults.map(r => ({ title: r.title, url: r.url, provider: marketResearch.reconProvider })),
       ...marketResearch.community.discussions.map(d => ({ title: d.title, url: d.url, provider: d.platform })),
@@ -1984,15 +1955,14 @@ Market & Prediction Signals: ${marketContext}`;
           `02 — Refine value proposition to address Red Team fatal flaw: "${weakestAssumption.fatalRisk}".`
         ],
         day3to5: [
-          `03 — Deploy targeted pilot LOI requests (Approval Gate 01).`,
+          `03 — Deploy targeted pilot LOI requests to design partners.`,
           `04 — Prototype isolated core single-job execution inside Dossier sandbox.`
         ],
         day6to7: [
           `05 — Re-run DOSSIER with live LOI response evidence.`,
           `06 — Final GO / NO-GO decision against defined kill conditions.`
         ]
-      },
-      approvalGates
+      }
     };
 
     // Idea Autopsy & Mutation Engine (plan 3.3): collapsed concepts receive three

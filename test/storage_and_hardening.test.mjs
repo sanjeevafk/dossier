@@ -88,16 +88,7 @@ test("Dossier Storage Service saves, retrieves, exports, and updates approvals",
       day1to2: [],
       day3to5: [],
       day6to7: []
-    },
-    approvalGates: [
-      {
-        id: "GATE-TEST-01",
-        actionType: "INFRASTRUCTURE_DEPLOY",
-        summary: "Deploy pilot cluster",
-        requiresApproval: true,
-        status: "PENDING_HUMAN_APPROVAL"
-      }
-    ]
+    }
   };
 
   // 1. Save and retrieve
@@ -116,12 +107,6 @@ test("Dossier Storage Service saves, retrieves, exports, and updates approvals",
   const markdown = dossierStorage.exportDossierMarkdown(retrieved);
   assert.ok(markdown.includes("DOSSIER REPORT: AUTOMATED TEST CONCEPT"), "Markdown should have report header");
   assert.ok(markdown.includes("BUILD_IF_VALIDATED"), "Markdown should include verdict");
-
-  // 4. Update approval gate
-  const approvalRes = await dossierStorage.updateApprovalStatus("GATE-TEST-01", "APPROVED");
-  assert.equal(approvalRes.updated, true, "Approval should be updated");
-  const updatedDossier = await dossierStorage.getDossier("TEST-DOSSIER-001");
-  assert.equal(updatedDossier.approvalGates[0].status, "APPROVED");
 });
 
 test("Sandbox Economics Runner securely sanitizes inputs and blocks script injection", async () => {

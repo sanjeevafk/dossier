@@ -12,7 +12,7 @@ import { EpistemicRobustVerifier } from "./core/verifier.js";
 import { runEconomicsSimulation } from "./tools/sandbox.js";
 import { runStressTestSuite } from "./stress-test.js";
 import { dossierStorage } from "./services/storage.js";
-import { IdeaInput, AgentOpinion, DebateChallenge, ApprovalAction, EvidenceItem } from "./types/index.js";
+import { IdeaInput, AgentOpinion, DebateChallenge, EvidenceItem } from "./types/index.js";
 
 /**
  * Dossier Model Context Protocol (MCP) Server
@@ -202,18 +202,6 @@ class DossierMCPServer {
             }
           },
           {
-            name: "update_approval_gate",
-            description: "Submits a human operator decision (APPROVED or REJECTED) on an action approval gate, persisting state.",
-            inputSchema: {
-              type: "object",
-              properties: {
-                actionId: { type: "string", description: "Approval Gate ID (e.g. 'GATE-01')" },
-                decision: { type: "string", enum: ["APPROVE", "REJECT"], description: "Operator authorization decision" }
-              },
-              required: ["actionId", "decision"]
-            }
-          },
-          {
             name: "update_outcome",
             description: "Records a real-world outcome (built, killed, pivoted) for a dossier. Feeds the calibration ledger (Brier/ECE) — resolves fatal assumptions and gates BUILD.",
             inputSchema: {
@@ -312,14 +300,7 @@ class DossierMCPServer {
                         monthlyInfraCostUsd: dossier.simulation.monthlyInfraCostUsd,
                         tamEstimateUsd: dossier.simulation.tamEstimateUsd,
                         sandboxExecutionProof: dossier.simulation.sandboxExecutionProof
-                      },
-                      humanApprovalGates: dossier.approvalGates.map((a: ApprovalAction) => ({
-                        id: a.id,
-                        actionType: a.actionType,
-                        summary: a.summary,
-                        status: a.status,
-                        requiresApproval: a.requiresApproval
-                      }))
+                      }
                     },
                     null,
                     2
@@ -471,34 +452,6 @@ class DossierMCPServer {
                 {
                   type: "text",
                   text: exportContent
-                }
-              ]
-            };
-          }
-
-          case "update_approval_gate": {
-            const actionId = String(args?.actionId || "");
-            const decision = args?.decision === "APPROVE" ? "APPROVED" : "REJECTED";
-
-            const result = await dossierStorage.updateApprovalStatus(actionId, decision as "APPROVED" | "REJECTED");
-
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(
-                    {
-                      success: result.updated,
-                      actionId,
-                      decision,
-                      dossierId: result.dossierId,
-                      message: result.updated
-                        ? `Approval gate ${actionId} successfully updated to ${decision}.`
-                        : `Approval gate ${actionId} not found in any active dossier.`
-                    },
-                    null,
-                    2
-                  )
                 }
               ]
             };

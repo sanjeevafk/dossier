@@ -306,11 +306,13 @@ async function main() {
       console.log(`  • Monthly Infra  : $${dossier.simulation.monthlyInfraCostUsd}`);
       console.log(`  • Sandbox Proof  : ${pc.dim(dossier.simulation.sandboxExecutionProof.runtime)} (exit ${dossier.simulation.sandboxExecutionProof.exitCode})`);
 
-      // Human Approval Gates
-      console.log(pc.bold("\n🛑 HUMAN-IN-THE-LOOP APPROVAL GATES (Dual-Key Safety):"));
-      for (const gate of dossier.approvalGates) {
-        console.log(`  • [${pc.yellow(gate.status)}] ${gate.summary}`);
-        console.log(`    Action Type: ${gate.actionType}`);
+      // 7-Day Falsification Validation Roadmap
+      if (dossier.cheapestValidationExperiment) {
+        console.log(pc.bold("\n🧪 7-DAY FALSIFICATION EXPERIMENTS (Cheapest Validation Move):"));
+        console.log(`  • Title       : ${dossier.cheapestValidationExperiment.title}`);
+        console.log(`  • Est. Cost   : $${dossier.cheapestValidationExperiment.estimatedCostUsd} | Turnaround: ${dossier.cheapestValidationExperiment.timeToExecuteDays} days`);
+        console.log(`  • Kill Signal : ${pc.red(dossier.cheapestValidationExperiment.failureKillSignal)}`);
+        console.log(`  • Success Gate: ${pc.green(dossier.cheapestValidationExperiment.successMetric)}`);
       }
 
       console.log(pc.green("\n✔ Full evidence-first dossier compiled successfully.\n"));
