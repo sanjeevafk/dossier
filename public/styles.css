@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Dossier Editorial Stylesheet — Inspired by ERP.AI & ProtoAgent.AI */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
 
@@ -98,71 +102,37 @@ html.dark .bg-zinc-950 {
 }
 
 html.dark .bg-zinc-100,
-html.dark .bg-zinc-200 {
-  background-color: #27272a !important;
-  color: #e4e4e7 !important;
+html.dark [class*="bg-zinc-100"] {
+  background-color: #201e1d !important;
 }
 
-html.dark .hover\:bg-zinc-800:hover {
-  background-color: #3f3f46 !important;
-}
-
-html.dark .bg-emerald-100 {
-  background-color: rgba(6, 78, 59, 0.4) !important;
-  color: #6ee7b7 !important;
-}
-
-html.dark .bg-red-100 {
-  background-color: rgba(127, 29, 29, 0.4) !important;
-  color: #fca5a5 !important;
-}
-
-html.dark .bg-amber-100 {
-  background-color: rgba(120, 53, 15, 0.4) !important;
-  color: #fcd34d !important;
-}
-
-html.dark .text-emerald-700,
-html.dark .text-emerald-800 {
-  color: #34d399 !important;
-}
-
-html.dark .text-red-700,
-html.dark .text-red-800 {
-  color: #f87171 !important;
-}
-
-html.dark .text-amber-700,
-html.dark .text-amber-800 {
-  color: #fbbf24 !important;
+html.dark .border-zinc-200,
+html.dark [class*="border-zinc-200"] {
+  border-color: #2b2927 !important;
 }
 
 html.dark input,
+html.dark textarea,
 html.dark select {
-  background-color: #1c1917 !important;
+  background-color: #1c1a19 !important;
+  border-color: #383533 !important;
   color: #fafaf9 !important;
-  border-color: #292524 !important;
 }
 
-html.dark textarea#ideaInput {
-  color: #fafaf9 !important;
-  background-color: #171717 !important;
+html.dark input:focus,
+html.dark textarea:focus,
+html.dark select:focus {
+  border-color: #71717a !important;
+  outline: none;
 }
 
-html.dark textarea#ideaInput::placeholder {
-  color: #71717a !important;
+/* Subtle focus ring */
+input:focus, textarea:focus, select:focus, button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.35);
 }
 
-code, kbd, samp, pre, .font-mono {
-  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-/* Hairline Grid & Divider */
-.hairline-border {
-  border-color: #e4e4e7;
-}
-
-/* Custom Scrollbars */
+/* Clean Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -171,155 +141,62 @@ code, kbd, samp, pre, .font-mono {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: #d4d4d8;
-  border-radius: 9999px;
+  background: #d6d3d1;
+  border-radius: 3px;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #44403c;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #a1a1aa;
+  background: #a8a29e;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #57534e;
 }
 
-/* Modal Backdrop */
-.modal-backdrop {
-  background-color: rgba(9, 9, 11, 0.65);
-  backdrop-filter: blur(6px);
+/* Micro-badge pulse */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+.pulse-dot {
+  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Live stream step animation */
-@keyframes pulseSubtle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+/* Shimmer scanline effect for active sandbox */
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.shimmer-bar::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(250, 204, 21, 0.15), transparent);
+  animation: shimmer-sweep 2s ease-in-out infinite;
 }
 
-.step-pulsing {
-  animation: pulseSubtle 1.4s ease-in-out infinite;
+/* Telemetry number styling */
+.tabular-numbers {
+  font-variant-numeric: tabular-nums;
 }
 
-/* Canvas styling */
-.canvas-container canvas {
-  width: 100% !important;
-  height: auto !important;
-  display: block;
-}
-
-/* Print Stylesheet for McKinsey/Venture Grade PDF Export */
+/* Print optimizations */
 @media print {
-  @page {
-    size: letter portrait;
-    margin: 12mm 14mm 14mm 14mm;
-  }
-
-  *, *:before, *:after {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
-
   body {
     background: #ffffff !important;
-    color: #09090b !important;
-    font-size: 9.5pt !important;
-    line-height: 1.4 !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    color: #000000 !important;
   }
-
-  main {
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    space-y: 0 !important;
-  }
-
-  /* Hide navigation, hero input, landing marketing, and controls */
-  header,
-  footer,
-  #heroSection,
-  #streamContainer,
-  #whySection,
-  #architectureSection,
-  #mcpSection,
-  #archiveSection,
-  .no-print,
-  #intakeModal,
-  #apiKeyModal {
+  header, footer, #evalForm, #recentRuns, .no-print {
     display: none !important;
   }
-
-  /* Unfold and display results container cleanly */
   #resultsSection {
     display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
+  }
+  .shadow-sm, .shadow-md, .shadow-lg {
     box-shadow: none !important;
-    background: transparent !important;
   }
-
-  /* Force open collapsible sections for full PDF diligence */
-  #resultsSection details {
-    display: block !important;
-    border: 1px solid #e7e5e4 !important;
-    background: #ffffff !important;
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-    margin-top: 12pt !important;
+  .border-sand-200, .border-sand-100 {
+    border-color: #cccccc !important;
   }
-
-  #resultsSection details summary {
-    display: block !important;
-    list-style: none !important;
-    font-size: 9pt !important;
-    padding: 6pt 10pt !important;
-    background: #fbfbfa !important;
-    border-bottom: 1px solid #e7e5e4 !important;
-  }
-
-  #resultsSection details summary::-webkit-details-marker {
-    display: none !important;
-  }
-
-  #resultsSection details > div {
-    display: block !important;
-    padding: 8pt 10pt !important;
-  }
-
-  /* Clean grids for print width */
-  .grid {
-    display: grid !important;
-  }
-
-  /* Keep core cards and stochastic financial ledger from breaking mid-box */
-  #resultsSection > div,
-  #mcFinancialLedger,
-  #mcSummaryCards,
-  #mcFinancialLedger > div,
-  .rounded-xl,
-  .rounded-2xl {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-
-  /* Ensure canvases retain clean dimensions and crisp borders */
-  .canvas-container {
-    height: 120px !important;
-  }
-
-  .canvas-container canvas {
-    max-height: 120px !important;
-    width: 100% !important;
-  }
-
-  /* Ensure dark stochastic cards print crisply with contrast */
-  .bg-zinc-900 {
-    background-color: #18181b !important;
-    color: #ffffff !important;
-    border: 1px solid #27272a !important;
-  }
-
-  /* Print specific font scaling */
-  h1 { font-size: 16pt !important; }
-  h2 { font-size: 13pt !important; }
-  h3 { font-size: 10pt !important; }
 }
