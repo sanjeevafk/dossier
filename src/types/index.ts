@@ -239,15 +239,6 @@ export interface ClaimNode {
   provenance?: string;
 }
 
-export interface ApprovalAction {
-  id: string;
-  actionType: "COLD_OUTREACH_EMAIL" | "SMOKE_TEST_LANDING_PAGE" | "COMMUNITY_POST" | "SURVEY_DISTRIBUTION" | "PILOT_LOI_DRAFT";
-  summary: string;
-  payload: Record<string, any>;
-  requiresApproval: true;
-  status: "PENDING_HUMAN_APPROVAL" | "APPROVED" | "REJECTED";
-}
-
 export interface ResilienceScoreBreakdown {
   technicalFeasibility: number; // 20%
   demandAndAdoption: number; // 25%
@@ -418,7 +409,6 @@ export interface IdeaDossier {
     day3to5: string[];
     day6to7: string[];
   };
-  approvalGates: ApprovalAction[];
 }
 
 // ======================= B1 — Calibration Ledger =======================

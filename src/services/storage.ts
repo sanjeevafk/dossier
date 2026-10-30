@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { IdeaDossier, ApprovalAction } from "../types/index.js";
+import { IdeaDossier } from "../types/index.js";
 import { seedDossiers } from "../data/seedDossiers.js";
 
 
@@ -433,30 +433,6 @@ export class DossierStorageService {
   }
 
   /**
-   * Update the status of a human approval gate action persistently across dossiers.
-   */
-  public async updateApprovalStatus(
-    actionId: string,
-    decision: "APPROVED" | "REJECTED"
-  ): Promise<{ updated: boolean; dossierId?: string; action?: ApprovalAction }> {
-    const newStatus = decision === "APPROVED" ? "APPROVED" : "REJECTED";
-
-    // Search cache and disk
-    await this.listDossiers(50); // hydrate cache
-
-    for (const [id, dossier] of this.memoryCache.entries()) {
-      const gate = dossier.approvalGates?.find(g => g.id === actionId);
-      if (gate) {
-        gate.status = newStatus;
-        await this.saveDossier(dossier);
-        return { updated: true, dossierId: id, action: gate };
-      }
-    }
-
-    return { updated: false };
-  }
-
-  /**
    * Export a dossier as clean GitHub Flavored Markdown.
    */
   public exportDossierMarkdown(d: IdeaDossier): string {
@@ -575,15 +551,7 @@ ${d.killConditions.map((c, i) => `${i + 1}. **KILL** ${c}`).join("\n")}
 
 ---
 
-## 8. Dual-Key Human Approval Gates (Safety Invariant)
-
-${d.approvalGates.map(gate => `- **[${gate.status}]** \`${gate.id}\` (${gate.actionType})
-  - *Summary:* ${gate.summary}
-  - *Requires Explicit Human Authorization:* Yes`).join("\n\n")}
-
----
-
-## 9. Epistemic Robustness Invariant Audit Trail
+## 8. Epistemic Robustness Invariant Audit Trail
 
 > **Protocol:** \`${d.verificationAudit?.verifierProtocol || "EPISTEMIC_ROBUST_VERIFIER"}\`  
 > **Claims Audited:** \`${d.verificationAudit?.totalClaimsAudited || d.verificationAudit?.auditItems?.length || 0}\` | **Contradictions / Hallucinations Intercepted:** \`${d.verificationAudit?.hallucinationsBlocked || 0}\`

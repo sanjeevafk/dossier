@@ -644,42 +644,7 @@ async function app(req: IncomingMessage, res: ServerResponse): Promise<void> {
       return;
     }
 
-    // 8. Approval action gate endpoint (Persistent Human-in-the-loop)
-    const approvalMatch = pathname.match(/^\/api\/approval\/([^/]+)$/);
-    if (method === "POST" && approvalMatch) {
-      if (!checkAuth(req, res)) return;
-      const actionId = approvalMatch[1];
-      let body: any;
-      try {
-        body = await readJsonBody(req);
-      } catch (err: any) {
-        sendJson(res, 400, { error: err.message || "Invalid JSON" });
-        return;
-      }
-      const { decision } = body;
-
-      if (!["APPROVE", "REJECT"].includes(decision)) {
-        sendJson(res, 400, { error: "Decision must be either 'APPROVE' or 'REJECT'" });
-        return;
-      }
-
-      const result = await dossierStorage.updateApprovalStatus(
-        actionId,
-        decision === "APPROVE" ? "APPROVED" : "REJECTED"
-      );
-
-      sendJson(res, 200, {
-        success: true,
-        actionId,
-        newStatus: decision === "APPROVE" ? "APPROVED" : "REJECTED",
-        persisted: result.updated,
-        dossierId: result.dossierId,
-        message: `Action ${actionId} has been successfully ${decision === "APPROVE" ? "approved" : "rejected"} by human operator.`
-      });
-      return;
-    }
-
-    // 9. Ledger outcome ingestion: resolves fatal assumptions for calibration.
+    // 8. Ledger outcome ingestion: resolves fatal assumptions for calibration.
     const outcomeMatch = pathname.match(/^\/api\/dossiers\/([^/]+)\/outcome$/);
     if (method === "POST" && outcomeMatch) {
       if (!checkAuth(req, res)) return;
