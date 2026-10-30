@@ -20,10 +20,21 @@ export interface MutationContext {
   };
 }
 
+const STOP_WORDS = new Set([
+  "and", "the", "for", "with", "that", "this", "from", "into", "over", "under",
+  "your", "their", "our", "are", "was", "were", "will", "can", "who", "what",
+  "where", "when", "why", "how", "all", "any", "both", "each", "few", "more",
+  "most", "other", "some", "such", "than", "too", "very", "via", "using", "uses",
+  "wraps", "builds", "creates", "makes", "helps", "allows", "enables", "provides",
+  "sends", "records", "outputs", "general", "target"
+]);
+
 function titleCase(words: string[]): string {
   return words
-    .filter((w) => w.length > 2)
+    .map((w) => w.replace(/[^a-zA-Z0-9-]/g, ""))
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w.toLowerCase()))
     .slice(0, 3)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
 
@@ -72,7 +83,7 @@ export function buildMutationProposals(
     label: "The Business Model Inversion",
     rationale: `${context.fatalFlaw} High-churn seat-based ${domain.unitEconomicsModel} invites novelty churn and price objections. Invert to B2B annual contracts or usage/outcome-based pricing billed against a value metric the buyer already tracks, converting churn risk into expansion economics under ${domain.regulatoryEnvironment}.`,
     mutatedIdea: {
-      title: `${baseTitle} Enterprise — outcome-priced ${titleCase(idea.summary.split(/\s+/).slice(0, 4))} platform`,
+      title: `${baseTitle} Enterprise — outcome-priced ${titleCase(idea.summary.split(/\s+/))} platform`,
       summary: `Same core capability "${idea.summary.slice(0, 90)}..." re-sold to ${domain.primaryCustomer} as an annual, usage-priced contract: billing keys to the ${domain.unitEconomicsModel} value metric, with staged rollout, audit trails, and dual-key spend controls. Sales cycle embraced rather than avoided — every deployment ships a signed success metric.`,
       targetAudience: `${domain.primaryCustomer} — budget holders evaluated on ${domain.regulatoryEnvironment} compliance, not end-consumer seats`,
       monetization: `Annual contract at $${Math.round(context.pricing * 12 * 0.9)}/seat-year (one month free) + usage overage priced on settled outcomes; net-15 invoicing beats churn by its very structure`

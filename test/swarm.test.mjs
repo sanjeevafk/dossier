@@ -30,6 +30,10 @@ test("Mutation Engine generates three distinct strategic pivots on a collapsed s
   assert.ok(strategies.has("TROJAN_DISTRIBUTION"), "Trojan Distribution must be present");
   proposals.forEach((p) => {
     assert.ok(p.mutatedIdea.title, `Pivot ${p.id} must carry a mutated title`);
+    assert.ok(
+      !/\b(and|that|with|for)\s+(edition|platform|acquisition)\b/i.test(p.mutatedIdea.title),
+      `Pivot ${p.id} title must strip stop-words: got "${p.mutatedIdea.title}"`
+    );
     assert.ok(p.mutatedIdea.summary.length > 40, `Pivot ${p.id} must carry a substantive summary`);
     assert.ok(p.mutatedIdea.monetization.match(/\$/), `Pivot ${p.id} monetization must be concrete`);
   });

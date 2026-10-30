@@ -21,6 +21,7 @@ plus optional "sobol_samples" (base sample size N, default 128, clamped 32..1024
 Output JSON: per-output {variance, first_order, total_order} per parameter,
 plus the total-order ranking for LTV/CAC.
 """
+import hashlib
 import json
 import sys
 
@@ -57,7 +58,10 @@ def sample_inputs(data, N):
     base_token_cost = (tokens_per_req * reqs_monthly / 1_000_000.0) * TOKEN_USD_PER_1M
     base_token_cost = float(data.get("token_cost_per_user", base_token_cost))
 
-    rng = np.random.default_rng()
+    seed = data.get("seed")
+    if seed is None:
+        seed = int(hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:8], 16)
+    rng = np.random.default_rng(int(seed) % (2 ** 32))
 
     def draw(n):
         return np.column_stack([
