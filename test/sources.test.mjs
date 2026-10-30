@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { queryManifoldMarkets } from "../dist/tools/manifold.js";
+import { queryManifoldUnified } from "../dist/tools/markets/manifold.js";
 import { queryOpenAlex } from "../dist/tools/openalex.js";
 import { queryEdgarFormD } from "../dist/tools/edgar.js";
 import { queryHuggingFace } from "../dist/tools/huggingface.js";
@@ -21,15 +21,15 @@ test("Manifold returns BINARY markets, skips resolved and non-binary", async () 
     { question: "AI model releases", outcomeType: "MULTIPLE_CHOICE", isResolved: false, probability: 0.5, volume: 1, uniqueBettorCount: 1, url: "u" },
     { question: "Old resolved AI bet", outcomeType: "BINARY", isResolved: true, probability: 1, volume: 1, uniqueBettorCount: 1, url: "u" }
   ];
-  const r = await queryManifoldMarkets("AI regulation", fetchMock(payload));
-  assert.equal(r.marketsFound.length, 1);
-  assert.equal(r.marketsFound[0].probabilityPercent, 22);
-  assert.ok(r.marketsFound[0].marketUrl.startsWith("https://"));
+  const r = await queryManifoldUnified("AI regulation", fetchMock(payload));
+  assert.equal(r.length, 1);
+  assert.equal(r[0].probabilityYesPercent, 22);
+  assert.ok(r[0].url.startsWith("https://"));
 });
 
 test("Manifold honest empty on network failure", async () => {
-  const r = await queryManifoldMarkets("x", async () => { throw new Error("down"); });
-  assert.equal(r.marketsFound.length, 0);
+  const r = await queryManifoldUnified("x", async () => { throw new Error("down"); });
+  assert.equal(r.length, 0);
 });
 
 test("OpenAlex parses papers with authors and citations", async () => {
@@ -151,11 +151,11 @@ test("Manifold falls back to domain query if composite phrase returns no binary 
     return { ok: true, json: async () => binaryPayload };
   };
 
-  const r = await queryManifoldMarkets("AI Trading Copilot", mock);
+  const r = await queryManifoldUnified("AI Trading Copilot", mock);
   assert.equal(calls, 2);
-  assert.equal(r.marketsFound.length, 1);
-  assert.equal(r.marketsFound[0].probabilityPercent, 45);
-  assert.ok(r.marketsFound[0].question.includes("Trading"));
+  assert.equal(r.length, 1);
+  assert.equal(r[0].probabilityYesPercent, 45);
+  assert.ok(r[0].title.includes("Trading"));
 });
 
 test("HuggingFace falls back to domain query if composite phrase returns empty", async () => {
