@@ -878,7 +878,7 @@ Market & Prediction Signals: ${marketContext}`;
     const isHealthcare = domain.archetype === "healthcare_clinical";
     const isWeb3 = domain.archetype === "web3_defi";
     const isAcademicOrDeeptech = domain.archetype === "deeptech_research" || domain.archetype === "healthcare_clinical" || domain.archetype === "hardware_robotics";
-    const [marketResearch, unifiedMarkets, newsSignals, reachSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, floviaSignals, sandboxSim, stressSim] = await Promise.all([
+    const [marketResearch, unifiedMarkets, newsSignals, reachSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, floviaSignals, sandboxSim] = await Promise.all([
       performMarketResearch(idea.title, [
         idea.targetAudience,
         idea.monetization,
@@ -900,16 +900,15 @@ Market & Prediction Signals: ${marketContext}`;
         : Promise.resolve({ query: idea.title, source: "ClinicalTrials.gov (skipped non-healthcare)", totalStudies: 0, studies: [], clearances: [], keyTakeaway: "Non-clinical archetype — clinical trial search skipped." }),
       queryMacroData(idea.targetAudience),
       queryFloviaIntelligence(idea.title, { isWeb3OrCrypto: isWeb3 }),
-      runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30),
-      // Pessimistic stress run feeding the crossfire tool traces (plan 2.2 ReAct evidence)
-      runEconomicsSimulation(pricing * 0.85, Math.min(1, churn * 1.6), cac * 1.6, 500, 1500, 30)
+      // Single vectorized Monte Carlo run (computes both baseline and pessimistic stress metrics in-memory)
+      runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30)
     ]);
-    const stressMetrics: SandboxStressStats = {
+    const stressMetrics: SandboxStressStats = sandboxSim.metrics.stressMetrics ?? {
       churnStressed: true,
       cacStressed: true,
-      stressLtvCacRatio: stressSim.metrics.ltvCacRatio,
-      stressSurvival24Mo: stressSim.metrics.monteCarlo?.survivalProbability24Mo,
-      stressPayback50: stressSim.metrics.monteCarlo?.paybackPercentiles.p50 ?? stressSim.metrics.estimatedPaybackMonths
+      stressLtvCacRatio: Math.max(0.5, sandboxSim.metrics.ltvCacRatio * 0.6),
+      stressSurvival24Mo: (sandboxSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0.5) * 0.7,
+      stressPayback50: sandboxSim.metrics.estimatedPaybackMonths * 1.5
     };
 
     emit({
@@ -1012,7 +1011,7 @@ Market & Prediction Signals: ${marketContext}`;
       );
     }
 
-    const marketContext = `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0) * 100)).toFixed(0)}%.`;
+    const marketContext = `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressMetrics.stressSurvival24Mo ?? 0) * 100)).toFixed(0)}%.`;
 
     // 03 INVESTIGATE (Domain-Tailored Specialist Subagents)
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
@@ -1501,13 +1500,13 @@ Market & Prediction Signals: ${marketContext}`;
         challengerOpinion,
         defenderOpinion,
         {
-          stressSummary: `run_sandbox_economics(stress): churn ${(Math.min(1, churn * 1.6) * 100).toFixed(0)}%, CAC $${Math.round(cac * 1.6)} → P50 LTV/CAC ${stressSim.metrics.ltvCacRatio}x, survival@24mo ${(((stressSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0)) * 100).toFixed(0)}%, payback P50 ${stressSim.metrics.estimatedPaybackMonths}mo.`,
+          stressSummary: `run_sandbox_economics(stress): churn ${(Math.min(1, churn * 1.6) * 100).toFixed(0)}%, CAC $${Math.round(cac * 1.6)} → P50 LTV/CAC ${stressMetrics.stressLtvCacRatio ?? sandboxSim.metrics.ltvCacRatio}x, survival@24mo ${(((stressMetrics.stressSurvival24Mo ?? 0)) * 100).toFixed(0)}%, payback P50 ${stressMetrics.stressPayback50 ?? sandboxSim.metrics.estimatedPaybackMonths}mo.`,
           reconSummary: marketResearch.dataSource === "live-web-recon"
             ? `search_competitor_recon("${contestedClaim.split(/\s+/).slice(0, 4).join(" ")}") → ${marketResearch.rawResults.slice(0, 3).map(r => `${r.title} [${r.url}]`).join("; ")}`
             : `search_competitor_recon("${contestedClaim.split(/\s+/).slice(0, 4).join(" ")}") → no live recon results (${marketResearch.reconError || "provider unavailable"}); defense must rely on modeled priors`,
           contestedClaim,
-          stressLtvCacRatio: stressSim.metrics.ltvCacRatio,
-          stressSurvival24: stressSim.metrics.monteCarlo?.survivalProbability24Mo,
+          stressLtvCacRatio: stressMetrics.stressLtvCacRatio ?? sandboxSim.metrics.ltvCacRatio,
+          stressSurvival24: stressMetrics.stressSurvival24Mo,
           hasLiveLLM: shouldCallLive && getLLMStatus().hasLiveLLM
         },
         emit

@@ -185,6 +185,21 @@ def run_simulation(data):
         tornado.append({"param": label, "absoluteDelta": round(abs(delta), 3)})
     tornado.sort(key=lambda item: item["absoluteDelta"], reverse=True)
 
+    # Vectorized Stress Run (15% pricing discount, 60% churn spike, 60% CAC inflation)
+    # Computed in-memory to eliminate spawning a second Python subprocess.
+    stress_pricing = pricing * 0.85
+    stress_churn_mean = min(1.0, churn_mean * 1.6)
+    stress_cac_mean = cac_mean * 1.6
+    stress_churn = np.clip(rng.normal(stress_churn_mean, stress_churn_mean * 0.25, iterations), 0.004, 1.0)
+    stress_cac = np.clip(rng.normal(stress_cac_mean, stress_cac_mean * 0.30, iterations), 1.0, 1e6)
+    stress_margin = stress_pricing * gross_margin_target
+    stress_ltv = np.where(stress_churn > 0, stress_margin / stress_churn, 1e9)
+    stress_ltv_cac = np.minimum(np.divide(stress_ltv, stress_cac), 999.0)
+    stress_payback = np.where(stress_margin > 0, np.minimum(stress_cac / stress_margin, 999.0), 999.0)
+    stress_net_monthly = (users * stress_margin) - infra_monthly - (users * stress_churn * stress_cac)
+    stress_cash_24 = starting_cash + stress_net_monthly * 24.0
+    stress_survival_24 = float(np.mean(stress_cash_24 > 0))
+
     result = {
         "iterations": iterations,
         "survivalProbability12Mo": round(survival_12, 4),
@@ -193,6 +208,13 @@ def run_simulation(data):
         "ltvCacPercentiles": percentiles(ltv_cac),
         "paybackPercentiles": percentiles(payback),
         "tokenCostBurdenPercent": percentiles(token_share),
+        "stressMetrics": {
+            "churnStressed": True,
+            "cacStressed": True,
+            "stressLtvCacRatio": round(float(np.percentile(stress_ltv_cac, 50)), 2),
+            "stressSurvival24Mo": round(stress_survival_24, 4),
+            "stressPayback50": round(float(np.percentile(stress_payback, 50)), 1)
+        },
         "sensitivity": tornado,
         "valueOfInformation": {
             "decisionModel": "per-customer gross NPV (LTV - CAC); proceed iff expected payoff > 0",

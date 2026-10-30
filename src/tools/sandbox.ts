@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { MonteCarloStats, SobolSensitivityStats, ValueOfInformationStats } from "../types/index.js";
+import { MonteCarloStats, SobolSensitivityStats, ValueOfInformationStats, SandboxStressStats } from "../types/index.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -23,6 +23,7 @@ export interface SandboxExecutionResult {
     sobol?: SobolSensitivityStats;
     voi?: ValueOfInformationStats;
     monteCarlo?: MonteCarloStats;
+    stressMetrics?: SandboxStressStats;
   };
 }
 
@@ -159,6 +160,7 @@ export async function runEconomicsSimulation(
       tamEstimateUsd: parsed.tamEstimateUsd,
       sobol,
       voi: parsed.valueOfInformation,
+      stressMetrics: parsed.stressMetrics,
       monteCarlo: {
         iterations: parsed.iterations,
         survivalProbability12Mo: parsed.survivalProbability12Mo,
