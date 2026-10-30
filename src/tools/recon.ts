@@ -25,7 +25,7 @@ export interface ReconOutcome {
   error?: string;
 }
 
-const RECON_TIMEOUT_MS = 8000;
+const RECON_TIMEOUT_MS = 3500;
 const MAX_RESULTS_PER_QUERY = 4;
 const MAX_TOTAL_RESULTS = 6;
 
