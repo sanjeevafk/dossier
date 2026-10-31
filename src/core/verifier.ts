@@ -95,26 +95,42 @@ export class EpistemicRobustVerifier {
     const verifiedOpinions: Record<SwarmRole, AgentOpinion> = { ...opinions };
     const claimDag = this.buildClaimDag(evidenceFeed);
 
-    const p50LtvCacRatio = sandboxSim.monteCarlo?.ltvCacPercentiles.p50 ?? sandboxSim.ltvCacRatio;
-    const p10LtvCacRatio = sandboxSim.monteCarlo?.ltvCacPercentiles.p10 ?? p50LtvCacRatio;
+    const isEconomicsAvailable = Boolean(
+      sandboxSim &&
+      !sandboxSim.degraded &&
+      sandboxSim.sandboxExecutionProof?.runtime !== "unavailable" &&
+      sandboxSim.sandboxExecutionProof?.exitCode === 0
+    );
+    const p50LtvCacRatio = isEconomicsAvailable ? (sandboxSim.monteCarlo?.ltvCacPercentiles.p50 ?? sandboxSim.ltvCacRatio) : null;
+    const p10LtvCacRatio = isEconomicsAvailable ? (sandboxSim.monteCarlo?.ltvCacPercentiles.p10 ?? p50LtvCacRatio) : null;
     const investorOpinion = verifiedOpinions.investor;
 
     const redTeamOpinion = verifiedOpinions.redteam;
-    if (redTeamOpinion && p10LtvCacRatio < 1.0) {
-      redTeamOpinion.score = Math.max(10, Math.min(redTeamOpinion.score, redTeamOpinion.score - 8));
-      hallucinationsBlocked++;
-      testTimeSelfCorrections++;
-      auditItems.push({
-        id: "VERIFY-P10-INSOLVENCY",
-        claimOrOpinion: `MC P10 LTV/CAC ${p10LtvCacRatio.toFixed(2)}x < 1.0x — downside tail is insolvent`,
-        verdict: "CORRECTED",
-        rationale: "P10-tail invariant: Red Team penalized 8pts because the pessimistic decile cannot pay back CAC.",
-        confidencePercent: 93
-      });
+    if (isEconomicsAvailable && p10LtvCacRatio !== null && p10LtvCacRatio < 1.0) {
+      if (redTeamOpinion) {
+        redTeamOpinion.score = Math.max(10, Math.min(redTeamOpinion.score, redTeamOpinion.score - 8));
+        hallucinationsBlocked++;
+        testTimeSelfCorrections++;
+        auditItems.push({
+          id: "VERIFY-P10-INSOLVENCY",
+          claimOrOpinion: `MC P10 LTV/CAC ${p10LtvCacRatio.toFixed(2)}x < 1.0x — downside tail is insolvent`,
+          verdict: "CORRECTED",
+          rationale: "P10-tail invariant: Red Team penalized 8pts because the pessimistic decile cannot pay back CAC.",
+          confidencePercent: 93
+        });
+      }
     }
 
     if (investorOpinion) {
-      if (investorOpinion.score > 85 && p50LtvCacRatio < 3.0) {
+      if (!isEconomicsAvailable) {
+        auditItems.push({
+          id: "VERIFY-MATH-01",
+          claimOrOpinion: "Economics simulation runtime was unavailable; quantitative LTV/CAC metrics remain unverified",
+          verdict: "CORRECTED",
+          rationale: "Economic degraded-state: unavailable simulation results cannot be treated as real zero-value economics. Marked UNKNOWN.",
+          confidencePercent: 0
+        });
+      } else if (p50LtvCacRatio !== null && investorOpinion.score > 85 && p50LtvCacRatio < 3.0) {
         hallucinationsBlocked++;
         testTimeSelfCorrections++;
         investorOpinion.score = 62;
@@ -127,7 +143,7 @@ export class EpistemicRobustVerifier {
           rationale: "Mathematical unit economics did not justify an unconstrained venture score.",
           confidencePercent: 96
         });
-      } else {
+      } else if (p50LtvCacRatio !== null) {
         auditItems.push({
           id: "VERIFY-MATH-01",
           claimOrOpinion: `Isolated Python3 simulation verified (Exit 0, P50 LTV/CAC ${p50LtvCacRatio.toFixed(2)}x across ${sandboxSim.monteCarlo?.iterations ?? 1} stochastic runs). Input assumptions remain separately labelled as MODELLED_ASSUMPTION.`,
@@ -211,7 +227,7 @@ export class EpistemicRobustVerifier {
           : `Regulatory applicability remains unverified: ${domain.regulatoryEnvironment}`,
         verdict: regulatoryEvidence ? "VERIFIED_PASS" : "CORRECTED",
         rationale: regulatoryEvidence
-          ? `Primary-source provenance: ${regulatoryEvidence.provenance}. Jurisdiction/applicability must still be checked for the specific product."
+          ? `Primary-source provenance: ${regulatoryEvidence.provenance}. Jurisdiction/applicability must still be checked for the specific product.`
           : "Domain classification is not primary-source evidence. Regulatory applicability is UNKNOWN until a citable primary source is supplied.",
         confidencePercent: regulatoryEvidence ? 90 : 0
       });
@@ -221,7 +237,24 @@ export class EpistemicRobustVerifier {
       }
     }
 
-    evidenceFeed.forEach(item => {
+    evidenceFeed.forEach((item) => {
+      // Epistemic Invariant: Evidence claimed as VERIFIED_FACT or EXTERNAL_EVIDENCE without a primary source URL must remain UNKNOWN
+      const hasPrimaryUrl = typeof item.provenance === "string" && /^https?:\/\//i.test(item.provenance.trim());
+      if ((item.tier === "VERIFIED_FACT" || item.tier === "EXTERNAL_EVIDENCE") && !hasPrimaryUrl) {
+        hallucinationsBlocked++;
+        testTimeSelfCorrections++;
+        const prevTier = item.tier;
+        item.tier = "UNKNOWN";
+        item.claimType = "UNKNOWN";
+        auditItems.push({
+          id: `VERIFY-SOURCE-${item.id}`,
+          claimOrOpinion: `Claim "${item.claim}" lacked primary-source provenance URL ("${item.provenance || "none"}"). Reclassified from ${prevTier} to UNKNOWN`,
+          verdict: "CORRECTED",
+          rationale: "Epistemic source invariant: External claims and facts require primary-source provenance URLs. Unanchored claims must remain UNKNOWN.",
+          confidencePercent: 95
+        });
+      }
+
       const text = item.claim.toLowerCase();
       if (item.tier === "VERIFIED_FACT" || item.tier === "VERIFIED_COMPUTATION") {
         if (
