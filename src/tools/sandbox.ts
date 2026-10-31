@@ -13,6 +13,7 @@ export interface SandboxExecutionResult {
   exitCode: number;
   stdout: string;
   stderr: string;
+  degraded: boolean;
   metrics: {
     cacEstimateUsd: number;
     ltvEstimateUsd: number;
@@ -39,10 +40,9 @@ export interface EconomicsSimulationOptions {
 }
 
 /**
- * Sanitized economics simulation runner. Executes the canonical vectorized
- * Monte Carlo script (scripts/simulate_monte_carlo.py) in an isolated temporary
- * sandbox and maps the stochastic result; degrades to the embedded closed-form
- * fallback when the Python runtime or canonical script is unavailable.
+ * Executes the canonical economics simulator. If the simulator cannot run,
+ * return an explicitly degraded result with unavailable metrics. A failed
+ * numerical computation must never become synthetic evidence.
  */
 export async function runEconomicsSimulation(
   pricingMonthlyUsd: number,
@@ -53,7 +53,6 @@ export async function runEconomicsSimulation(
   requestsPerUserMonthly: number,
   options: EconomicsSimulationOptions = {}
 ): Promise<SandboxExecutionResult> {
-  // Sanitize and validate inputs against injection and mathematical invalidity
   const cleanPricing = Math.max(0, Number(pricingMonthlyUsd) || 0);
   const cleanChurn = Math.min(1.0, Math.max(0.001, Number(expectedMonthlyChurnRate) || 0.05));
   const cleanCac = Math.max(0, Number(estimatedCacUsd) || 0);
@@ -63,7 +62,6 @@ export async function runEconomicsSimulation(
 
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "dossier-sandbox-"));
   const inputPath = path.join(tmpDir, "inputs.json");
-
   const inputPayload: Record<string, unknown> = {
     pricing_monthly: cleanPricing,
     churn_mean: cleanChurn,
@@ -77,151 +75,113 @@ export async function runEconomicsSimulation(
     runway_months: typeof options.runwayMonths === "number" ? Math.max(1, Math.min(60, options.runwayMonths)) : 18,
     iterations: Math.max(1000, Math.min(50000, Math.round(options.iterations ?? 10000)))
   };
-  if (typeof options.seed === "number") {
-    inputPayload.seed = Math.round(Math.abs(options.seed));
-  } else {
+  if (typeof options.seed === "number") inputPayload.seed = Math.round(Math.abs(options.seed));
+  else {
     let hash = 0;
     const key = `${cleanPricing}|${cleanChurn}|${cleanCac}|${cleanUsers}`;
     for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
     inputPayload.seed = hash;
   }
-  if (typeof options.grossMarginTarget === "number") {
-    inputPayload.gross_margin_target = Math.max(0.1, Math.min(0.98, options.grossMarginTarget));
-  }
-  if (typeof options.startingCashUsd === "number" && options.startingCashUsd >= 0) {
-    inputPayload.starting_cash_usd = options.startingCashUsd;
-  }
+  if (typeof options.grossMarginTarget === "number") inputPayload.gross_margin_target = Math.max(0.1, Math.min(0.98, options.grossMarginTarget));
+  if (typeof options.startingCashUsd === "number" && options.startingCashUsd >= 0) inputPayload.starting_cash_usd = options.startingCashUsd;
 
   try {
     await fs.writeFile(inputPath, JSON.stringify(inputPayload), "utf-8");
-
-    // Canonical script executed in the isolation boundary: only the input file path is
-    // interpolated into the command; no user-controlled content ever reaches the shell.
-    let candidatePaths = [
+    const candidatePaths = [
       path.resolve(import.meta.dirname, "..", "..", "scripts", "simulate_monte_carlo.py"),
       path.resolve(import.meta.dirname, "..", "scripts", "simulate_monte_carlo.py"),
       path.resolve(import.meta.dirname, "simulate_monte_carlo.py"),
       path.resolve(process.cwd(), "scripts", "simulate_monte_carlo.py"),
       path.resolve(process.cwd(), "dist", "scripts", "simulate_monte_carlo.py")
     ];
-    let scriptPath = candidatePaths.find((p) => {
-      try {
-        return fsSync.existsSync(p);
-      } catch {
-        return false;
-      }
+    const scriptPath = candidatePaths.find((p) => {
+      try { return fsSync.existsSync(p); } catch { return false; }
     }) || candidatePaths[0];
 
-    const { stdout, stderr } = await execFileAsync("python3", [scriptPath, inputPath], {
-      timeout: 20000,
-      maxBuffer: 1024 * 1024
-    });
-
+    const { stdout, stderr } = await execFileAsync("python3", [scriptPath, inputPath], { timeout: 20000, maxBuffer: 1024 * 1024 });
     const parsed = JSON.parse(stdout.trim());
 
-    // Sobol global sensitivity enrichment (A1): runs the Saltelli scheme over the
-    // same model. Opt-out via DOSSIER_SOBOL=0; silently absent if the script or
-    // runtime is unavailable — never fabricates indices.
     let sobol: SobolSensitivityStats | undefined;
     if (process.env.DOSSIER_SOBOL !== "0") {
       try {
-        let candidateSobol = [
+        const candidateSobol = [
           path.resolve(import.meta.dirname, "..", "..", "scripts", "simulate_sobol.py"),
           path.resolve(import.meta.dirname, "..", "scripts", "simulate_sobol.py"),
           path.resolve(import.meta.dirname, "simulate_sobol.py"),
           path.resolve(process.cwd(), "scripts", "simulate_sobol.py"),
           path.resolve(process.cwd(), "dist", "scripts", "simulate_sobol.py")
         ];
-        let sobolScript = candidateSobol.find((p) => {
-          try {
-            return fsSync.existsSync(p);
-          } catch {
-            return false;
-          }
+        const sobolScript = candidateSobol.find((p) => {
+          try { return fsSync.existsSync(p); } catch { return false; }
         }) || candidateSobol[0];
         const sobolInputPath = path.join(tmpDir, "sobol_inputs.json");
         await fs.writeFile(sobolInputPath, JSON.stringify({ ...inputPayload, sobol_samples: 512 }), "utf-8");
-        const { stdout: sobolStdout } = await execFileAsync("python3", [sobolScript, sobolInputPath], {
-          timeout: 30000,
-          maxBuffer: 1024 * 1024
-        });
+        const { stdout: sobolStdout } = await execFileAsync("python3", [sobolScript, sobolInputPath], { timeout: 30000, maxBuffer: 1024 * 1024 });
         sobol = JSON.parse(sobolStdout.trim());
       } catch {
-        // Sobol enrichment is optional — absence is honest, not an error.
+        // Optional enrichment. Its absence does not invalidate the main simulation.
       }
     }
-
-    const metrics: SandboxExecutionResult["metrics"] = {
-      cacEstimateUsd: parsed.cacEstimateUsd,
-      ltvEstimateUsd: parsed.ltvEstimateUsd,
-      ltvCacRatio: parsed.ltvCacRatio,
-      estimatedPaybackMonths: parsed.estimatedPaybackMonths,
-      monthlyInfraCostUsd: parsed.monthlyInfraCostUsd,
-      tamEstimateUsd: parsed.tamEstimateUsd,
-      sobol,
-      voi: parsed.valueOfInformation,
-      stressMetrics: parsed.stressMetrics,
-      monteCarlo: {
-        iterations: parsed.iterations,
-        survivalProbability12Mo: parsed.survivalProbability12Mo,
-        survivalProbability24Mo: parsed.survivalProbability24Mo,
-        insolvencyCurveByMonth: parsed.insolvencyCurveByMonth ?? [],
-        ltvCacPercentiles: parsed.ltvCacPercentiles ?? { p10: parsed.ltvCacRatio, p50: parsed.ltvCacRatio, p90: parsed.ltvCacRatio },
-        paybackPercentiles: parsed.paybackPercentiles ?? { p10: parsed.estimatedPaybackMonths, p50: parsed.estimatedPaybackMonths, p90: parsed.estimatedPaybackMonths },
-        tokenCostBurdenPercent: parsed.tokenCostBurdenPercent ?? { p10: 0, p50: 0, p90: 0 },
-        sensitivity: parsed.sensitivity ?? [],
-        simulationNotes: parsed.simulationNotes
-      }
-    };
 
     return {
       runtime: "python3-numpy-monte-carlo",
       exitCode: 0,
       stdout: stdout.trim(),
       stderr: stderr.trim(),
-      metrics
+      degraded: false,
+      metrics: {
+        cacEstimateUsd: parsed.cacEstimateUsd,
+        ltvEstimateUsd: parsed.ltvEstimateUsd,
+        ltvCacRatio: parsed.ltvCacRatio,
+        estimatedPaybackMonths: parsed.estimatedPaybackMonths,
+        monthlyInfraCostUsd: parsed.monthlyInfraCostUsd,
+        tamEstimateUsd: parsed.tamEstimateUsd,
+        sobol,
+        voi: parsed.valueOfInformation,
+        stressMetrics: parsed.stressMetrics,
+        monteCarlo: {
+          iterations: parsed.iterations,
+          survivalProbability12Mo: parsed.survivalProbability12Mo,
+          survivalProbability24Mo: parsed.survivalProbability24Mo,
+          insolvencyCurveByMonth: parsed.insolvencyCurveByMonth ?? [],
+          ltvCacPercentiles: parsed.ltvCacPercentiles,
+          paybackPercentiles: parsed.paybackPercentiles,
+          tokenCostBurdenPercent: parsed.tokenCostBurdenPercent,
+          sensitivity: parsed.sensitivity ?? [],
+          simulationNotes: parsed.simulationNotes
+        }
+      }
     };
   } catch (error: unknown) {
-    // Fallback calculation if python runtime execution fails
-    const grossMargin = 0.80;
-    const arpu = cleanPricing * grossMargin;
-    const ltv = arpu > 0 ? Number((arpu / cleanChurn).toFixed(2)) : 0;
-    const ltvCacRatio = cleanCac > 0 ? Number(Math.min(ltv / cleanCac, 99.9).toFixed(2)) : 99.9;
-    const payback = arpu > 0 ? Number(Math.min(cleanCac / arpu, 999.0).toFixed(1)) : 999.0;
     const execErr = error as { code?: unknown; stdout?: string; message?: string };
     const numericExitCode = typeof execErr.code === "number" ? execErr.code : 1;
-
     return {
-      runtime: "fallback-embedded-sandbox",
+      runtime: "unavailable",
       exitCode: numericExitCode,
       stdout: typeof execErr.stdout === "string" ? execErr.stdout : "",
-      stderr: execErr.message ?? "",
+      stderr: execErr.message ?? "Economics simulator failed",
+      degraded: true,
       metrics: {
         cacEstimateUsd: cleanCac,
-        ltvEstimateUsd: ltv,
-        ltvCacRatio: ltvCacRatio,
-        estimatedPaybackMonths: payback,
-        monthlyInfraCostUsd: 250.0,
-        tamEstimateUsd: "$2.5B",
+        ltvEstimateUsd: 0,
+        ltvCacRatio: 0,
+        estimatedPaybackMonths: 0,
+        monthlyInfraCostUsd: 0,
+        tamEstimateUsd: "UNKNOWN — simulation unavailable",
         monteCarlo: {
-          iterations: 1000,
-          survivalProbability12Mo: cleanPricing > 0 ? 0.85 : 0.1,
-          survivalProbability24Mo: cleanPricing > 0 ? 0.70 : 0.05,
+          iterations: 0,
+          survivalProbability12Mo: 0,
+          survivalProbability24Mo: 0,
           insolvencyCurveByMonth: [],
-          ltvCacPercentiles: { p10: Number((ltvCacRatio * 0.7).toFixed(2)), p50: ltvCacRatio, p90: Number((ltvCacRatio * 1.3).toFixed(2)) },
-          paybackPercentiles: { p10: Number((payback * 0.8).toFixed(1)), p50: payback, p90: Number((payback * 1.4).toFixed(1)) },
-          tokenCostBurdenPercent: { p10: 0.02, p50: 0.05, p90: 0.12 },
+          ltvCacPercentiles: { p10: 0, p50: 0, p90: 0 },
+          paybackPercentiles: { p10: 0, p50: 0, p90: 0 },
+          tokenCostBurdenPercent: { p10: 0, p50: 0, p90: 0 },
           sensitivity: [],
-          simulationNotes: "Closed-form analytical fallback"
+          simulationNotes: "Unavailable: canonical economics simulator failed to execute."
         }
       }
     };
   } finally {
-    // Clean up temporary sandbox directory
-    try {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    } catch {
-      // ignore cleanup errors
-    }
+    try { await fs.rm(tmpDir, { recursive: true, force: true }); } catch { /* best effort */ }
   }
 }
