@@ -69,6 +69,10 @@ export interface SwarmExecutionOptions {
   tavilyKey?: string;
 }
 
+const PRODUCT_FORMAT_KEYWORDS = /(chrome extension|browser extension|gpt wrapper|chat with pdf|meeting notes|summariz|prompt engineering|simple crm|transcriber|ai copywriter|ai tweet)/i;
+const STRUCTURAL_DEFENSIBILITY_SIGNALS = /(proprietary (data|dataset|model|algorithm|hardware|knowledge|infrastructure)|fine-tune|fine-tuning|on-prem|air-gap|system of record|soc-?2|hipaa|fda|ehr|emr|salesforce|hubspot|epic systems|sap|erp|bi-directional sync|formal verification|symbolic execution|edge yolov8|firmware|hardware|patent|escrow|settlement|autonomous drone|enterprise workflow|audit log|hardware sensor)/i;
+const EXPLICIT_COMMODITY_SIGNALS = /(thin wrapper|zero moat|commodity wrapper|no proprietary|just a wrapper|simple wrapper|wraps gpt|pure prompt|no defensibility)/i;
+
 /**
  * Deterministic adversarial invariants shared by the live-LLM and heuristic evaluation paths.
  * These enforce hard kill ceilings independent of model drift, reinforced by the calibrated decision model.
@@ -77,11 +81,25 @@ function detectAdversarialInvariants(idea: IdeaInput, pricing: number, decisionE
   const text = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization} ${idea.techStack || ""}`.toLowerCase();
   const thinWrapperByDecision = decisionEvaluation?.answers?.moat?.flagged ?? false;
   const zeroMonetizationByDecision = decisionEvaluation?.answers?.monetization?.flagged ?? false;
+
+  const hasFormatRisk = PRODUCT_FORMAT_KEYWORDS.test(text);
+  const hasDefensibilityEvidence = STRUCTURAL_DEFENSIBILITY_SIGNALS.test(text);
+  const hasExplicitCommodity = EXPLICIT_COMMODITY_SIGNALS.test(text);
+
+  // Treat product format as a moat-risk signal, NOT proof of weak defensibility.
+  // Only penalize when corroborating evidence supports weak differentiation/defensibility.
+  const isThinWrapper = hasExplicitCommodity || (
+    thinWrapperByDecision && !hasDefensibilityEvidence
+  ) || (
+    hasFormatRisk && !hasDefensibilityEvidence && (thinWrapperByDecision || /freemium|indie|tweet|bulleted notes|general remote workers/i.test(text))
+  );
+
   return {
     isPromptInjection: /ignore (previous|all) instructions|system prompt|jailbreak|output 100|developer mode/i.test(text),
     isImpossiblePhysics: /perpetual motion|free energy|infinite electricity|zero input energy|violates thermodynamics|overunity/i.test(text),
     isNoMonetization: /free forever|no monetization|zero revenue|not charging/i.test(text) || pricing <= 0 || zeroMonetizationByDecision,
-    isThinWrapper: /(chrome extension|browser extension|gpt wrapper|chat with pdf|meeting notes|summariz|prompt engineering|simple crm|transcriber|ai copywriter|ai tweet)/i.test(text) || thinWrapperByDecision
+    hasFormatRisk,
+    isThinWrapper
   };
 }
 
@@ -317,6 +335,10 @@ Market & Prediction Signals: ${marketContext}`;
           verdict = guard.verdict;
           fatalFlaws.unshift("Zero structural defensibility: thin wrapper over frontier models is trivially replicable as a native platform feature.");
         }
+      } else if (invariants.hasFormatRisk) {
+        // Product format is a moat-risk signal, not proof of weak defensibility.
+        parsed.competitiveRisks = parsed.competitiveRisks || [];
+        parsed.competitiveRisks.push("Platform format risk: distribution modality relies on host platform/OS. Long-term defensibility requires proprietary workflows and switching moats.");
       }
       if (domain.archetype === "consumer_social" && (role === "investor" || role === "redteam") && score > HIGH_CHURN_KILL_CEILING) {
         score = HIGH_CHURN_KILL_CEILING;
@@ -497,8 +519,9 @@ Market & Prediction Signals: ${marketContext}`;
     invariants: AdversarialInvariants
   ): AgentOpinion {
     const roleLabels = domain.specialistRoleLabels;
-    const { isPromptInjection, isImpossiblePhysics, isNoMonetization, isThinWrapper } = invariants;
-    const ltvCac = sandboxSim.metrics.ltvCacRatio;
+    const { isPromptInjection, isImpossiblePhysics, isNoMonetization, isThinWrapper, hasFormatRisk } = invariants;
+    const isEconomicsAvailable = Boolean(sandboxSim && !sandboxSim.degraded && sandboxSim.runtime !== "unavailable" && sandboxSim.exitCode === 0);
+    const ltvCac = isEconomicsAvailable ? sandboxSim.metrics.ltvCacRatio : null;
 
     let score = 70;
     let verdict: Verdict = "VIABLE_WITH_RISK";
@@ -532,6 +555,9 @@ Market & Prediction Signals: ${marketContext}`;
           competitiveRisks = reconCount > 0
             ? marketResearch.rawResults.slice(0, 3).map((r: { title: string; url: string }) => `${r.title} (${r.url})`)
             : ["Competitive landscape unverified — no live recon provider was available during this evaluation."];
+          if (hasFormatRisk) {
+            competitiveRisks.push("Platform format risk: distribution format requires defensibility through proprietary integrations to resist platform commoditization.");
+          }
           mustTestBeforeBuilding = [`Validate addressable budget allocations across 10 prospective buyers in ${domain.primaryCustomer}.`];
           rationale = reconCount > 0
             ? `Evaluated competitive whitespace for ${domain.archetypeLabel} against ${reconCount} live recon sources (${marketResearch.reconProvider}).`
@@ -549,6 +575,9 @@ Market & Prediction Signals: ${marketContext}`;
           : [`Adoption inertia: ${domain.primaryCustomer} have entrenched habits with high switching drag.`];
         keyAssumptions = [`End users will switch to a new workflow without extensive retraining.`];
         competitiveRisks = ["Existing manual processes, bookmarks, or entrenched legacy tools with zero marginal training cost."];
+        if (hasFormatRisk && !isThinWrapper) {
+          competitiveRisks.push("Format novelty churn: ensure workflow embedding avoids single-purpose tool fatigue.");
+        }
         mustTestBeforeBuilding = [`Observe 5 target operators completing the core task in their native workflow.`];
         rationale = `Users feel the pain point, but habit inertia and workflow disruption create high pilot abandonment risk.`;
         break;
@@ -572,14 +601,18 @@ Market & Prediction Signals: ${marketContext}`;
           rationale = "Architecture review: Trivially simple integration, but heavy upstream platform dependency.";
         } else {
           score = (sandboxSim.exitCode === 0 ? 84 : 55) + (DOMAIN_FEASIBILITY_DRAG[domain.archetype] ?? 0);
-          const mcFeasibility = sandboxSim.metrics.monteCarlo;
-          if (mcFeasibility) {
-            if (mcFeasibility.tokenCostBurdenPercent.p50 > 0.45) score -= 6;
-            if (mcFeasibility.survivalProbability12Mo < 0.6) score -= 6;
+          if (isEconomicsAvailable) {
+            const mcFeasibility = sandboxSim.metrics.monteCarlo;
+            if (mcFeasibility) {
+              if (mcFeasibility.tokenCostBurdenPercent.p50 > 0.45) score -= 6;
+              if (mcFeasibility.survivalProbability12Mo < 0.6) score -= 6;
+            }
           }
           verdict = score >= 75 ? "STRONG_PURSUE" : "VIABLE_WITH_RISK";
           fatalFlaws = ["API token inflation or uncontrolled recursion under burst concurrency load."];
-          rationale = `Architecture verified feasible with Python sandbox simulation (Exit 0); ${domain.archetypeLabel} engineering burden applied.`;
+          rationale = isEconomicsAvailable
+            ? `Architecture verified feasible with Python sandbox simulation (Exit 0); ${domain.archetypeLabel} engineering burden applied.`
+            : `Architecture verified under ${domain.archetypeLabel} specifications; sandbox simulation unavailable (status: degraded).`;
         }
         keyAssumptions = ["Underlying infrastructure and edge models maintain required throughput and latency budgets."];
         competitiveRisks = ["Commoditization of base foundation models."];
@@ -599,11 +632,16 @@ Market & Prediction Signals: ${marketContext}`;
             "Zero structural defensibility: Thin wrapper architecture offers no proprietary data moat or sustainable pricing power.",
             "Platform Replication Risk: Hyperscalers or upstream model providers can commoditize this entire workflow with a native feature release."
           ];
-        } else if (ltvCac < 1.0) {
+        } else if (!isEconomicsAvailable) {
+          // Rule: unavailable ≠ zero. Do NOT treat degraded sandbox as real 0.0x LTV/CAC.
+          score = 62;
+          verdict = "VIABLE_WITH_RISK";
+          fatalFlaws = ["Quantitative unit economics unverified: sandbox simulation was unavailable (status: degraded). Real LTV/CAC ratio could not be deterministically proven."];
+        } else if (ltvCac !== null && ltvCac < 1.0) {
           score = 22;
           verdict = "STRONG_KILL";
           fatalFlaws = [`Mathematically inverted unit economics: CAC ($${cac}) exceeds LTV ($${sandboxSim.metrics.ltvEstimateUsd}). Every user burns capital.`];
-        } else if (ltvCac < 2.5) {
+        } else if (ltvCac !== null && ltvCac < 2.5) {
           score = 52;
           verdict = "VIABLE_WITH_RISK";
           fatalFlaws = [`Compressed venture margins: LTV/CAC ratio of ${ltvCac}x leaves insufficient buffer for sales payback.`];
@@ -614,7 +652,7 @@ Market & Prediction Signals: ${marketContext}`;
           }
         } else {
           const mcStrong = sandboxSim.metrics.monteCarlo;
-          const ltvP50 = mcStrong?.ltvCacPercentiles.p50 ?? ltvCac;
+          const ltvP50 = mcStrong?.ltvCacPercentiles.p50 ?? (ltvCac ?? 3.0);
           score = Math.min(88, Math.round(48 + (ltvP50 * 4)));
           const paybackMonths = mcStrong?.paybackPercentiles.p50 ?? sandboxSim.metrics.estimatedPaybackMonths;
           if (paybackMonths > 22) {
@@ -643,9 +681,13 @@ Market & Prediction Signals: ${marketContext}`;
           verdict = score >= 75 ? "STRONG_PURSUE" : "VIABLE_WITH_RISK";
         }
         keyAssumptions = [`Unit economics support healthy margins under ${domain.unitEconomicsModel}.`];
-        competitiveRisks = ["Well-funded legacy providers bundle identical capability for free."];
+        competitiveRisks = hasFormatRisk && !isThinWrapper
+          ? ["Platform commoditization risk: host platform may bundle baseline features; defensibility requires proprietary data and deep integrations."]
+          : ["Well-funded legacy providers bundle identical capability for free."];
         mustTestBeforeBuilding = [`Pre-secure 2 paid pilots or signed Letters of Intent (LOIs).`];
-        rationale = `LTV/CAC modeled at ${ltvCac}x with ${sandboxSim.metrics.estimatedPaybackMonths}mo payback under ${domain.unitEconomicsModel}.`;
+        rationale = isEconomicsAvailable
+          ? `LTV/CAC modeled at ${ltvCac}x with ${sandboxSim.metrics.estimatedPaybackMonths}mo payback under ${domain.unitEconomicsModel}.`
+          : `Unit economics simulation unavailable (status: degraded/unavailable). Heuristic assessment applied; unavailable metrics are not treated as zero economics.`;
         break;
       }
 
@@ -672,7 +714,7 @@ Market & Prediction Signals: ${marketContext}`;
             "Zero Structural Moat: Without proprietary datasets or embedded workflow lock-in, monthly user churn exceeds 25% as free alternatives emerge."
           ];
           rationale = "Red Team Defensibility Audit: Extreme replication vulnerability to native foundation model updates.";
-        } else if (ltvCac < 1.0) {
+        } else if (isEconomicsAvailable && ltvCac !== null && ltvCac < 1.0) {
           score = 22;
           verdict = "STRONG_KILL";
           fatalFlaws = [
@@ -682,11 +724,11 @@ Market & Prediction Signals: ${marketContext}`;
         } else {
           // Domain-tailored adversarial failure patterns; severity narrows to
           // procurement timing when stochastic economics survive the stress replay.
-          const mcRedteam = sandboxSim.metrics.monteCarlo;
-          const econSurvivesStress = ltvCac >= 6 && (mcRedteam ? mcRedteam.survivalProbability24Mo >= 0.8 : false);
+          const mcRedteam = isEconomicsAvailable ? sandboxSim.metrics.monteCarlo : undefined;
+          const econSurvivesStress = isEconomicsAvailable && (ltvCac ?? 0) >= 6 && (mcRedteam ? mcRedteam.survivalProbability24Mo >= 0.8 : false);
           switch (domain.archetype) {
             case "b2b_saas":
-              score = econSurvivesStress ? 52 : (ltvCac < 2.5 ? 36 : 46);
+              score = econSurvivesStress ? 52 : (isEconomicsAvailable && (ltvCac ?? 0) < 2.5 ? 36 : 46);
               verdict = "LEAN_KILL";
               fatalFlaws = [
                 `Enterprise Procurement Deadlock: ${domain.primaryCustomer} praise discovery demos, but security reviews and IT committees stall contracts for 4–9 months while incumbents bundle the capability for free.`,
@@ -902,12 +944,13 @@ Market & Prediction Signals: ${marketContext}`;
       // Single vectorized Monte Carlo run (computes both baseline and pessimistic stress metrics in-memory)
       runEconomicsSimulation(pricing, churn, cac, 500, 1500, 30)
     ]);
+    const isEconomicsAvailable = Boolean(sandboxSim && !sandboxSim.degraded && sandboxSim.runtime !== "unavailable" && sandboxSim.exitCode === 0);
     const stressMetrics: SandboxStressStats = sandboxSim.metrics.stressMetrics ?? {
       churnStressed: true,
       cacStressed: true,
-      stressLtvCacRatio: Math.max(0.5, sandboxSim.metrics.ltvCacRatio * 0.6),
-      stressSurvival24Mo: (sandboxSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0.5) * 0.7,
-      stressPayback50: sandboxSim.metrics.estimatedPaybackMonths * 1.5
+      stressLtvCacRatio: isEconomicsAvailable ? Math.max(0.5, sandboxSim.metrics.ltvCacRatio * 0.6) : undefined,
+      stressSurvival24Mo: isEconomicsAvailable ? (sandboxSim.metrics.monteCarlo?.survivalProbability24Mo ?? 0.5) * 0.7 : undefined,
+      stressPayback50: isEconomicsAvailable ? sandboxSim.metrics.estimatedPaybackMonths * 1.5 : undefined
     };
 
     emit({
@@ -1010,7 +1053,9 @@ Market & Prediction Signals: ${marketContext}`;
       );
     }
 
-    const marketContext = `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressMetrics.stressSurvival24Mo ?? 0) * 100)).toFixed(0)}%.`;
+    const marketContext = isEconomicsAvailable
+      ? `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressMetrics.stressSurvival24Mo ?? 0) * 100)).toFixed(0)}%.`
+      : `${reconSourceParts.join(" ")}. Economics Simulation Unavailable (degraded execution): Pricing $${pricing}/mo, CAC $${cac}. Quantitative LTV/CAC is UNKNOWN and must not be treated as zero.`;
 
     // 03 INVESTIGATE (Domain-Tailored Specialist Subagents)
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
@@ -1335,12 +1380,14 @@ Market & Prediction Signals: ${marketContext}`;
     const evidenceFeed: EvidenceItem[] = [
       {
         id: "EV-01",
-        claim: `Sandboxed unit economics computation: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)}mo (Python3 Subprocess Exit 0). Input pricing ($${pricing}/mo) and CAC ($${cac}) remain MODELLED_ASSUMPTION.`,
-        tier: "VERIFIED_COMPUTATION",
-        claimType: "VERIFIED_COMPUTATION",
-        provenance: "Dossier Python3 Sandbox (Isolated Subprocess Exit 0)",
-        indicator: "SUPPORTING",
-        confidencePercent: 98
+        claim: isEconomicsAvailable
+          ? `Sandboxed unit economics computation: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)}mo (Python3 Subprocess Exit 0). Input pricing ($${pricing}/mo) and CAC ($${cac}) remain MODELLED_ASSUMPTION.`
+          : `Sandboxed unit economics simulation unavailable: quantitative LTV/CAC and payback could not be computed (status: degraded).`,
+        tier: isEconomicsAvailable ? "VERIFIED_COMPUTATION" : "UNKNOWN",
+        claimType: isEconomicsAvailable ? "VERIFIED_COMPUTATION" : "UNKNOWN",
+        provenance: isEconomicsAvailable ? "Dossier Python3 Sandbox (Isolated Subprocess Exit 0)" : "Dossier Sandbox (unavailable)",
+        indicator: isEconomicsAvailable ? "SUPPORTING" : "NEUTRAL",
+        confidencePercent: isEconomicsAvailable ? 98 : 0
       },
       {
         id: "EV-02",
@@ -1425,11 +1472,17 @@ Market & Prediction Signals: ${marketContext}`;
         estimatedPaybackMonths: sandboxSim.metrics.estimatedPaybackMonths,
         monthlyInfraCostUsd: sandboxSim.metrics.monthlyInfraCostUsd,
         tamEstimateUsd: sandboxSim.metrics.tamEstimateUsd,
+        monteCarlo: sandboxSim.metrics.monteCarlo,
+        sobol: sandboxSim.metrics.sobol,
+        voi: sandboxSim.metrics.voi,
+        stressMetrics,
         sandboxExecutionProof: {
           runtime: sandboxSim.runtime,
           exitCode: sandboxSim.exitCode,
           stdout: sandboxSim.stdout
-        }
+        },
+        degraded: sandboxSim.degraded,
+        status: sandboxSim.degraded ? "unavailable" : "available"
       },
       evidenceFeed
     );
@@ -1528,11 +1581,13 @@ Market & Prediction Signals: ${marketContext}`;
     const demandAndAdoption = Math.max(10, Math.min(100, Math.round(
       (verifiedOpinions.customer.score * 0.6) + (verifiedOpinions.analyst.score * 0.4)
     )));
-    const economicsAndCapitalEfficiency = Math.max(10, Math.min(100, Math.round(
-      (verifiedOpinions.investor.score * 0.7) +
-      Math.min(Math.round((mc?.ltvCacPercentiles.p50 ?? sandboxSim.metrics.ltvCacRatio) * 6), 30) -
-      (mc && mc.tokenCostBurdenPercent.p50 > 0.35 ? Math.round((mc.tokenCostBurdenPercent.p50 - 0.35) * 40) : 0)
-    )));
+    const economicsAndCapitalEfficiency = isEconomicsAvailable
+      ? Math.max(10, Math.min(100, Math.round(
+          (verifiedOpinions.investor.score * 0.7) +
+          Math.min(Math.round((mc?.ltvCacPercentiles.p50 ?? sandboxSim.metrics.ltvCacRatio) * 6), 30) -
+          (mc && mc.tokenCostBurdenPercent.p50 > 0.35 ? Math.round((mc.tokenCostBurdenPercent.p50 - 0.35) * 40) : 0)
+        )))
+      : Math.max(10, Math.min(100, Math.round(verifiedOpinions.investor.score * 0.8)));
     const defensibilityAndMoat = Math.max(10, Math.min(100, Math.round(
       (verifiedOpinions.expert.score * 0.6) + (verifiedOpinions.analyst.score * 0.4)
     )));
@@ -1555,7 +1610,7 @@ Market & Prediction Signals: ${marketContext}`;
     // Structural adversarial gates: non-differentiated wrappers, inverted unit economics,
     // and zero-monetization profiles cannot be averaged into viability — the composite is
     // capped below the KILL threshold (50) no matter how optimistic the remaining dimensions are.
-    if (invariants.isThinWrapper || sandboxSim.metrics.ltvCacRatio < 1) {
+    if (invariants.isThinWrapper || (isEconomicsAvailable && sandboxSim.metrics.ltvCacRatio < 1)) {
       compositeScore = Math.min(compositeScore, 44);
     }
     if (graveyardMatches.length > 0) {
@@ -1573,7 +1628,7 @@ Market & Prediction Signals: ${marketContext}`;
       invariants.isNoMonetization ||
       invariants.isPromptInjection ||
       invariants.isImpossiblePhysics ||
-      sandboxSim.metrics.ltvCacRatio < 1 ||
+      (isEconomicsAvailable && sandboxSim.metrics.ltvCacRatio < 1) ||
       verifiedOpinions.redteam.verdict === "STRONG_KILL";
     if (fatalProfile) {
       const weakestDimension = Math.min(
@@ -1616,11 +1671,18 @@ Market & Prediction Signals: ${marketContext}`;
       },
       economicsAndCapitalEfficiency: {
         score: economicsAndCapitalEfficiency,
-        factors: [
-          { impact: Math.min(Math.round(sandboxSim.metrics.ltvCacRatio * 7), 40), description: `Modelled LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x (computation passed Exit 0; input CAC remains modelled)`, groundingTier: "VERIFIED_COMPUTATION" as EpistemicTier, riskMitigationVerdict: "MITIGATES_RISK" as const },
-          { impact: Math.round(verifiedOpinions.investor.score * 0.6) - 15, description: `Extended ${domain.procurementCycle} sales cycle requires cash buffer before first collection`, groundingTier: "INFERENCE" as EpistemicTier, riskMitigationVerdict: "PARTIAL_MITIGATION" as const }
-        ],
-        rationale: `LTV/CAC ratio modeled at ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x under ${domain.unitEconomicsModel}.`
+        factors: isEconomicsAvailable
+          ? [
+              { impact: Math.min(Math.round(sandboxSim.metrics.ltvCacRatio * 7), 40), description: `Modelled LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x (computation passed Exit 0; input CAC remains modelled)`, groundingTier: "VERIFIED_COMPUTATION" as EpistemicTier, riskMitigationVerdict: "MITIGATES_RISK" as const },
+              { impact: Math.round(verifiedOpinions.investor.score * 0.6) - 15, description: `Extended ${domain.procurementCycle} sales cycle requires cash buffer before first collection`, groundingTier: "INFERENCE" as EpistemicTier, riskMitigationVerdict: "PARTIAL_MITIGATION" as const }
+            ]
+          : [
+              { impact: 0, description: "Sandboxed unit economics simulation unavailable (runtime degraded); quantitative LTV/CAC unverified", groundingTier: "UNKNOWN" as EpistemicTier, riskMitigationVerdict: "DOES_NOT_MITIGATE" as const },
+              { impact: Math.round(verifiedOpinions.investor.score * 0.6) - 15, description: `Extended ${domain.procurementCycle} sales cycle requires cash buffer before first collection`, groundingTier: "INFERENCE" as EpistemicTier, riskMitigationVerdict: "PARTIAL_MITIGATION" as const }
+            ],
+        rationale: isEconomicsAvailable
+          ? `LTV/CAC ratio modeled at ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x under ${domain.unitEconomicsModel}.`
+          : "Unit economics simulation unavailable; quantitative metrics remain unverified and treated as UNKNOWN rather than zero."
       },
       defensibilityAndMoat: {
         score: defensibilityAndMoat,
@@ -1873,6 +1935,10 @@ Market & Prediction Signals: ${marketContext}`;
       verdictContested: agentScores.filter(s => s < 40).length >= 2 && compositeScore >= 50
     };
 
+    if (decisionEvaluation) {
+      decisionEvaluation.economicsAvailability = isEconomicsAvailable ? "available" : "unavailable";
+    }
+
     const dossier: IdeaDossier = {
       id: `DOSSIER-${Date.now().toString().slice(-6)}`,
       dossierCode: `DOS-${domain.archetype.toUpperCase().slice(0, 3)}`,
@@ -1947,7 +2013,9 @@ Market & Prediction Signals: ${marketContext}`;
           runtime: sandboxSim.runtime,
           exitCode: sandboxSim.exitCode,
           stdout: sandboxSim.stdout
-        }
+        },
+        degraded: sandboxSim.degraded,
+        status: sandboxSim.degraded ? "unavailable" : "available"
       },
       validationRoadmap: {
         day1to2: [

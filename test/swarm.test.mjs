@@ -152,3 +152,101 @@ test("Dossier Orchestrator evaluates idea and generates complete intelligence do
     assert.ok(crossfire && Array.isArray(crossfire.debateHistory) && crossfire.debateHistory.length > 0, "Crossfire contradiction must carry the full debate history");
   }
 });
+
+test("Thin-wrapper false positive prevention: legitimate format products with enterprise defensibility are not killed", async () => {
+  const orchestrator = new IdeaSwarmOrchestrator();
+  const legitimateIdea = {
+    title: "ScribeEHR: Browser Extension Clinical Assistant",
+    summary: "A Chrome extension and desktop assistant that automates EHR clinical documentation with bi-directional Epic Systems and Cerner integration, HIPAA compliance, and proprietary medical fine-tuned models.",
+    targetAudience: "Enterprise hospital health systems and outpatient clinics",
+    monetization: "$250/mo per licensed clinician"
+  };
+
+  const dossier = await orchestrator.evaluateIdea(legitimateIdea, { useLiveLLM: false });
+
+  // Must NOT trigger thin wrapper hard kill ceilings
+  assert.notEqual(dossier.overallVerdict, "KILL", "Legitimate enterprise extension must not be killed as a thin wrapper");
+  assert.ok(dossier.killScore >= 60, `Score must remain viable (got ${dossier.killScore}, expected >= 60)`);
+  assert.notEqual(dossier.roleAssessments.investor.verdict, "STRONG_KILL", "Investor must not issue STRONG_KILL on defensible enterprise workflow");
+  assert.ok(dossier.roleAssessments.investor.score > 35, `Investor score must exceed wrapper ceiling (got ${dossier.roleAssessments.investor.score})`);
+  assert.notEqual(dossier.roleAssessments.redteam.verdict, "STRONG_KILL", "Red Team must not issue STRONG_KILL based solely on format");
+  assert.ok(dossier.roleAssessments.redteam.score > 25, `Red Team score must exceed wrapper ceiling (got ${dossier.roleAssessments.redteam.score})`);
+});
+
+test("Economic degraded-state propagation: unavailable simulation does not collapse economics to zero", async () => {
+  const orchestrator = new IdeaSwarmOrchestrator();
+  const idea = {
+    title: "Enterprise Fleet Telematics Optimizer",
+    summary: "Hardware sensor telemetry platform optimizing commercial trucking routes and fuel compliance.",
+    targetAudience: "Logistics fleets",
+    monetization: "$500/mo per fleet"
+  };
+
+  // We can simulate an environment where python sandbox execution fails / is degraded
+  const degradedSim = {
+    runtime: "unavailable",
+    exitCode: 1,
+    stdout: "",
+    stderr: "Subprocess timeout: python3 runtime unavailable",
+    degraded: true,
+    status: "unavailable",
+    metrics: {
+      cacEstimateUsd: 1200,
+      ltvEstimateUsd: 0,
+      ltvCacRatio: 0,
+      estimatedPaybackMonths: 0,
+      monthlyInfraCostUsd: 0,
+      tamEstimateUsd: "UNKNOWN — simulation unavailable"
+    }
+  };
+
+  // Evaluate heuristic opinion directly with degraded sandbox to verify Rule: unavailable != zero
+  const domain = classifyIdeaDomain(idea);
+  const invariants = {
+    isPromptInjection: false,
+    isImpossiblePhysics: false,
+    isNoMonetization: false,
+    hasFormatRisk: false,
+    isThinWrapper: false
+  };
+
+  const investorOpinion = orchestrator["generateHeuristicOpinion"](
+    "investor",
+    idea,
+    domain,
+    { rawResults: [], dataSource: "none" },
+    degradedSim,
+    500,
+    1200,
+    invariants
+  );
+
+  assert.notEqual(investorOpinion.verdict, "STRONG_KILL", "Investor must not issue STRONG_KILL for unavailable economics");
+  assert.equal(investorOpinion.verdict, "VIABLE_WITH_RISK", "Investor must issue VIABLE_WITH_RISK for unverified economics");
+  assert.ok(investorOpinion.score >= 50, `Investor score must reflect viable fundamentals, not zero economics (got ${investorOpinion.score})`);
+  assert.ok(
+    investorOpinion.fatalFlaws.some((f) => f.includes("unverified") || f.includes("unavailable")),
+    "Investor fatal flaw must note unverified simulation status, not inverted math"
+  );
+  assert.ok(
+    !investorOpinion.fatalFlaws.some((f) => f.includes("Every user burns capital")),
+    "Investor must NOT claim every user burns capital when simulation is unavailable"
+  );
+
+  const redteamOpinion = orchestrator["generateHeuristicOpinion"](
+    "redteam",
+    idea,
+    domain,
+    { rawResults: [], dataSource: "none" },
+    degradedSim,
+    500,
+    1200,
+    invariants
+  );
+
+  assert.notEqual(redteamOpinion.verdict, "STRONG_KILL", "Red Team must not issue STRONG_KILL for unavailable economics");
+  assert.ok(
+    !redteamOpinion.fatalFlaws.some((f) => f.includes("Terminal unit economics insolvency")),
+    "Red Team must NOT claim terminal insolvency when simulation is unavailable"
+  );
+});
