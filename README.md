@@ -198,13 +198,13 @@ pnpm run benchmark
 
 ### Historical Backtest Results
 
-The repository contains a **9-case retrospective development benchmark** covering Stripe, Figma, Vanta, Airbnb, Quibi, Fast, Juicero, Theranos, and Zume Pizza.
+The repository contains a **9-case retrospective development benchmark** covering Stripe, Figma, Vanta, Airbnb, Quibi, Fast, Juicero, Theranos, and Zume Pizza (4 real-world breakout successes and 5 real-world failures).
 
-The current recorded results are:
+The current recorded results on this retrospective set are:
 
-- **Overall classification:** 8/9 correct (88.9%).
-- **Failure cases flagged:** 5/5 in this retrospective set.
-- **Success cases identified:** 3/4 in this retrospective set.
+- **Overall classification accuracy:** 8/9 correct (88.9%).
+- **Failure detection (Specificity / True Negatives):** 5/5 (100%) — correctly flagged Quibi, Fast, Juicero, Theranos, and Zume Pizza as fatal risks.
+- **Success identification (Sensitivity / True Positives):** 3/4 (75%) — correctly cleared Stripe, Figma, and Vanta; conservative false negative on Airbnb (tripped trust/regulatory gates).
 
 These numbers are **not production accuracy, specificity, or sensitivity estimates**. The sample is small, retrospective, and deliberately composed of well-known historical cases. It is used primarily as a regression and sanity-check suite.
 
