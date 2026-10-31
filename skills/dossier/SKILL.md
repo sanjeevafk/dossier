@@ -1,13 +1,13 @@
 ---
 name: dossier
-description: Adversarial multi-agent idea intelligence and stress testing for startup concepts, product features, and technical proposals. Uses a 6-agent swarm, epistemic robustness verification, isolated Python unit economics sandbox, and dual-key human approval checkpoints.
+description: Adversarial multi-agent idea intelligence and stress testing for startup concepts, product features, and technical proposals. Uses a 7-agent swarm, epistemic robustness verification, isolated Python unit economics sandbox, and evidence-driven validation checkpoints.
 ---
 
 # Dossier: Adversarial Idea Intelligence Agent Skill
 
 Use this skill whenever you need to rigorously stress-test, validate, or cross-examine a new startup idea, feature proposal, business model, or architecture design.
 
-Instead of flattering you with generic praise, Dossier deploys a 6-agent domain-aware swarm to actively seek fatal flaws before engineering capital is spent.
+Instead of flattering you with generic praise, Dossier deploys a 7-agent domain-aware swarm to actively seek fatal flaws before engineering capital is spent.
 
 ---
 
@@ -17,7 +17,7 @@ Instead of flattering you with generic praise, Dossier deploys a 6-agent domain-
 - **Epistemic Evidence Audit:** When separating verified facts and deterministic computations from ungrounded assumptions.
 - **Unit Economics Stress Testing:** When calculating LTV, CAC, payback period, and gross margin in an isolated sandbox.
 - **Red Team Cross-Examination:** When probing fatal regulatory, technical, or customer adoption risks.
-- **Human Safety Checkpoints:** When preparing high-risk validation experiments (e.g. pilot LOIs, smoke tests) requiring dual-key operator authorization.
+- **Validation Planning:** When converting high-value uncertainty into the cheapest falsifiable experiment.
 
 ---
 
@@ -28,7 +28,6 @@ Instead of flattering you with generic praise, Dossier deploys a 6-agent domain-
 Run Dossier directly in your terminal:
 
 ```bash
-# Evaluate any concept
 pnpm cli evaluate \
   --title "Your Idea Title" \
   --summary "Detailed problem, solution, and workflow summary" \
@@ -74,7 +73,7 @@ Or run directly via `tsx`:
 ## Available MCP Tools
 
 ### 1. `evaluate_idea`
-Runs the complete 6-agent domain adversarial swarm and compiles a structured intelligence dossier.
+Runs the complete 7-agent domain adversarial swarm and compiles a structured intelligence dossier.
 - **Arguments:**
   - `title` *(string, required)*: Concept name.
   - `summary` *(string, required)*: Problem and solution description.
@@ -84,10 +83,10 @@ Runs the complete 6-agent domain adversarial swarm and compiles a structured int
   - `cac` *(number, optional)*: Estimated CAC in USD.
 
 ### 2. `stress_test_concept`
-Runs the 5-invariant adversarial stress suite evaluating prompt injection defense, impossible physics detection, sandbox isolation, and burst concurrency.
+Runs the adversarial stress suite evaluating prompt injection defense, impossible physics detection, sandbox isolation, and burst concurrency.
 
 ### 3. `run_sandbox_economics`
-Executes an isolated Python 3 subprocess in a sandboxed runtime to deterministically calculate LTV, CAC, and payback bounds.
+Executes an isolated Python 3 subprocess to deterministically calculate LTV, CAC, payback bounds, Monte Carlo outcomes, and sensitivity. Failed simulation is explicitly marked unavailable/degraded and must not be treated as economic evidence.
 
 ### 4. `verify_claims_epistemics`
 Audits an array of claims against the 7 epistemic states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
@@ -97,12 +96,12 @@ Audits an array of claims against the 7 epistemic states (`VERIFIED_FACT`, `VERI
 ## 7-Tier Epistemic Standard
 
 Dossier enforces a strict epistemic taxonomy:
-1. `VERIFIED_FACT`: Backed by reputable, verified external primary records.
-2. `VERIFIED_COMPUTATION`: Deterministic math computed in an isolated sandbox (Exit Code 0).
-3. `EXTERNAL_EVIDENCE`: Sourced third-party signal (e.g. Polymarket odds, Reddit data) not yet verified.
+1. `VERIFIED_FACT`: Backed by reputable, citable external primary records.
+2. `VERIFIED_COMPUTATION`: Deterministic math computed in an isolated sandbox (Exit Code 0); this validates execution, not the assumptions.
+3. `EXTERNAL_EVIDENCE`: Sourced third-party signal not yet independently verified.
 4. `MODELLED_ASSUMPTION`: Founder or agent hypothesis without empirical proof.
 5. `INFERENCE`: Deductive logical reasoning derived from domain patterns.
-6. `UNKNOWN`: Unquantified black-box parameter.
-7. `CONTRADICTED`: Two opposing claims clashing without resolution.
+6. `UNKNOWN`: Unquantified black-box risk or missing evidence.
+7. `CONTRADICTED`: Two opposing claims or direct counter-evidence that remain unresolved.
 
-> **Zero-Sycophancy Rule:** Unvalidated assumptions, LLM agreements, and inferences can **never** be marked as `VERIFIED`. Unresolved fatal assumptions constrain the verdict to `BUILD_IF_VALIDATED` or `KILL`.
+> **Zero-Sycophancy Rule:** Unvalidated assumptions, LLM agreement, and inference can never be upgraded to `VERIFIED_FACT`. Regulatory applicability also remains `UNKNOWN` unless supported by citable primary evidence.
