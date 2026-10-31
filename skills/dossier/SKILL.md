@@ -23,9 +23,7 @@ Instead of flattering you with generic praise, Dossier deploys a 7-agent domain-
 
 ## Invocation Modes
 
-### Mode 1: CLI Execution (Fast Local Execution)
-
-Run Dossier directly in your terminal:
+### Mode 1: CLI Execution
 
 ```bash
 pnpm cli evaluate \
@@ -37,7 +35,7 @@ pnpm cli evaluate \
   --cac 150
 ```
 
-### Mode 2: MCP Server (Model Context Protocol)
+### Mode 2: MCP Server
 
 Add Dossier to your agent harness or Claude Desktop configuration (`claude_desktop_config.json` or `.mcp.json`):
 
@@ -49,7 +47,7 @@ Add Dossier to your agent harness or Claude Desktop configuration (`claude_deskt
       "args": ["/path/to/dossier/dist/mcp-server.js"],
       "env": {
         "ORCAROUTER_API_KEY": "your_api_key_here",
-        "MODEL_NAME": "openai/gpt-4o-mini"
+        "ORCAROUTER_MODEL": "orcarouter/free"
       }
     }
   }
@@ -74,13 +72,6 @@ Or run directly via `tsx`:
 
 ### 1. `evaluate_idea`
 Runs the complete 7-agent domain adversarial swarm and compiles a structured intelligence dossier.
-- **Arguments:**
-  - `title` *(string, required)*: Concept name.
-  - `summary` *(string, required)*: Problem and solution description.
-  - `targetAudience` *(string, required)*: Customer segment.
-  - `monetization` *(string, required)*: Revenue model.
-  - `pricing` *(number, optional)*: Monthly price in USD.
-  - `cac` *(number, optional)*: Estimated CAC in USD.
 
 ### 2. `stress_test_concept`
 Runs the adversarial stress suite evaluating prompt injection defense, impossible physics detection, sandbox isolation, and burst concurrency.
@@ -89,19 +80,18 @@ Runs the adversarial stress suite evaluating prompt injection defense, impossibl
 Executes an isolated Python 3 subprocess to deterministically calculate LTV, CAC, payback bounds, Monte Carlo outcomes, and sensitivity. Failed simulation is explicitly marked unavailable/degraded and must not be treated as economic evidence.
 
 ### 4. `verify_claims_epistemics`
-Audits an array of claims against the 7 epistemic states (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
+Audits claims against the 7 epistemic states.
 
 ---
 
 ## 7-Tier Epistemic Standard
 
-Dossier enforces a strict epistemic taxonomy:
 1. `VERIFIED_FACT`: Backed by reputable, citable external primary records.
 2. `VERIFIED_COMPUTATION`: Deterministic math computed in an isolated sandbox (Exit Code 0); this validates execution, not the assumptions.
 3. `EXTERNAL_EVIDENCE`: Sourced third-party signal not yet independently verified.
 4. `MODELLED_ASSUMPTION`: Founder or agent hypothesis without empirical proof.
 5. `INFERENCE`: Deductive logical reasoning derived from domain patterns.
 6. `UNKNOWN`: Unquantified black-box risk or missing evidence.
-7. `CONTRADICTED`: Two opposing claims or direct counter-evidence that remain unresolved.
+7. `CONTRADICTED`: Conflicting or disproved claims with unresolved counter-evidence.
 
 > **Zero-Sycophancy Rule:** Unvalidated assumptions, LLM agreement, and inference can never be upgraded to `VERIFIED_FACT`. Regulatory applicability also remains `UNKNOWN` unless supported by citable primary evidence.
