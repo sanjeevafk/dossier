@@ -14,6 +14,7 @@ export interface SandboxExecutionResult {
   stdout: string;
   stderr: string;
   degraded: boolean;
+  status: "available" | "degraded" | "unavailable";
   metrics: {
     cacEstimateUsd: number;
     ltvEstimateUsd: number;
@@ -129,6 +130,7 @@ export async function runEconomicsSimulation(
       stdout: stdout.trim(),
       stderr: stderr.trim(),
       degraded: false,
+      status: "available",
       metrics: {
         cacEstimateUsd: parsed.cacEstimateUsd,
         ltvEstimateUsd: parsed.ltvEstimateUsd,
@@ -161,6 +163,7 @@ export async function runEconomicsSimulation(
       stdout: typeof execErr.stdout === "string" ? execErr.stdout : "",
       stderr: execErr.message ?? "Economics simulator failed",
       degraded: true,
+      status: "unavailable",
       metrics: {
         cacEstimateUsd: cleanCac,
         ltvEstimateUsd: 0,

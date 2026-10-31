@@ -46,7 +46,7 @@ test("Google News returns honest empty on HTTP failure", async () => {
 
 test("Google News utilizes SQLite cache on repeated queries", async () => {
   const key = `cached-rover-query-${Date.now()}`;
-  dossierStorage.setReconCache(`news:google:${key}`, "google-news", {
+  const cachedPayload = {
     articles: [
       {
         title: "Cached Rover Article",
@@ -54,7 +54,9 @@ test("Google News utilizes SQLite cache on repeated queries", async () => {
         url: "https://example.com/cached"
       }
     ]
-  });
+  };
+  dossierStorage.setReconCache(`news:google:${key}`, "google-news", cachedPayload);
+  dossierStorage.setReconCache(`news:google:us:${key}`, "google-news", cachedPayload);
 
   const result = await queryNewsHeadlines(key, async () => {
     throw new Error("Should not be called because cache exists");
