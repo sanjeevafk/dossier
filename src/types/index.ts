@@ -213,6 +213,8 @@ export interface SimulationResult {
     exitCode: number;
     stdout: string;
   };
+  degraded?: boolean;
+  status?: "available" | "degraded" | "unavailable";
 }
 
 export type ClaimStatus = "VERIFIED" | "DISPUTED" | "CONTRADICTED" | "UNKNOWN";
@@ -323,6 +325,7 @@ export interface DecisionModelOutput {
   verdict: "BUILD" | "REFINE" | "KILL";
   loss_ratio: number;
   runtimeMs?: number;
+  economicsAvailability?: "available" | "degraded" | "unavailable";
 }
 
 /** Honest inter-agent disagreement signal — replaces cosmetic confidence scores. */
