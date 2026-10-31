@@ -31,7 +31,10 @@ def cohort_metrics(pricing, churn, cac, token_multiplier, token_cost_per_user, g
         np.clip(1.0 - churn[:, None] * decay_matrix[None, :], 0.0, 1.0),
         axis=1,
     )
-    cohort_margin = pricing * gross_margin_target - token_cost_per_user * token_multiplier[:, None]
+    token_cost = np.asarray(token_cost_per_user)
+    if token_cost.ndim == 0:
+        token_cost = np.full(len(token_multiplier), float(token_cost))
+    cohort_margin = pricing[:, None] * gross_margin_target - token_cost[:, None] * token_multiplier[:, None]
     cohort_ltv = np.sum(np.maximum(cohort_margin, 0.0) * cohort_survival, axis=1)
     ltv_cac = np.minimum(np.divide(cohort_ltv, cac), 999.0)
     first_month_margin = np.maximum(cohort_margin[:, 0], 0.01)
@@ -73,7 +76,7 @@ def run_simulation(data):
     cac = np.clip(rng.normal(cac_mean, cac_std, iterations), 1.0, 1e6)
     token_multiplier = rng.uniform(0.7, 1.3, iterations)
 
-    cohort_ltv, ltv_cac, payback, cohort_survival = cohort_metrics(
+    cohort_ltv, ltv_cac, payback, _ = cohort_metrics(
         np.full(iterations, pricing), churn, cac, token_multiplier,
         token_cost_per_user, gross_margin_target, churn_decay
     )
@@ -92,10 +95,7 @@ def run_simulation(data):
     balances = starting_cash + np.outer(net_monthly, horizon)
     insolvency_curve = np.mean(balances <= 0.0, axis=0)
 
-    token_share = np.divide(
-        token_cost_per_user * token_multiplier,
-        np.maximum(pricing * gross_margin_target, 0.01),
-    )
+    token_share = np.divide(token_cost_per_user * token_multiplier, np.maximum(pricing * gross_margin_target, 0.01))
 
     payoff = cohort_ltv - cac
     baseline_proceed_value = float(np.mean(payoff))
@@ -131,7 +131,7 @@ def run_simulation(data):
         token_p = token_cost_per_user * token_multiplier
         if name == "token_cost": token_p = np.clip(token_p * shift, 0.0, 1e4)
         pricing_p = np.full(iterations, probe["pricing_monthly"])
-        ltv_p, ratio_p, _, _ = cohort_metrics(pricing_p, churn_p, cac_p, token_multiplier, token_p, gross_margin_target, churn_decay)
+        _, ratio_p, _, _ = cohort_metrics(pricing_p, churn_p, cac_p, token_multiplier, token_p, gross_margin_target, churn_decay)
         return float(np.percentile(ratio_p, 50))
 
     base_p50 = float(np.percentile(ltv_cac, 50))
