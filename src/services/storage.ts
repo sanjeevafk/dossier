@@ -42,6 +42,7 @@ export class DossierStorageService {
   private static instance: DossierStorageService;
   private static readonly MAX_CACHE_SIZE = 25;
   private memoryCache: Map<string, IdeaDossier> = new Map();
+  private reconMemoryCache: Map<string, { provider: string; response: unknown; expiresAt: number }> = new Map();
   private db: SqliteDb | null = null;
 
   private setCache(id: string, dossier: IdeaDossier): void {
@@ -67,6 +68,14 @@ export class DossierStorageService {
     if (this.db) return this.db;
     fsSync.mkdirSync(DATA_DIR, { recursive: true });
     const db: SqliteDb = new DatabaseSync(DB_PATH) as unknown as SqliteDb;
+    try {
+      db.exec(`
+        PRAGMA journal_mode = WAL;
+        PRAGMA busy_timeout = 5000;
+      `);
+    } catch {
+      // WAL pragma best effort
+    }
     db.exec(`
       CREATE TABLE IF NOT EXISTS dossiers (
         id TEXT PRIMARY KEY,
@@ -141,22 +150,32 @@ export class DossierStorageService {
   }
 
   public getReconCache(queryKey: string): { provider: string; response: unknown } | null {
+    const key = queryKey.toLowerCase();
+    const inMem = this.reconMemoryCache.get(key);
+    if (inMem && inMem.expiresAt >= Date.now()) {
+      return { provider: inMem.provider, response: inMem.response };
+    }
     try {
       const row = this.getDb()
         .prepare("SELECT provider, response_json, expires_at FROM recon_cache WHERE query_key = ?")
-        .get(queryKey.toLowerCase()) as { provider: string; response_json: string; expires_at: number } | undefined;
+        .get(key) as { provider: string; response_json: string; expires_at: number } | undefined;
       if (!row || row.expires_at < Date.now()) return null;
-      return { provider: row.provider, response: JSON.parse(row.response_json) };
+      const parsed = { provider: row.provider, response: JSON.parse(row.response_json) };
+      this.reconMemoryCache.set(key, { provider: row.provider, response: parsed.response, expiresAt: row.expires_at });
+      return parsed;
     } catch {
       return null;
     }
   }
 
   public setReconCache(queryKey: string, provider: string, response: unknown): void {
+    const key = queryKey.toLowerCase();
+    const expiresAt = Date.now() + ONE_WEEK_MS;
+    this.reconMemoryCache.set(key, { provider, response, expiresAt });
     try {
       this.getDb()
         .prepare("INSERT OR REPLACE INTO recon_cache (query_key, provider, response_json, expires_at) VALUES (?, ?, ?, ?)")
-        .run(queryKey.toLowerCase(), provider, JSON.stringify(response), Date.now() + ONE_WEEK_MS);
+        .run(key, provider, JSON.stringify(response), expiresAt);
     } catch {
       // cache write failure must never break evaluation
     }
