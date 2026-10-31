@@ -1,29 +1,10 @@
 #!/usr/bin/env python3
 """
-Dossier stochastic economics sandbox — vectorized Monte Carlo (10,000 runs).
+Dossier stochastic economics sandbox — vectorized Monte Carlo.
 
-Input JSON (argv[1] or stdin):
-{
-  "pricing_monthly": float,
-  "churn_mean": float (0..1),
-  "churn_std":  float (optional, default 25% of mean),
-  "churn_decay": float (optional, default 1.0; monthly retention improvement 0.90-1.0),
-  "cac_mean":   float,
-  "cac_std":    float (optional, default 30% of mean),
-  "users_m12":  int,
-  "tokens_per_req": int,
-  "reqs_monthly":   int,
-  "token_cost_per_user": float (optional; overrides tokens/reqs derived cost, USD/user/month),
-  "gross_margin_target": float (optional, default 0.80),
-  "iterations": int (optional, default 10000, clamped 1000..50000),
-  "starting_cash_usd": float (optional; default 3x worst-case monthly burn),
-  "runway_months": float (optional; explicit burn runway for notes, default 18),
-  "seed": int (optional; RNG seed for reproducible runs)
-}
-
-Output JSON: survival probabilities (cash > 0 at month 12/24), monthly insolvency curve,
-cohort LTV, LTV/CAC + payback percentiles (P10/P50/P90), token-cost burden percentiles, and a
-tornado sensitivity ranking of which parameter moves the P50 LTV/CAC most.
+The model uses one consistent 24-month cohort contribution-margin model for LTV,
+LTV/CAC and payback. Input assumptions remain assumptions; successful execution
+is not evidence that those assumptions are correct.
 """
 import hashlib
 import json
@@ -61,10 +42,7 @@ def run_simulation(data):
         seed = int(hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:8], 16)
 
     derived_token_cost = (tokens_per_req * reqs_monthly / 1_000_000.0) * 2.50
-    token_cost_per_user = float(
-        data.get("token_cost_per_user", derived_token_cost)
-    )
-    token_cost_per_user = clamp(token_cost_per_user, 0.0, 1e4)
+    token_cost_per_user = clamp(float(data.get("token_cost_per_user", derived_token_cost)), 0.0, 1e4)
 
     if "starting_cash_usd" in data:
         starting_cash = clamp(float(data["starting_cash_usd"]), 0.0, 1e12)
@@ -76,53 +54,49 @@ def run_simulation(data):
         starting_cash = 3.0 * worst_monthly_burn
 
     rng = np.random.default_rng(int(seed) % (2 ** 32))
-
     churn = np.clip(rng.normal(churn_mean, churn_std, iterations), 0.004, 0.5)
     cac = np.clip(rng.normal(cac_mean, cac_std, iterations), 1.0, 1e6)
     token_multiplier = rng.uniform(0.7, 1.3, iterations)
 
-    # Cohort LTV: month-1 cohort decays by churn*decay^t; LTV = sum of cohort margin.
-    # churn_decay < 1.0 models retention improvement (expansion, habit formation).
+    # One coherent 24-month cohort model. Each month's contribution margin is
+    # discounted by the cohort survival probability. This same LTV drives LTV/CAC.
     months = np.arange(1, 25)
-    decay_matrix = np.power(churn_decay, months - 1)  # (24,)
-    cohort_survival = np.clip(1.0 - churn[:, None] * decay_matrix[None, :], 0.0, 1.0)
+    decay_matrix = np.power(churn_decay, months - 1)
+    cohort_survival = np.cumprod(
+        np.clip(1.0 - churn[:, None] * decay_matrix[None, :], 0.0, 1.0),
+        axis=1,
+    )
     cohort_margin = pricing * gross_margin_target - token_cost_per_user * token_multiplier[:, None]
     cohort_ltv = np.sum(np.maximum(cohort_margin, 0.0) * cohort_survival, axis=1)
+    ltv_cac = np.minimum(np.divide(cohort_ltv, cac), 999.0)
 
-    margin_per_user = pricing * gross_margin_target
-    ltv = np.where(churn > 0, margin_per_user / churn, 1e9)
-    ltv_cac = np.minimum(np.divide(np.maximum(cohort_ltv, ltv * 0.5), cac), 999.0)
-    payback = np.where(margin_per_user > 0, np.minimum(cac / margin_per_user, 999.0), 999.0)
+    # Payback is based on first-month contribution margin, so it is consistent
+    # with the same contribution-margin definition used by cohort LTV.
+    first_month_margin = np.maximum(cohort_margin[:, 0], 0.01)
+    payback = np.minimum(cac / first_month_margin, 999.0)
 
-    revenue_monthly = users * margin_per_user
+    revenue_monthly = users * pricing * gross_margin_target
     infra_monthly = 150.0 + users * 0.05 + users * token_cost_per_user
     acquisition_monthly = users * churn * cac
     net_monthly = revenue_monthly - infra_monthly - acquisition_monthly
 
-    # Insolvency model: flat net margin against a banked starting runway (steady-state
-    # replacement model); cash trajectory is linear, so survival is the share of runs
-    # whose cash balance stays above zero through the horizon.
     cash_month_12 = starting_cash + net_monthly * 12.0
     cash_month_24 = starting_cash + net_monthly * 24.0
     survival_12 = float(np.mean(cash_month_12 > 0))
     survival_24 = float(np.mean(cash_month_24 > 0))
 
     horizon = np.arange(1, 25)
-    balances = starting_cash + np.outer(net_monthly, horizon)  # (iterations, 24)
-    insolvency_curve = np.mean(balances <= 0.0, axis=0)  # share insolvent by month m
+    balances = starting_cash + np.outer(net_monthly, horizon)
+    insolvency_curve = np.mean(balances <= 0.0, axis=0)
 
     token_share = np.divide(
         token_cost_per_user * token_multiplier,
-        np.maximum(margin_per_user, 0.01),
+        np.maximum(pricing * gross_margin_target, 0.01),
     )
 
-    # --- Value of Information (empirical partial EVPI, per-customer gross NPV) ---
-    # Decision model: proceed iff expected payoff > 0; payoff per acquired customer
-    # = LTV - CAC (both already stochastic draws). Perfect information on parameter i
-    # lets the founder switch decision per bin of x_i; partial EVPI_i is the expected
-    # decision-value gain from that knowledge. Pricing uncertainty is not drawn here —
-    # it is covered by the separate Sobol module's ±25% founder-estimate band.
-    payoff = ltv - cac
+    # EVPI remains a decision-model diagnostic. It uses the same cohort LTV as
+    # the displayed LTV/CAC so the decision model cannot silently use another LTV.
+    payoff = cohort_ltv - cac
     baseline_proceed_value = float(np.mean(payoff))
     baseline_best = max(baseline_proceed_value, 0.0)
     perfect_info_value = float(np.mean(np.maximum(payoff, 0.0)))
@@ -136,44 +110,32 @@ def run_simulation(data):
     ):
         order = np.argsort(draws)
         sorted_payoff = payoff[order]
-        n_bins = 10
-        bin_edges = np.array_split(np.arange(len(sorted_payoff)), n_bins)
+        bin_edges = np.array_split(np.arange(len(sorted_payoff)), 10)
         informed_value = 0.0
         for idx in bin_edges:
-            if idx.size == 0:
-                continue
-            informed_value += (idx.size / len(sorted_payoff)) * max(
-                float(np.mean(sorted_payoff[idx])), 0.0
-            )
+            if idx.size:
+                informed_value += (idx.size / len(sorted_payoff)) * max(float(np.mean(sorted_payoff[idx])), 0.0)
         partial_evpi[name] = max(min(informed_value - baseline_best, evpi), 0.0)
 
     evpi_ranking = sorted(partial_evpi.items(), key=lambda kv: kv[1], reverse=True)
+
     def percentiles(values):
         p10, p50, p90 = np.percentile(values, [10, 50, 90])
-        return {
-            "p10": round(float(p10), 2),
-            "p50": round(float(p50), 2),
-            "p90": round(float(p90), 2),
-        }
+        return {"p10": round(float(p10), 2), "p50": round(float(p50), 2), "p90": round(float(p90), 2)}
 
     def p50_ratio_with_param(name, shift):
-        probe = {
-            "pricing_monthly": pricing,
-            "churn_mean": churn_mean,
-            "cac_mean": cac_mean,
-            "token_cost": token_cost_per_user,
-        }
-        probe[name] = probe[name] * shift
+        probe = {"pricing_monthly": pricing, "churn_mean": churn_mean, "cac_mean": cac_mean, "token_cost": token_cost_per_user}
+        probe[name] *= shift
         probe_churn = clamp(probe["churn_mean"], 0.005, 0.5)
         probe_cac = clamp(probe["cac_mean"], 1.0, 1e6)
         probe_token = clamp(probe["token_cost"], 0.0, 1e4)
         churn_p = np.clip(rng.normal(probe_churn, churn_std, iterations), 0.004, 0.5)
-        cac_p = cac if name != "cac_mean" else np.clip(
-            rng.normal(probe_cac, cac_std, iterations), 1.0, 1e6
+        cac_p = cac if name != "cac_mean" else np.clip(rng.normal(probe_cac, cac_std, iterations), 1.0, 1e6)
+        margin_p = max(probe["pricing_monthly"] * gross_margin_target - probe_token, 0.01)
+        cohort_survival_p = np.cumprod(
+            np.clip(1.0 - churn_p[:, None] * decay_matrix[None, :], 0.0, 1.0), axis=1
         )
-        margin_p = probe["pricing_monthly"] * gross_margin_target - probe_token
-        margin_p = np.maximum(margin_p, 0.01)
-        ltv_p = np.where(churn_p > 0, margin_p / churn_p, 1e9)
+        ltv_p = np.sum(margin_p * cohort_survival_p, axis=1)
         ratio_p = np.minimum(np.divide(ltv_p, cac_p), 999.0)
         return float(np.percentile(ratio_p, 50))
 
@@ -181,12 +143,9 @@ def run_simulation(data):
     tornado = []
     for name, shift in (("churn_mean", 1.10), ("cac_mean", 1.10), ("pricing_monthly", 0.90), ("token_cost", 1.10)):
         delta = p50_ratio_with_param(name, shift) - base_p50
-        label = "pricing_monthly" if name == "pricing_monthly" else name
-        tornado.append({"param": label, "absoluteDelta": round(abs(delta), 3)})
+        tornado.append({"param": name, "absoluteDelta": round(abs(delta), 3)})
     tornado.sort(key=lambda item: item["absoluteDelta"], reverse=True)
 
-    # Vectorized Stress Run (15% pricing discount, 60% churn spike, 60% CAC inflation)
-    # Computed in-memory to eliminate spawning a second Python subprocess.
     stress_pricing = pricing * 0.85
     stress_churn_mean = min(1.0, churn_mean * 1.6)
     stress_cac_mean = cac_mean * 1.6
@@ -198,7 +157,6 @@ def run_simulation(data):
     stress_payback = np.where(stress_margin > 0, np.minimum(stress_cac / stress_margin, 999.0), 999.0)
     stress_net_monthly = (users * stress_margin) - infra_monthly - (users * stress_churn * stress_cac)
     stress_cash_24 = starting_cash + stress_net_monthly * 24.0
-    stress_survival_24 = float(np.mean(stress_cash_24 > 0))
 
     result = {
         "iterations": iterations,
@@ -212,46 +170,31 @@ def run_simulation(data):
             "churnStressed": True,
             "cacStressed": True,
             "stressLtvCacRatio": round(float(np.percentile(stress_ltv_cac, 50)), 2),
-            "stressSurvival24Mo": round(stress_survival_24, 4),
-            "stressPayback50": round(float(np.percentile(stress_payback, 50)), 1)
+            "stressSurvival24Mo": round(float(np.mean(stress_cash_24 > 0)), 4),
+            "stressPayback50": round(float(np.percentile(stress_payback, 50)), 1),
         },
         "sensitivity": tornado,
         "valueOfInformation": {
-            "decisionModel": "per-customer gross NPV (LTV - CAC); proceed iff expected payoff > 0",
+            "decisionModel": "per-customer gross NPV (24-month cohort LTV - CAC); proceed iff expected payoff > 0",
             "expectedPayoffIfProceeding": round(baseline_proceed_value, 2),
             "expectedPayoffWithPerfectInfo": round(perfect_info_value, 2),
             "evpiPerCustomer": round(evpi, 2),
             "partialEvpi": [
-                {
-                    "param": name,
-                    "evpiPerCustomer": round(value, 2),
-                    "shareOfEvpi": round(value / evpi, 3) if evpi > 0 else 0.0,
-                }
+                {"param": name, "evpiPerCustomer": round(value, 2), "shareOfEvpi": round(value / evpi, 3) if evpi > 0 else 0.0}
                 for name, value in evpi_ranking
             ],
         },
         "medianInferredUsers": users,
         "cacEstimateUsd": round(float(np.percentile(cac, 50)), 2),
-        "ltvEstimateUsd": round(float(np.percentile(ltv, 50)), 2),
+        "ltvEstimateUsd": round(float(np.percentile(cohort_ltv, 50)), 2),
         "ltvCacRatio": round(base_p50, 2),
         "estimatedPaybackMonths": round(float(np.percentile(payback, 50)), 1),
         "monthlyInfraCostUsd": round(float(infra_monthly), 2),
         "tamEstimateUsd": "UNKNOWN — no citable TAM source for this archetype",
         "simulationNotes": (
-            "Cohort Monte Carlo: %d runs, seed %d, churn ~ N(%.3f, %.3f) decay %.2f, "
+            "24-month cohort Monte Carlo: %d runs, seed %d, churn ~ N(%.3f, %.3f) decay %.2f, "
             "CAC ~ N(%.0f, %.0f), gross margin %.0f%%, token cost $%.4f/user/mo, runway %.0fmo."
-            % (
-                iterations,
-                int(seed) % (2 ** 32),
-                churn_mean,
-                churn_std,
-                churn_decay,
-                cac_mean,
-                cac_std,
-                gross_margin_target * 100,
-                token_cost_per_user,
-                runway_months,
-            )
+            % (iterations, int(seed) % (2 ** 32), churn_mean, churn_std, churn_decay, cac_mean, cac_std, gross_margin_target * 100, token_cost_per_user, runway_months)
         ),
     }
     print(json.dumps(result))
