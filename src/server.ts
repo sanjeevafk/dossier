@@ -146,6 +146,16 @@ function releaseEvaluationSlot(): void {
   activeEvaluations = Math.max(0, activeEvaluations - 1);
 }
 
+function getClientIp(req: IncomingMessage): string {
+  if (process.env.TRUST_PROXY === "true" || process.env.TRUST_PROXY === "1") {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (typeof forwarded === "string" && forwarded.trim()) {
+      return forwarded.split(",")[0].trim();
+    }
+  }
+  return req.socket.remoteAddress || "global";
+}
+
 function createRateLimiter(windowMs: number, maxHits: number, message: string) {
   const hits = new Map<string, { count: number; resetAt: number }>();
   setInterval(() => {
@@ -156,7 +166,7 @@ function createRateLimiter(windowMs: number, maxHits: number, message: string) {
   }, 300_000).unref();
 
   return (req: IncomingMessage, res: ServerResponse): boolean => {
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "global";
+    const ip = getClientIp(req);
     const now = Date.now();
     const entry = hits.get(ip);
     if (!entry || entry.resetAt <= now) {
@@ -437,6 +447,10 @@ async function app(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const exportMatch = pathname.match(/^\/api\/dossiers\/([^/]+)\/export$/);
     if (method === "GET" && exportMatch) {
       const id = exportMatch[1];
+      if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+        sendJson(res, 400, { success: false, error: "Invalid dossier ID format" });
+        return;
+      }
       try {
         const format = (parsedUrl.searchParams.get("format") || "markdown").toLowerCase();
         const dossier = await dossierStorage.getDossier(id);
@@ -447,7 +461,7 @@ async function app(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
         if (format === "json") {
           res.statusCode = 200;
-          res.setHeader("Content-Disposition", `attachment; filename="dossier_${id}.json"`);
+          res.setHeader("Content-Disposition", `attachment; filename="dossier_${dossier.id}.json"`);
           res.setHeader("Content-Type", "application/json");
           res.end(JSON.stringify(dossier, null, 2));
           return;
@@ -456,7 +470,7 @@ async function app(req: IncomingMessage, res: ServerResponse): Promise<void> {
           const scriptPath = path.resolve(process.cwd(), "scripts/export_pdf.py");
           const currentPort = port;
 
-          execFile("python3", [scriptPath, id, String(currentPort)], { maxBuffer: 30 * 1024 * 1024, encoding: "buffer" }, (error, stdout, stderr) => {
+          execFile("python3", [scriptPath, dossier.id, String(currentPort)], { maxBuffer: 30 * 1024 * 1024, encoding: "buffer", timeout: 30000 }, (error, stdout, stderr) => {
             if (error) {
               log.error({ err: error, stderr: stderr.toString() }, "Playwright PDF export failed");
               sendJson(res, 500, { success: false, error: "Failed to generate PDF report via Playwright" });
@@ -795,6 +809,9 @@ async function app(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
     // 14. Streaming playground chat (SSE)
     if (method === "POST" && pathname === "/api/chat/stream") {
+      if (!chatLimiter(req, res)) return;
+      if (!checkAuth(req, res)) return;
+
       let body: any;
       try {
         body = await readJsonBody(req);
