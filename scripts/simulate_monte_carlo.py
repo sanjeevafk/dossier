@@ -24,6 +24,21 @@ def load_input():
     return json.loads(sys.stdin.read())
 
 
+def cohort_metrics(pricing, churn, cac, token_multiplier, token_cost_per_user, gross_margin_target, churn_decay):
+    months = np.arange(1, 25)
+    decay_matrix = np.power(churn_decay, months - 1)
+    cohort_survival = np.cumprod(
+        np.clip(1.0 - churn[:, None] * decay_matrix[None, :], 0.0, 1.0),
+        axis=1,
+    )
+    cohort_margin = pricing * gross_margin_target - token_cost_per_user * token_multiplier[:, None]
+    cohort_ltv = np.sum(np.maximum(cohort_margin, 0.0) * cohort_survival, axis=1)
+    ltv_cac = np.minimum(np.divide(cohort_ltv, cac), 999.0)
+    first_month_margin = np.maximum(cohort_margin[:, 0], 0.01)
+    payback = np.minimum(cac / first_month_margin, 999.0)
+    return cohort_ltv, ltv_cac, payback, cohort_survival
+
+
 def run_simulation(data):
     pricing = clamp(float(data.get("pricing_monthly", 49.0)), 0.0, 1e7)
     churn_mean = clamp(float(data.get("churn_mean", 0.05)), 0.005, 0.5)
@@ -58,22 +73,10 @@ def run_simulation(data):
     cac = np.clip(rng.normal(cac_mean, cac_std, iterations), 1.0, 1e6)
     token_multiplier = rng.uniform(0.7, 1.3, iterations)
 
-    # One coherent 24-month cohort model. Each month's contribution margin is
-    # discounted by the cohort survival probability. This same LTV drives LTV/CAC.
-    months = np.arange(1, 25)
-    decay_matrix = np.power(churn_decay, months - 1)
-    cohort_survival = np.cumprod(
-        np.clip(1.0 - churn[:, None] * decay_matrix[None, :], 0.0, 1.0),
-        axis=1,
+    cohort_ltv, ltv_cac, payback, cohort_survival = cohort_metrics(
+        np.full(iterations, pricing), churn, cac, token_multiplier,
+        token_cost_per_user, gross_margin_target, churn_decay
     )
-    cohort_margin = pricing * gross_margin_target - token_cost_per_user * token_multiplier[:, None]
-    cohort_ltv = np.sum(np.maximum(cohort_margin, 0.0) * cohort_survival, axis=1)
-    ltv_cac = np.minimum(np.divide(cohort_ltv, cac), 999.0)
-
-    # Payback is based on first-month contribution margin, so it is consistent
-    # with the same contribution-margin definition used by cohort LTV.
-    first_month_margin = np.maximum(cohort_margin[:, 0], 0.01)
-    payback = np.minimum(cac / first_month_margin, 999.0)
 
     revenue_monthly = users * pricing * gross_margin_target
     infra_monthly = 150.0 + users * 0.05 + users * token_cost_per_user
@@ -94,8 +97,6 @@ def run_simulation(data):
         np.maximum(pricing * gross_margin_target, 0.01),
     )
 
-    # EVPI remains a decision-model diagnostic. It uses the same cohort LTV as
-    # the displayed LTV/CAC so the decision model cannot silently use another LTV.
     payoff = cohort_ltv - cac
     baseline_proceed_value = float(np.mean(payoff))
     baseline_best = max(baseline_proceed_value, 0.0)
@@ -103,11 +104,7 @@ def run_simulation(data):
     evpi = max(perfect_info_value - baseline_best, 0.0)
 
     partial_evpi = {}
-    for name, draws in (
-        ("churn_mean", churn),
-        ("cac_mean", cac),
-        ("token_cost", token_cost_per_user * token_multiplier),
-    ):
+    for name, draws in (("churn_mean", churn), ("cac_mean", cac), ("token_cost", token_cost_per_user * token_multiplier)):
         order = np.argsort(draws)
         sorted_payoff = payoff[order]
         bin_edges = np.array_split(np.arange(len(sorted_payoff)), 10)
@@ -131,12 +128,10 @@ def run_simulation(data):
         probe_token = clamp(probe["token_cost"], 0.0, 1e4)
         churn_p = np.clip(rng.normal(probe_churn, churn_std, iterations), 0.004, 0.5)
         cac_p = cac if name != "cac_mean" else np.clip(rng.normal(probe_cac, cac_std, iterations), 1.0, 1e6)
-        margin_p = max(probe["pricing_monthly"] * gross_margin_target - probe_token, 0.01)
-        cohort_survival_p = np.cumprod(
-            np.clip(1.0 - churn_p[:, None] * decay_matrix[None, :], 0.0, 1.0), axis=1
-        )
-        ltv_p = np.sum(margin_p * cohort_survival_p, axis=1)
-        ratio_p = np.minimum(np.divide(ltv_p, cac_p), 999.0)
+        token_p = token_cost_per_user * token_multiplier
+        if name == "token_cost": token_p = np.clip(token_p * shift, 0.0, 1e4)
+        pricing_p = np.full(iterations, probe["pricing_monthly"])
+        ltv_p, ratio_p, _, _ = cohort_metrics(pricing_p, churn_p, cac_p, token_multiplier, token_p, gross_margin_target, churn_decay)
         return float(np.percentile(ratio_p, 50))
 
     base_p50 = float(np.percentile(ltv_cac, 50))
@@ -146,15 +141,18 @@ def run_simulation(data):
         tornado.append({"param": name, "absoluteDelta": round(abs(delta), 3)})
     tornado.sort(key=lambda item: item["absoluteDelta"], reverse=True)
 
+    # Stress the same 24-month cohort model with worse pricing, churn and CAC.
     stress_pricing = pricing * 0.85
-    stress_churn_mean = min(1.0, churn_mean * 1.6)
+    stress_churn_mean = min(0.5, churn_mean * 1.6)
     stress_cac_mean = cac_mean * 1.6
-    stress_churn = np.clip(rng.normal(stress_churn_mean, stress_churn_mean * 0.25, iterations), 0.004, 1.0)
+    stress_churn_std = max(0.002, stress_churn_mean * 0.25)
+    stress_churn = np.clip(rng.normal(stress_churn_mean, stress_churn_std, iterations), 0.004, 0.5)
     stress_cac = np.clip(rng.normal(stress_cac_mean, stress_cac_mean * 0.30, iterations), 1.0, 1e6)
-    stress_margin = stress_pricing * gross_margin_target
-    stress_ltv = np.where(stress_churn > 0, stress_margin / stress_churn, 1e9)
-    stress_ltv_cac = np.minimum(np.divide(stress_ltv, stress_cac), 999.0)
-    stress_payback = np.where(stress_margin > 0, np.minimum(stress_cac / stress_margin, 999.0), 999.0)
+    stress_ltv, stress_ltv_cac, stress_payback, _ = cohort_metrics(
+        np.full(iterations, stress_pricing), stress_churn, stress_cac, token_multiplier,
+        token_cost_per_user, gross_margin_target, churn_decay
+    )
+    stress_margin = np.maximum(stress_pricing * gross_margin_target - token_cost_per_user * token_multiplier, 0.0)
     stress_net_monthly = (users * stress_margin) - infra_monthly - (users * stress_churn * stress_cac)
     stress_cash_24 = starting_cash + stress_net_monthly * 24.0
 
