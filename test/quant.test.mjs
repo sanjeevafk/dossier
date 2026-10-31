@@ -158,3 +158,39 @@ test("Orchestrator dossier carries VOI-ranked validation priority", async () => 
     assert.ok(ev9.provenance.includes("Sandbox"));
   }
 });
+
+test("Consistent base and stress LTV model: cohort dynamics align without model drift", async () => {
+  const sim = await runPython("simulate_monte_carlo.py", {
+    pricing_monthly: 99,
+    churn_mean: 0.05,
+    cac: 300,
+    users_m12: 1000,
+    iterations: 5000,
+    seed: 42
+  });
+
+  const baseP50 = sim.ltvCacPercentiles.p50;
+  const stress = sim.stressMetrics;
+
+  assert.ok(stress, "Stress metrics must be present");
+  assert.equal(stress.churnStressed, true);
+  assert.equal(stress.cacStressed, true);
+
+  // Stressed parameters (higher churn, higher CAC, lower pricing) must produce worse LTV/CAC
+  assert.ok(
+    stress.stressLtvCacRatio < baseP50,
+    `Stressed LTV/CAC (${stress.stressLtvCacRatio}) must be strictly lower than base P50 (${baseP50})`
+  );
+
+  // Stressed survival must be <= base survival
+  assert.ok(
+    stress.stressSurvival24Mo <= sim.survivalProbability24Mo,
+    `Stressed survival (${stress.stressSurvival24Mo}) must be <= base survival (${sim.survivalProbability24Mo})`
+  );
+
+  // Stressed payback months must be >= base payback months
+  assert.ok(
+    stress.stressPayback50 >= sim.paybackPercentiles.p50,
+    `Stressed payback (${stress.stressPayback50}mo) must be >= base payback (${sim.paybackPercentiles.p50}mo)`
+  );
+});
