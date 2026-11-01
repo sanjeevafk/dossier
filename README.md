@@ -4,7 +4,7 @@ Dossier is an adversarial multi-agent evaluation platform that stress-tests star
 
 The platform deploys seven specialized analytical perspectives to challenge assumptions, runs quantitative unit economics simulations in an isolated Python sandbox, verifies factual claims against empirical sources, and outputs a concrete 7-day falsification roadmap.
 
-Live Deployment: https://dossier.sanjeevkumar.me
+Live Deployment: https://dossier.worksforme.tech
 
 ---
 

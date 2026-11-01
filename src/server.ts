@@ -61,7 +61,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       "http://localhost:3000",
       "http://127.0.0.1:3000",
       "https://dossier-ai.azurewebsites.net",
-      "https://dossier.sanjeevkumar.me"
+      "https://dossier.worksforme.tech"
     ];
 
 function sendJson(res: ServerResponse, statusCode: number, data: unknown): void {
