@@ -55,11 +55,24 @@ function streamFile(filePath: string, stat: fs.Stats, req: IncomingMessage, res:
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
+  // Revalidate on every load: heuristic browser caching served stale app.js after deploys,
+  // which broke the report render until a hard refresh. no-cache = revalidate, 304 when unchanged.
+  const lastModified = stat.mtime.toUTCString();
   res.statusCode = 200;
   res.setHeader("Content-Type", contentType);
   res.setHeader("Content-Length", stat.size);
+  res.setHeader("Last-Modified", lastModified);
+  res.setHeader("Cache-Control", "no-cache");
 
   if (req.method === "HEAD") {
+    res.end();
+    return true;
+  }
+
+  const ifModifiedSince = req.headers["if-modified-since"];
+  if (ifModifiedSince && new Date(ifModifiedSince).getTime() >= Math.floor(stat.mtimeMs / 1000) * 1000) {
+    res.statusCode = 304;
+    res.removeHeader("Content-Length");
     res.end();
     return true;
   }
