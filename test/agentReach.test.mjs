@@ -5,7 +5,7 @@ import {
   queryGitHubTraction,
   queryV2EXCommunity,
   queryAgentReachIntel
-} from "../dist/tools/agentReach.js";
+} from "../src/tools/agentReach.ts";
 
 test("scrapeWebPageWithJina parses markdown title, pricing, and bullet claims", async () => {
   const markdownSample = `Title: Pinecone - Vector Database for AI

@@ -1,3 +1,4 @@
+import { LANES, hasFindings, decideVerdictV2, isEvidencedStructuralFatal, type Lane } from "./verdict.js";
 import {
   AgentOpinion,
   SwarmRole,
@@ -21,6 +22,8 @@ export interface DimensionalScoringInput {
   invariants: AdversarialInvariants;
   graveyardMatches: any[];
   evidenceFeed: EvidenceItem[];
+  /** True only when price AND CAC come from the founder or a source, not from archetype defaults. */
+  economicsGrounded: boolean;
 }
 
 export interface DimensionalScoringResult {
@@ -38,6 +41,7 @@ export interface DimensionalScoringResult {
   agentScores: number[];
   verdictSpread: number;
   swarmDissent: SwarmDissent;
+  verdictBasis: { engine: "findings_v2" | "legacy_score"; reasons: string[] };
 }
 
 export function computeDimensionalResilience(input: DimensionalScoringInput): DimensionalScoringResult {
@@ -49,7 +53,8 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
     isEconomicsAvailable,
     invariants,
     graveyardMatches,
-    evidenceFeed
+    evidenceFeed,
+    economicsGrounded
   } = input;
 
   const technicalFeasibility = Math.max(10, Math.min(100, Math.round(
@@ -59,7 +64,8 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
   const demandAndAdoption = Math.max(10, Math.min(100, Math.round(
     (verifiedOpinions.customer.score * 0.6) + (verifiedOpinions.analyst.score * 0.4)
   )));
-  const economicsAndCapitalEfficiency = isEconomicsAvailable
+  // The simulated LTV/CAC term feeds the dimension only when its inputs are the founder's or a source's.
+  const economicsAndCapitalEfficiency = isEconomicsAvailable && economicsGrounded
     ? Math.max(10, Math.min(100, Math.round(
         (verifiedOpinions.investor.score * 0.7) +
         Math.min(Math.round((mc?.ltvCacPercentiles.p50 ?? sandboxSim.metrics.ltvCacRatio) * 6), 30) -
@@ -69,7 +75,17 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
   const defensibilityAndMoat = Math.max(10, Math.min(100, Math.round(
     (verifiedOpinions.expert.score * 0.6) + (verifiedOpinions.analyst.score * 0.4)
   )));
-  const adversarialResilience = Math.max(10, Math.min(100,
+  // v2 agents: resilience reflects the evidenced severity of what the red team found, not a self-assigned score.
+  const useFindings = hasFindings(verifiedOpinions as Partial<Record<Lane, AgentOpinion>>);
+  const findingsResilience = (): number => {
+    const all = LANES.flatMap((l) => (verifiedOpinions as Partial<Record<Lane, AgentOpinion>>)[l]?.findings ?? []);
+    if (all.some((f) => isEvidencedStructuralFatal(f, economicsGrounded))) return 25;
+    const rt = (verifiedOpinions.redteam as AgentOpinion).findings ?? [];
+    if (rt.some((f) => f.severity === "FATAL")) return 48;
+    if (rt.some((f) => f.severity === "MAJOR")) return 60;
+    return (verifiedOpinions.redteam.rating ?? 3) >= 4 ? 75 : 66;
+  };
+  const adversarialResilience = useFindings ? findingsResilience() : Math.max(10, Math.min(100,
     verifiedOpinions.redteam.score <= 35
       ? verifiedOpinions.redteam.score
       : Math.round(verifiedOpinions.redteam.score * 0.9 + 5)
@@ -85,15 +101,20 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
     adversarialResilience * 0.20
   );
 
+  // Economics may gate the verdict only when its inputs are the founder's or a source's. Numbers that come from
+  // archetype defaults are placeholders: they add a "validate CAC" item elsewhere but never kill an idea.
+  const economicsInsolvent = isEconomicsAvailable && economicsGrounded && sandboxSim.metrics.ltvCacRatio < 1;
+  // A STRONG_KILL gates the verdict only when it is a finding (LLM, hard invariant, grounded insolvency), not a template.
+  const invariantGated = invariants.isThinWrapper || invariants.isPromptInjection || invariants.isImpossiblePhysics;
+  const authoritative = (op?: { source?: string }) => op?.source !== "heuristic" || invariantGated || economicsInsolvent;
+
   // Structural adversarial gates: non-differentiated wrappers, inverted unit economics,
   // and zero-monetization profiles cannot be averaged into viability — the composite is
   // capped below the KILL threshold (50) no matter how optimistic the remaining dimensions are.
-  if (invariants.isThinWrapper || (isEconomicsAvailable && sandboxSim.metrics.ltvCacRatio < 1)) {
+  if (invariants.isThinWrapper || economicsInsolvent) {
     compositeScore = Math.min(compositeScore, 44);
   }
-  if (graveyardMatches.length > 0) {
-    compositeScore = Math.min(compositeScore, 46);
-  }
+  // Graveyard matches are precedent shown to the reader (see the red-team flaw text), never a score cap.
   if (invariants.isNoMonetization) {
     compositeScore = Math.min(compositeScore, 39);
   }
@@ -106,8 +127,8 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
     invariants.isNoMonetization ||
     invariants.isPromptInjection ||
     invariants.isImpossiblePhysics ||
-    (isEconomicsAvailable && sandboxSim.metrics.ltvCacRatio < 1) ||
-    verifiedOpinions.redteam.verdict === "STRONG_KILL";
+    economicsInsolvent ||
+    (verifiedOpinions.redteam.verdict === "STRONG_KILL" && authoritative(verifiedOpinions.redteam));
   if (fatalProfile) {
     const weakestDimension = Math.min(
       technicalFeasibility,
@@ -228,11 +249,13 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
   let overallVerdict: ValidationVerdict = "REFINE";
   let riskLevel: RiskLevel = "MEDIUM";
 
+  // A STRONG_KILL forces the verdict only when it is a finding: produced by the LLM, by a hard invariant gate,
+  // or by the simulation showing insolvency. A per-archetype template opinion is a prior, not evidence.
   const hasUnmitigatedKillFlaw =
-    verifiedOpinions.redteam?.verdict === "STRONG_KILL" ||
-    verifiedOpinions.architect?.verdict === "STRONG_KILL" ||
-    verifiedOpinions.investor?.verdict === "STRONG_KILL" ||
-    (verifiedOpinions.redteam?.score ?? 50) <= 15;
+    (verifiedOpinions.redteam?.verdict === "STRONG_KILL" && authoritative(verifiedOpinions.redteam)) ||
+    (verifiedOpinions.architect?.verdict === "STRONG_KILL" && authoritative(verifiedOpinions.architect)) ||
+    (verifiedOpinions.investor?.verdict === "STRONG_KILL" && authoritative(verifiedOpinions.investor)) ||
+    ((verifiedOpinions.redteam?.score ?? 50) <= 15 && authoritative(verifiedOpinions.redteam));
 
   if (compositeScore < 50 || hasUnmitigatedKillFlaw) {
     overallVerdict = "KILL";
@@ -251,6 +274,19 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
     }
   }
 
+  let verdictBasis: { engine: "findings_v2" | "legacy_score"; reasons: string[] } = { engine: "legacy_score", reasons: [] };
+  if (useFindings) {
+    const decision = decideVerdictV2({
+      opinions: verifiedOpinions as Partial<Record<Lane, AgentOpinion>>,
+      compositeScore,
+      economicsGrounded,
+      invariantGated
+    });
+    overallVerdict = decision.verdict;
+    riskLevel = decision.riskLevel;
+    verdictBasis = { engine: "findings_v2", reasons: decision.reasons };
+  }
+
   // Calibration: P(build-worthy) as an explicit probability for ledger tracking.
   // Uncalibrated until the ledger holds >= 20 outcomes for this archetype.
   const agentScores = [
@@ -262,12 +298,29 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
     verifiedOpinions.expert.score
   ];
   const verdictSpread = Math.max(...agentScores) - Math.min(...agentScores);
-  const confidenceScore = Math.min(
-    95,
-    Math.max(55, Math.round(100 - verdictSpread / 2))
+  // Agent agreement only; the dossier builder caps it by verifier confidence and run provenance.
+  const confidenceScore = Math.min(95, Math.max(5, Math.round(100 - verdictSpread / 2)));
+
+  // Independence check: how much the six agents' top fatal flaws overlap (0 = distinct, 1 = identical).
+  const topFlawTokens = (["analyst", "customer", "architect", "investor", "redteam", "expert"] as const).map((r) =>
+    new Set(((verifiedOpinions[r]?.fatalFlaws?.[0] ?? "").toLowerCase().match(/[a-z]{4,}/g) ?? []))
   );
+  let overlapSum = 0;
+  let overlapPairs = 0;
+  for (let i = 0; i < topFlawTokens.length; i++) {
+    for (let j = i + 1; j < topFlawTokens.length; j++) {
+      const inter = [...topFlawTokens[i]].filter((t) => topFlawTokens[j].has(t)).length;
+      const union = new Set([...topFlawTokens[i], ...topFlawTokens[j]]).size;
+      if (union > 0) {
+        overlapSum += inter / union;
+        overlapPairs++;
+      }
+    }
+  }
+  const flawOverlap = overlapPairs ? Math.round((overlapSum / overlapPairs) * 100) / 100 : 0;
 
   const swarmDissent: SwarmDissent = {
+    flawOverlap,
     scoreSpread: verdictSpread,
     killGradeAgents: agentScores.filter(s => s < 40).length,
     avgAgentScore: Math.round(agentScores.reduce((a, b) => a + b, 0) / agentScores.length),
@@ -288,6 +341,7 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
     confidenceScore,
     agentScores,
     verdictSpread,
-    swarmDissent
+    swarmDissent,
+    verdictBasis
   };
 }

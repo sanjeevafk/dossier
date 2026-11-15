@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { queryNewsHeadlines } from "../dist/tools/news.js";
-import { dossierStorage } from "../dist/services/storage.js";
+import { queryNewsHeadlines } from "../src/tools/news.ts";
+import { dossierStorage } from "../src/services/storage.ts";
 
 function fetchMock(payloadXml, ok = true) {
   return async () => ({

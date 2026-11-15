@@ -36,8 +36,8 @@ export function detectAdversarialInvariants(
   );
 
   return {
-    isPromptInjection: /ignore (previous|all) instructions|system prompt|jailbreak|output 100|developer mode/i.test(text),
-    isImpossiblePhysics: /perpetual motion|free energy|infinite electricity|zero input energy|violates thermodynamics|overunity/i.test(text),
+    isPromptInjection: /ignore (all |any |the )?(previous|prior|above) (instructions|prompts?)|disregard (all |any )?(previous|prior) instructions|disregard (the |all |any |your )?system prompts?|you are now (an?|the|in) |output (a )?(verdict )?(build\b|score (of )?100)|score of 100|reveal (your|the) system prompt|jailbreak/i.test(text),
+    isImpossiblePhysics: /perpetual motion|free energy|infinite (electricity|energy|power)|zero input energy|violates thermodynamics|over-?unity|more (electrical |usable )?(energy|power) than (it|they) (consumes?|uses?|takes?)|no fuel input|self-(reinforcing|sustaining|powering)[^.]{0,60}(indefinitely|forever)|powers? (a |an |the )?[\w ]{0,30}indefinitely/i.test(text),
     isNoMonetization: /free forever|no monetization|zero revenue|not charging/i.test(text) || pricing <= 0 || zeroMonetizationByDecision,
     hasFormatRisk,
     isThinWrapper
@@ -62,11 +62,13 @@ export const DOMAIN_FEASIBILITY_DRAG: Partial<Record<IdeaDomainArchetype, number
   web3_defi: -7,
   b2g_govtech: -5,
   healthcare_clinical: -4,
+  smb_commerce: -3,
   consumer_social: -3
 };
 
 export const DOMAIN_REGULATORY_DRAG: Partial<Record<IdeaDomainArchetype, number>> = {
   b2b_saas: 0,
+  smb_commerce: -5,
   consumer_social: -3,
   general_startup: -4,
   deeptech_research: -5,

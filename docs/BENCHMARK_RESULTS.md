@@ -1,5 +1,7 @@
 # Dossier Domain-Aware Adversarial Benchmark Report
 
+> **Read first:** this is a development regression report, not evidence of accuracy. On neutral held-out cases the verdict does not separate eventual successes from eventual failures better than chance; see [EVALUATION.md](EVALUATION.md).
+
 **Execution Date:** 2026-10-26T09:16:00.357Z  
 **Agent Harness:** Dossier Swarm Runtime  
 **De-Noising:** 1 full runs per concept; Quality Gate 3 evaluates σ of per-concept mean scores  

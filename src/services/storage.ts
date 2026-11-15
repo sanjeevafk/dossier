@@ -4,6 +4,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { IdeaDossier } from "../types/index.js";
 import { seedDossiers } from "../data/seedDossiers.js";
+import { warn } from "../utils/log.js";
 
 
 
@@ -373,6 +374,7 @@ export class DossierStorageService {
       }>;
       const archetypeLabels: Record<string, string> = {
         b2b_saas: "B2B Enterprise & Vertical SaaS",
+        smb_commerce: "SMB Commerce & Fintech",
         b2g_govtech: "Government Technology & Civic Systems (B2G)",
         healthcare_clinical: "Healthcare & Clinical Systems",
         hardware_robotics: "Hardware, Robotics & Autonomous Systems",
@@ -397,8 +399,9 @@ export class DossierStorageService {
         });
       }
       if (summaries.length > 0) return summaries.slice(0, limit);
-    } catch {
+    } catch (err) {
       // fall through to memory + disk scan
+      warn("sqlite list query failed, falling back to memory/disk", err);
     }
 
     // 1. From memory cache

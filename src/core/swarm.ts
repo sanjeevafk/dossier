@@ -40,7 +40,9 @@ import { queryFloviaIntelligence } from "../tools/flovia.js";
 import { runEconomicsSimulation } from "../tools/sandbox.js";
 import { EpistemicRobustVerifier } from "./verifier.js";
 import { runDecisionModel } from "../tools/decision-runner.js";
-import { getLLMStatus } from "../services/llm.js";
+import { parseMonetization } from "./economics.js";
+import { getBaseRate } from "./baseRates.js";
+import { getLLMStatus, runWithUsageTracking } from "../services/llm.js";
 import { buildRoundOneDebateTrail, DebateTrailInput } from "./debate.js";
 import { shrinkTowardBaseRate } from "./baseRates.js";
 import { detectJurisdiction } from "../tools/geo.js";
@@ -52,6 +54,7 @@ import { computeDimensionalResilience } from "./swarm/dimensionalScoring.js";
 import { formatReconContext, buildEvidenceFeed } from "./swarm/evidence.js";
 import { evaluateRoleWithLLM, runRoundTwoCrossfire } from "./swarm/agentRunner.js";
 import { assembleDossier } from "./swarm/dossierBuilder.js";
+import { debug } from "../utils/log.js";
 
 export { detectAdversarialInvariants, type AdversarialInvariants, generateHeuristicOpinion };
 
@@ -87,7 +90,12 @@ export class IdeaSwarmOrchestrator {
    * Run the full evidence-first adversarial evaluation loop:
    * INGEST → DECOMPOSE → INVESTIGATE → ATTACK → VERIFY → CROSS-EXAMINE → CONVERGE → VERDICT → VALIDATION
    */
-  public async evaluateIdea(
+  public evaluateIdea(idea: IdeaInput, options: SwarmExecutionOptions = {}): Promise<IdeaDossier> {
+    // Fresh per-evaluation LLM usage tracker (async-local, so parallel evaluations never mix counts).
+    return runWithUsageTracking(() => this.runEvaluation(idea, options));
+  }
+
+  private async runEvaluation(
     idea: IdeaInput,
     options: SwarmExecutionOptions = {}
   ): Promise<IdeaDossier> {
@@ -115,6 +123,7 @@ export class IdeaSwarmOrchestrator {
     const pricingOrder: Record<IdeaDomainArchetype, number> = {
       hardware_robotics: 1500,
       b2b_saas: 499,
+      smb_commerce: 15,
       deeptech_research: 2500,
       consumer_social: 19,
       b2g_govtech: 900,
@@ -122,10 +131,31 @@ export class IdeaSwarmOrchestrator {
       web3_defi: 149,
       general_startup: 100
     };
-    const pricing = options.pricingMonthlyUsd ?? pricingOrder[domain.archetype];
-    const cac = options.estimatedCacUsd ?? (domain.archetype === "hardware_robotics" ? 2500 : domain.archetype === "b2b_saas" ? 1200 : (domain.archetype === "deeptech_research" ? 5000 : 350));
+    // Price: explicit override > parsed from the monetization text > archetype default.
+    const parsedMonetization = parseMonetization(idea.monetization);
+    const pricingSource: "override" | "parsed" | "archetype_default" =
+      options.pricingMonthlyUsd !== undefined ? "override" : parsedMonetization.monthlyUsd !== undefined ? "parsed" : "archetype_default";
+    const pricing = options.pricingMonthlyUsd ?? parsedMonetization.monthlyUsd ?? pricingOrder[domain.archetype];
+    // CAC: explicit override > archetype reference-class median.
+    const cacSource: "override" | "archetype_default" = options.estimatedCacUsd !== undefined ? "override" : "archetype_default";
+    const cac = options.estimatedCacUsd ?? getBaseRate(domain.archetype).cacMedianUsd;
     const invariants = detectAdversarialInvariants(idea, pricing, decisionEvaluation);
     const churn = options.expectedChurnMonthly ?? (invariants.isThinWrapper ? 0.28 : (domain.archetype === "consumer_social" ? 0.12 : 0.04));
+    const economicsInputs = {
+      monetizationModel: parsedMonetization.model,
+      pricingMonthlyUsd: pricing,
+      pricingSource,
+      pricingEvidence: parsedMonetization.evidence,
+      takeRatePct: parsedMonetization.takeRatePct,
+      cacUsd: cac,
+      cacSource,
+      churnMonthly: churn,
+      note: parsedMonetization.model === "take_rate"
+        ? "Take-rate model: the simulator is subscription-shaped, so this price is a proxy, not modelled GMV."
+        : pricingSource === "archetype_default"
+          ? "No price found in the monetization text: an archetype default was used."
+          : undefined
+    };
 
     emit({ type: "sandbox_simulating", iterationCount: 10000 });
 
@@ -138,11 +168,10 @@ export class IdeaSwarmOrchestrator {
     const isAcademicOrDeeptech = domain.archetype === "deeptech_research" || domain.archetype === "healthcare_clinical" || domain.archetype === "hardware_robotics";
 
     const [marketResearch, unifiedMarkets, newsSignals, reachSignals, openAlexSignals, edgarSignals, hfSignals, clinicalSignals, macroSignals, floviaSignals, sandboxSim] = await Promise.all([
-      performMarketResearch(idea.title, [
-        idea.targetAudience,
-        idea.monetization,
-        domain.regulatoryEnvironment
-      ], { exaKey: options.exaKey, tavilyKey: options.tavilyKey }),
+      performMarketResearch(
+        { title: idea.title, summary: idea.summary, targetAudience: idea.targetAudience },
+        { exaKey: options.exaKey, tavilyKey: options.tavilyKey }
+      ),
       queryUnifiedPredictionMarkets(idea.title),
       queryNewsHeadlines(idea.title, geo.googleNewsLocale),
       queryAgentReachIntel(idea.title, {
@@ -197,6 +226,7 @@ export class IdeaSwarmOrchestrator {
       cac,
       churn,
       isEconomicsAvailable,
+      economicsGrounded: economicsInputs.pricingSource !== "archetype_default" && economicsInputs.cacSource !== "archetype_default",
       sandboxSim,
       stressMetrics,
       mc: sandboxSim.metrics.monteCarlo
@@ -206,9 +236,8 @@ export class IdeaSwarmOrchestrator {
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
     emit({ type: "stage", stage: "03 INVESTIGATE", detail: `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`, timestamp: new Date().toISOString() });
 
-    const shouldCallLive = options.useLiveLLM !== false;
-    const evaluationMode: "LIVE_LLM" | "HEURISTIC_ENGINE" =
-      shouldCallLive && getLLMStatus().hasLiveLLM ? "LIVE_LLM" : "HEURISTIC_ENGINE";
+    const shouldCallLive = options.useLiveLLM !== false && getLLMStatus().hasLiveLLM;
+    const fallbackReasons: Record<string, string> = {};
 
     const AGENT_ROLES = ["analyst", "customer", "architect", "investor", "redteam", "expert"] as const;
     const [analystOpinion, customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion] = await Promise.all(
@@ -217,9 +246,11 @@ export class IdeaSwarmOrchestrator {
         const roleStart = Date.now();
         const live = shouldCallLive ? await evaluateRoleWithLLM(role, idea, marketContext, domain, invariants) : null;
         if (live?.fallbackReason) {
+          fallbackReasons[role] = live.fallbackReason;
           emit({ type: "parse_fallback", role, reason: live.fallbackReason });
         }
         const opinion: AgentOpinion = live?.opinion || generateHeuristicOpinion(role, idea, domain, marketResearch, sandboxSim, pricing, cac, invariants);
+        opinion.source = live?.opinion ? "llm" : "heuristic";
         if (role === "redteam" && graveyardMatches.length > 0) {
           const g = graveyardMatches[0];
           opinion.fatalFlaws.unshift(
@@ -228,8 +259,7 @@ export class IdeaSwarmOrchestrator {
           opinion.mustTestBeforeBuilding.unshift(
             `Falsify ${g.companyName} Death Trap: ${g.takeaway}`
           );
-          opinion.score = 28;
-          opinion.verdict = "STRONG_KILL";
+          // Precedent is context for the reader; it never overwrites an agent's score or verdict.
         }
         if (role === "customer" && itchMatches.length > 0) {
           const itch = itchMatches[0];
@@ -237,13 +267,14 @@ export class IdeaSwarmOrchestrator {
             `Verified Buyer Demand (Razorpay Fix My Itch): "${itch.problemStatement}"`
           );
         }
-        if (evaluationMode === "HEURISTIC_ENGINE" && !invariants.isPromptInjection && !invariants.isImpossiblePhysics) {
+        // Rule-based opinions are priors, not findings: shrink them toward the archetype base rate whatever the overall mode.
+        if (opinion.source === "heuristic" && !invariants.isPromptInjection && !invariants.isImpossiblePhysics) {
           opinion.score = Math.max(10, Math.min(100, shrinkTowardBaseRate(opinion.score, domain.archetype)));
         }
         opinion.telemetryMetadata = {
           latencyMs: Date.now() - roleStart,
           threatSeverity: opinion.score < 50 ? "HIGH" : "MODERATE",
-          modelId: evaluationMode === "LIVE_LLM" ? (getLLMStatus().activeModel || "live-llm") : "deterministic-heuristics"
+          modelId: opinion.source === "llm" ? (opinion.telemetryMetadata?.modelId || "live-llm") : "deterministic-heuristics"
         };
         emit({
           type: "agent_opinion",
@@ -256,6 +287,14 @@ export class IdeaSwarmOrchestrator {
         return opinion;
       })
     );
+
+    const roleOpinions = [analystOpinion, customerOpinion, architectOpinion, investorOpinion, redTeamOpinion, expertOpinion];
+    const llmRoles = roleOpinions.filter((o) => o.source === "llm").map((o) => o.role);
+    const heuristicRoles = roleOpinions.filter((o) => o.source !== "llm").map((o) => o.role);
+    // Derived after the fact from who actually answered, never from whether keys were configured.
+    const evaluationMode: "LIVE_LLM" | "MIXED" | "HEURISTIC_ENGINE" =
+      heuristicRoles.length === 0 ? "LIVE_LLM" : llmRoles.length === 0 ? "HEURISTIC_ENGINE" : "MIXED";
+    const provenance = { llmRoles, heuristicRoles, fallbackReasons };
 
     // 04 ATTACK & CROSS-EXAMINE (Adversarial Round 1)
     notify("04 ATTACK", `Red Team deploying fatal assumption attacks across [${domain.archetypeLabel}]...`);
@@ -292,6 +331,7 @@ export class IdeaSwarmOrchestrator {
 
     const evidenceFeed = buildEvidenceFeed({
       isEconomicsAvailable,
+      economicsGrounded: economicsInputs.pricingSource !== "archetype_default" && economicsInputs.cacSource !== "archetype_default",
       sandboxSim,
       pricing,
       cac,
@@ -381,8 +421,8 @@ export class IdeaSwarmOrchestrator {
           hallucinationsBlocked: audit.hallucinationsBlocked
         });
       }
-    } catch {
-      // NLI failure never breaks evaluation
+    } catch (err) {
+      debug("NLI contradiction pass skipped", err);
     }
 
     // 06 CONVERGE (Round 2 Escalation)
@@ -451,7 +491,8 @@ export class IdeaSwarmOrchestrator {
       isEconomicsAvailable,
       invariants,
       graveyardMatches,
-      evidenceFeed
+      evidenceFeed,
+      economicsGrounded: economicsInputs.pricingSource !== "archetype_default" && economicsInputs.cacSource !== "archetype_default"
     });
 
     // 08 ASSEMBLE DOSSIER & PERSIST
@@ -459,6 +500,8 @@ export class IdeaSwarmOrchestrator {
       idea,
       domain,
       evaluationMode,
+      provenance,
+      economicsInputs,
       pricing,
       cac,
       churn,

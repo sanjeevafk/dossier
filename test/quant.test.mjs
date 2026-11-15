@@ -5,8 +5,8 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { runEconomicsSimulation } from "../dist/tools/sandbox.js";
-import { IdeaSwarmOrchestrator } from "../dist/core/swarm.js";
+import { runEconomicsSimulation } from "../src/tools/sandbox.ts";
+import { IdeaSwarmOrchestrator } from "../src/core/swarm.ts";
 
 const execFileAsync = promisify(execFile);
 

@@ -24,6 +24,8 @@ export interface ReconContextInput {
   cac: number;
   churn: number;
   isEconomicsAvailable: boolean;
+  /** Price and CAC come from the founder or a source (not archetype defaults). */
+  economicsGrounded?: boolean;
   sandboxSim: any;
   stressMetrics: any;
   mc: any;
@@ -49,6 +51,7 @@ export function formatReconContext(input: ReconContextInput): string {
     cac,
     churn,
     isEconomicsAvailable,
+    economicsGrounded = true,
     sandboxSim,
     stressMetrics,
     mc
@@ -62,6 +65,11 @@ export function formatReconContext(input: ReconContextInput): string {
   } else {
     reconSourceParts.push(
       `No live web recon results were retrieved (${marketResearch.reconError || "provider unavailable"}) — treat competitive and demand statements as heuristic priors, not sourced evidence.`
+    );
+  }
+  if (marketResearch.filteredOut?.length > 0) {
+    reconSourceParts.push(
+      `Entity-relevance filter removed ${marketResearch.filteredOut.length} result(s) that matched the idea's name but not its content (e.g. "${marketResearch.filteredOut[0].title.slice(0, 80)}"): do not cite same-name-but-different-business entities as competitors or precedents.`
     );
   }
   if (marketResearch.community.discussions.length > 0) {
@@ -142,6 +150,10 @@ export function formatReconContext(input: ReconContextInput): string {
     );
   }
 
+  if (isEconomicsAvailable && !economicsGrounded) {
+    return `${reconSourceParts.join(" ")}. Economics: the price ($${pricing}/mo) and/or CAC ($${cac}) are PLACEHOLDERS from archetype defaults, not facts from the founder or a source, so simulated LTV/CAC and payback are NOT evidence in either direction. Do not mark the idea down for them. Treat "validate price and CAC" as a validation item, and judge economics from the stated model and the structure of the business.`;
+  }
+
   return isEconomicsAvailable
     ? `${reconSourceParts.join(" ")}. Modeled Economics: Pricing $${pricing}/mo, CAC $${cac}. Monte Carlo (${mc?.iterations ?? 0} runs): P50 LTV/CAC ${sandboxSim.metrics.ltvCacRatio}x [P10 ${mc?.ltvCacPercentiles.p10 ?? sandboxSim.metrics.ltvCacRatio} / P90 ${mc?.ltvCacPercentiles.p90 ?? sandboxSim.metrics.ltvCacRatio}], 24-month survival ${( (mc?.survivalProbability24Mo ?? 0) * 100).toFixed(0)}%, payback P50 ${sandboxSim.metrics.estimatedPaybackMonths}mo, token burden ${(((mc?.tokenCostBurdenPercent.p50 ?? 0)) * 100).toFixed(1)}% of gross revenue. Stress run (${(Math.min(1, churn * 1.6) * 100).toFixed(0)}% churn / $${Math.round(cac * 1.6)} CAC): survival ${(((stressMetrics.stressSurvival24Mo ?? 0) * 100)).toFixed(0)}%.`
     : `${reconSourceParts.join(" ")}. Economics Simulation Unavailable (degraded execution): Pricing $${pricing}/mo, CAC $${cac}. Quantitative LTV/CAC is UNKNOWN and must not be treated as zero.`;
@@ -149,6 +161,7 @@ export function formatReconContext(input: ReconContextInput): string {
 
 export interface EvidenceFeedInput {
   isEconomicsAvailable: boolean;
+  economicsGrounded?: boolean;
   sandboxSim: any;
   pricing: number;
   cac: number;
@@ -173,6 +186,7 @@ export interface EvidenceFeedInput {
 export function buildEvidenceFeed(input: EvidenceFeedInput): EvidenceItem[] {
   const {
     isEconomicsAvailable,
+    economicsGrounded = true,
     sandboxSim,
     pricing,
     cac,
@@ -441,13 +455,15 @@ export function buildEvidenceFeed(input: EvidenceFeedInput): EvidenceItem[] {
     {
       id: "EV-01",
       claim: isEconomicsAvailable
-        ? `Sandboxed unit economics computation: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)}mo (Python3 Subprocess Exit 0). Input pricing ($${pricing}/mo) and CAC ($${cac}) remain MODELLED_ASSUMPTION.`
+        ? (economicsGrounded
+          ? `Sandboxed unit economics computation: LTV/CAC ratio is ${sandboxSim.metrics.ltvCacRatio.toFixed(2)}x with payback in ${sandboxSim.metrics.estimatedPaybackMonths.toFixed(1)}mo (Python3 Subprocess Exit 0). Input pricing ($${pricing}/mo) and CAC ($${cac}) remain MODELLED_ASSUMPTION.`
+          : `Unit economics were simulated on placeholder inputs (price $${pricing}/mo and/or CAC $${cac} from archetype defaults). The result is not evidence: validate real price and CAC before relying on LTV/CAC.`)
         : `Sandboxed unit economics simulation unavailable: quantitative LTV/CAC and payback could not be computed (status: degraded).`,
-      tier: isEconomicsAvailable ? "VERIFIED_COMPUTATION" : "UNKNOWN",
-      claimType: isEconomicsAvailable ? "VERIFIED_COMPUTATION" : "UNKNOWN",
+      tier: isEconomicsAvailable ? (economicsGrounded ? "VERIFIED_COMPUTATION" : "MODELLED_ASSUMPTION") : "UNKNOWN",
+      claimType: isEconomicsAvailable ? (economicsGrounded ? "VERIFIED_COMPUTATION" : "MODELLED_ASSUMPTION") : "UNKNOWN",
       provenance: isEconomicsAvailable ? "Dossier Python3 Sandbox (Isolated Subprocess Exit 0)" : "Dossier Sandbox (unavailable)",
-      indicator: isEconomicsAvailable ? "SUPPORTING" : "NEUTRAL",
-      confidencePercent: isEconomicsAvailable ? 98 : 0
+      indicator: isEconomicsAvailable && economicsGrounded ? "SUPPORTING" : "NEUTRAL",
+      confidencePercent: isEconomicsAvailable ? (economicsGrounded ? 98 : 30) : 0
     },
     {
       id: "EV-02",

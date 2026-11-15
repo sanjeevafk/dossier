@@ -9,6 +9,7 @@ export type SwarmRole =
 
 export type IdeaDomainArchetype =
   | "b2b_saas"
+  | "smb_commerce"
   | "b2g_govtech"
   | "healthcare_clinical"
   | "hardware_robotics"
@@ -47,7 +48,26 @@ export interface IdeaInput {
 export type Verdict = "BUILD" | "BUILD_IF_VALIDATED" | "REFINE" | "KILL" | "STRONG_KILL" | "LEAN_KILL" | "PIVOT_REQUIRED" | "VIABLE_WITH_RISK" | "STRONG_PURSUE";
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
+/** An evidenced problem (or strength) an agent found in its own lane. */
+export type FindingSeverity = "FATAL" | "MAJOR" | "MINOR";
+/** STRUCTURAL: only fixable by changing the idea. VALIDATABLE: an unknown a test resolves. EXECUTION: ordinary delivery risk. */
+export type FindingKind = "STRUCTURAL" | "VALIDATABLE" | "EXECUTION";
+export type FindingEvidenceType = "STATED_INPUT" | "COMPUTATION" | "SOURCE" | "PRECEDENT" | "REASONING";
+
+export interface Finding {
+  claim: string;
+  severity: FindingSeverity;
+  kind: FindingKind;
+  evidence: { type: FindingEvidenceType; ref: string };
+  cheapestTest?: string;
+  killCriterion?: string;
+}
+
 export interface AgentOpinion {
+  /** Lane rating 1-5 (v2 agents). Absent on rule-based fallback opinions. */
+  rating?: 1 | 2 | 3 | 4 | 5;
+  findings?: Finding[];
+  strengths?: string[];
   role: SwarmRole;
   roleNumber: string;
   roleTitle: string;
@@ -66,6 +86,8 @@ export interface AgentOpinion {
     /** Exact model/backend that produced this opinion (e.g. "gemini-3.8-flash-medium", "deterministic-heuristics"). */
     modelId?: string;
   };
+  /** Who produced this opinion: a live LLM turn, or the rule-based fallback. */
+  source?: "llm" | "heuristic";
 }
 
 export interface KeyAssumption {
@@ -330,6 +352,8 @@ export interface DecisionModelOutput {
 
 /** Honest inter-agent disagreement signal — replaces cosmetic confidence scores. */
 export interface SwarmDissent {
+  /** Mean pairwise token overlap of the six agents' top fatal flaws: near 1 means they all found the same flaw. */
+  flawOverlap?: number;
   /** max - min of the six verified agent scores. */
   scoreSpread: number;
   /** Agents issuing kill-grade scores (< 40). */
@@ -344,15 +368,35 @@ export interface IdeaDossier {
   dossierCode: string; // e.g. "TF-007"
   timestamp: string;
   /** Which engine produced this dossier: live LLM swarm or the deterministic heuristic engine. */
-  evaluationMode?: "LIVE_LLM" | "HEURISTIC_ENGINE";
+  evaluationMode?: "LIVE_LLM" | "MIXED" | "HEURISTIC_ENGINE";
   /** P(build-worthy) — killScore mapped to a probability for calibration tracking. */
   pSuccess?: number;
   /** Archetype reference-class base rate shown alongside the score. */
   baseRate?: number;
   /** True once a ledger outcome resolves every fatal assumption (gates BUILD). */
   fatalsResolved?: boolean;
-  /** Estimated marginal run cost in USD (recon queries + LLM tokens). */
+  /** LLM cost in USD, computed from measured tokens when LLM_PRICE_IN_PER_M / LLM_PRICE_OUT_PER_M are set; otherwise omitted. */
   costUsd?: number;
+  /** Inputs to the headline confidence: it is the minimum of these. */
+  confidenceBasis?: { agreement: number; verifier?: number; provenanceCap?: number };
+  /** Measured LLM usage for this evaluation. */
+  llmUsage?: { calls: number; failedCalls: number; inputTokens: number; outputTokens: number; models: Record<string, number> };
+  /** The revenue and acquisition inputs the simulation actually used, and where each came from. */
+  economicsInputs?: {
+    monetizationModel: "subscription" | "take_rate" | "license" | "one_time" | "unknown";
+    pricingMonthlyUsd: number;
+    pricingSource: "override" | "parsed" | "archetype_default";
+    pricingEvidence?: string;
+    takeRatePct?: number;
+    cacUsd: number;
+    cacSource: "override" | "archetype_default";
+    churnMonthly: number;
+    note?: string;
+  };
+  /** Why the verdict is what it is: the findings and rules that decided it. */
+  verdictBasis?: { engine: "findings_v2" | "legacy_score"; reasons: string[] };
+  /** Which role opinions came from the LLM and which fell back to rules, with the reasons. */
+  provenance?: { llmRoles: string[]; heuristicRoles: string[]; fallbackReasons: Record<string, string> };
   /** Actually-retrieved external sources backing this dossier (empty when no recon provider ran). */
   externalEvidenceSources?: ExternalEvidenceSource[];
   /** Competitors discovered through Market Analyst live web recon. */

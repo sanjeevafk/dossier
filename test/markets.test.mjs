@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { queryKalshiMarkets } from "../dist/tools/markets/kalshi.js";
-import { deduplicateAndClusterMarkets } from "../dist/tools/markets/dedupe.js";
-import { queryUnifiedPredictionMarkets } from "../dist/tools/markets/router.js";
+import { queryKalshiMarkets } from "../src/tools/markets/kalshi.ts";
+import { deduplicateAndClusterMarkets } from "../src/tools/markets/dedupe.ts";
+import { queryUnifiedPredictionMarkets } from "../src/tools/markets/router.ts";
 
 function fetchMock(payload, ok = true) {
   return async () => ({

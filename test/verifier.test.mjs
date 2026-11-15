@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EpistemicRobustVerifier, StanfordRobustVerifier } from "../dist/core/verifier.js";
-import { classifyIdeaDomain } from "../dist/core/classifier.js";
+import { EpistemicRobustVerifier, StanfordRobustVerifier } from "../src/core/verifier.ts";
+import { classifyIdeaDomain } from "../src/core/classifier.ts";
 
 test("Epistemic Robust Verifier (and StanfordRobustVerifier alias) audits subagents and applies test-time self-correction", () => {
   assert.equal(StanfordRobustVerifier, EpistemicRobustVerifier, "StanfordRobustVerifier must be an alias for EpistemicRobustVerifier");

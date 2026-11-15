@@ -3,127 +3,73 @@
 @tailwind utilities;
 
 /* Dossier Editorial Stylesheet — Inspired by ERP.AI & ProtoAgent.AI */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
 
 :root {
-  --bg-sand: #fbfbfa;
-  --bg-card: #ffffff;
-  --bg-subtle: #f5f5f4;
-  --border-subtle: #e7e5e4;
-  --border-strong: #d6d3d1;
-  --text-main: #09090b;
-  --text-muted: #71717a;
-  --accent-gold: #facc15;
-  --accent-gold-hover: #eab308;
+  /* Theme tokens as RGB channels so Tailwind alpha modifiers (bg-page/90) work. */
+  --c-page: 251 251 250;
+  --c-surface: 255 255 255;
+  --c-raised: 245 245 244;
+  --c-muted: 231 229 228;
+  --c-line: 231 229 228;
+  --c-line-strong: 214 211 209;
+  --c-ink: 9 9 11;
+  --c-ink-2: 82 82 91;
+  --c-ink-3: 113 113 122;
+  --c-inverse: 9 9 11;
+  --c-inverse-hover: 39 39 42;
+  --c-code: 9 9 11;
+  --c-ok: 4 120 87;
+  --c-ok-soft: 209 250 229;
+  --c-ok-line: 167 243 208;
+  --c-warn: 180 83 9;
+  --c-warn-soft: 254 243 199;
+  --c-bad: 185 28 28;
+  --c-bad-soft: 254 226 226;
+  --c-bad-line: 254 202 202;
 }
 
 html.dark {
-  --bg-sand: #0c0a09;
-  --bg-card: #1c1917;
-  --bg-subtle: #292524;
-  --border-subtle: #292524;
-  --border-strong: #44403c;
-  --text-main: #fafaf9;
-  --text-muted: #a8a29e;
-  --accent-gold: #facc15;
-  --accent-gold-hover: #fde047;
+  --c-page: 12 10 9;
+  --c-surface: 23 23 23;
+  --c-raised: 28 26 25;
+  --c-muted: 38 36 34;
+  --c-line: 38 36 34;
+  --c-line-strong: 56 53 51;
+  --c-ink: 250 250 249;
+  --c-ink-2: 212 212 216;
+  --c-ink-3: 161 161 170;
+  --c-inverse: 39 39 42;
+  --c-inverse-hover: 63 63 70;
+  --c-code: 19 18 17;
+  --c-ok: 52 211 153;
+  --c-ok-soft: 16 54 44;
+  --c-ok-line: 6 95 70;
+  --c-warn: 251 191 36;
+  --c-warn-soft: 66 45 12;
+  --c-bad: 248 113 113;
+  --c-bad-soft: 69 24 24;
+  --c-bad-line: 127 29 29;
 }
 
 body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  background-color: var(--bg-sand);
-  color: var(--text-main);
+  background-color: rgb(var(--c-page));
+  color: rgb(var(--c-ink));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Dark mode overrides for editorial clarity */
-html.dark header {
-  background-color: rgba(12, 10, 9, 0.88) !important;
-  border-color: #292524 !important;
-}
-
-html.dark footer {
-  background-color: #0c0a09 !important;
-  border-color: #292524 !important;
-}
-
-html.dark .bg-white {
-  background-color: #171717 !important;
-  color: #fafaf9 !important;
-}
-
-html.dark .bg-sand-50,
-html.dark [class*="bg-sand-50"] {
-  background-color: #121110 !important;
-}
-
-html.dark .bg-sand-100,
-html.dark [class*="bg-sand-100"] {
-  background-color: #1c1a19 !important;
-}
-
-html.dark .border-sand-200,
-html.dark .border-sand-100,
-html.dark .border-sand-300,
-html.dark [class*="border-sand-"] {
-  border-color: #262422 !important;
-}
-
 html.dark [class*="shadow-"] {
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
-html.dark .divide-sand-200 > :not([hidden]) ~ :not([hidden]),
-html.dark .divide-sand-100 > :not([hidden]) ~ :not([hidden]) {
-  border-color: #2b2927 !important;
-}
-
-html.dark .text-zinc-950,
-html.dark .text-zinc-900,
-html.dark .text-zinc-800 {
-  color: #fafaf9 !important;
-}
-
-html.dark .text-zinc-700,
-html.dark .text-zinc-600 {
-  color: #d4d4d8 !important;
-}
-
-html.dark .text-zinc-500,
-html.dark .text-zinc-400 {
-  color: #a1a1aa !important;
-}
-
-html.dark .bg-zinc-950 {
-  background-color: #27272a !important;
-  color: #ffffff !important;
-}
-
-html.dark .bg-zinc-100,
-html.dark [class*="bg-zinc-100"] {
-  background-color: #201e1d !important;
-}
-
-html.dark .border-zinc-200,
-html.dark [class*="border-zinc-200"] {
-  border-color: #2b2927 !important;
-}
-
-html.dark input,
-html.dark textarea,
-html.dark select {
-  background-color: #1c1a19 !important;
-  border-color: #383533 !important;
-  color: #fafaf9 !important;
-}
-
-html.dark input:focus,
-html.dark textarea:focus,
-html.dark select:focus {
-  border-color: #71717a !important;
-  outline: none;
+input,
+select {
+  background-color: rgb(var(--c-surface));
+  color: rgb(var(--c-ink));
+  border-color: rgb(var(--c-line-strong));
 }
 
 /* Subtle focus ring */
@@ -154,26 +100,12 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background: #57534e;
 }
 
-/* Micro-badge pulse */
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
-}
-.pulse-dot {
-  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Shimmer scanline effect for active sandbox */
-@keyframes shimmer-sweep {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-.shimmer-bar::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(250, 204, 21, 0.15), transparent);
-  animation: shimmer-sweep 2s ease-in-out infinite;
+/* Red-pencil mark for the claim that failed */
+.redline {
+  text-decoration: underline;
+  text-decoration-color: #dc2626;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 
 /* Telemetry number styling */
@@ -196,7 +128,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   .shadow-sm, .shadow-md, .shadow-lg {
     box-shadow: none !important;
   }
-  .border-sand-200, .border-sand-100 {
+  .border-line {
     border-color: #cccccc !important;
   }
 }

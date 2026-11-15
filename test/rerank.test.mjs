@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rerank, getEmbedder } from "../dist/tools/rerank.js";
+import { rerank, getEmbedder } from "../src/tools/rerank.ts";
 
 test("Rerank returns null offline so callers fall back to provider order", async () => {
   const passages = [

@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { IdeaSwarmOrchestrator } from "../dist/core/swarm.js";
-import { matchReferenceClasses, buildOutsideViewPanel } from "../dist/core/outside-view.js";
-import { REFERENCE_CLASSES } from "../dist/data/reference-classes.js";
+import { IdeaSwarmOrchestrator } from "../src/core/swarm.ts";
+import { matchReferenceClasses, buildOutsideViewPanel } from "../src/core/outside-view.ts";
+import { REFERENCE_CLASSES } from "../src/data/reference-classes.ts";
 
 test("Reference-class table is internally coherent and honestly sourced", () => {
   for (const ref of REFERENCE_CLASSES) {

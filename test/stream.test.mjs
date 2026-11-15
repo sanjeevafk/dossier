@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 
 test("Server-Sent Events (SSE) stream endpoint emits structured events", async () => {
-  const { default: app } = await import("../dist/server.js");
+  const { default: app } = await import("../src/server.ts");
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, resolve));
   const port = server.address().port;

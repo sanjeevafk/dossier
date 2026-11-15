@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dossierStorage } from "../dist/services/storage.js";
-import { runEconomicsSimulation } from "../dist/tools/sandbox.js";
-import { getLLMStatus } from "../dist/services/llm.js";
-import { IdeaSwarmOrchestrator } from "../dist/core/swarm.js";
+import { dossierStorage } from "../src/services/storage.ts";
+import { runEconomicsSimulation } from "../src/tools/sandbox.ts";
+import { getLLMStatus } from "../src/services/llm.ts";
+import { IdeaSwarmOrchestrator } from "../src/core/swarm.ts";
 
 test("Dossier Storage Service saves, retrieves, exports, and updates approvals", async () => {
   const dummyDossier = {

@@ -5,8 +5,34 @@ import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { MonteCarloStats, SobolSensitivityStats, ValueOfInformationStats, SandboxStressStats } from "../types/index.js";
+import { warn } from "../utils/log.js";
 
 const execFileAsync = promisify(execFile);
+
+// Launcher applying hard CPU/memory limits before running the (trusted) simulator script.
+const PY_LIMIT_LAUNCHER = [
+  "import resource, runpy, sys",
+  "resource.setrlimit(resource.RLIMIT_CPU, (30, 30))",
+  "resource.setrlimit(resource.RLIMIT_AS, (2 << 30, 2 << 30))",
+  "resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))",
+  "sys.argv = sys.argv[1:]",
+  "runpy.run_path(sys.argv[0], run_name='__main__')"
+].join("\n");
+
+/** Run a simulator script with resource limits, SIGKILL on timeout, and a scrubbed environment (no API keys). */
+function runPythonLimited(scriptPath: string, inputPath: string, timeoutMs: number) {
+  return execFileAsync("python3", ["-c", PY_LIMIT_LAUNCHER, scriptPath, inputPath], {
+    timeout: timeoutMs,
+    killSignal: "SIGKILL",
+    maxBuffer: 1024 * 1024,
+    env: {
+      PATH: process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin",
+      OPENBLAS_NUM_THREADS: "1",
+      OMP_NUM_THREADS: "1",
+      PYTHONDONTWRITEBYTECODE: "1"
+    }
+  });
+}
 
 export interface SandboxExecutionResult {
   runtime: string;
@@ -99,7 +125,7 @@ export async function runEconomicsSimulation(
       try { return fsSync.existsSync(p); } catch { return false; }
     }) || candidatePaths[0];
 
-    const { stdout, stderr } = await execFileAsync("python3", [scriptPath, inputPath], { timeout: 20000, maxBuffer: 1024 * 1024 });
+    const { stdout, stderr } = await runPythonLimited(scriptPath, inputPath, 20000);
     const parsed = JSON.parse(stdout.trim());
 
     let sobol: SobolSensitivityStats | undefined;
@@ -117,10 +143,11 @@ export async function runEconomicsSimulation(
         }) || candidateSobol[0];
         const sobolInputPath = path.join(tmpDir, "sobol_inputs.json");
         await fs.writeFile(sobolInputPath, JSON.stringify({ ...inputPayload, sobol_samples: 512 }), "utf-8");
-        const { stdout: sobolStdout } = await execFileAsync("python3", [sobolScript, sobolInputPath], { timeout: 30000, maxBuffer: 1024 * 1024 });
+        const { stdout: sobolStdout } = await runPythonLimited(sobolScript, sobolInputPath, 30000);
         sobol = JSON.parse(sobolStdout.trim());
-      } catch {
+      } catch (err) {
         // Optional enrichment. Its absence does not invalidate the main simulation.
+        warn("Sobol sensitivity enrichment failed", err);
       }
     }
 

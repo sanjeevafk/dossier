@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runEconomicsSimulation } from "../dist/tools/sandbox.js";
-import { IdeaSwarmOrchestrator } from "../dist/core/swarm.js";
-import { buildMutationProposals } from "../dist/core/mutator.js";
-import { classifyIdeaDomain } from "../dist/core/classifier.js";
+import { runEconomicsSimulation } from "../src/tools/sandbox.ts";
+import { IdeaSwarmOrchestrator } from "../src/core/swarm.ts";
+import { buildMutationProposals } from "../src/core/mutator.ts";
+import { classifyIdeaDomain } from "../src/core/classifier.ts";
 
 test("Mutation Engine generates three distinct strategic pivots on a collapsed score", () => {
   const idea = {

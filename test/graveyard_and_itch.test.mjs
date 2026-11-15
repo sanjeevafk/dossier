@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findMatchingItchProblems, FIX_MY_ITCH_PROBLEMS } from "../dist/data/fixMyItchProblems.js";
-import { findMatchingGraveyardPrecedents, GRAVEYARD_PRECEDENTS } from "../dist/data/graveyardAntipatterns.js";
+import { findMatchingItchProblems, FIX_MY_ITCH_PROBLEMS } from "../src/data/fixMyItchProblems.ts";
+import { findMatchingGraveyardPrecedents, GRAVEYARD_PRECEDENTS } from "../src/data/graveyardAntipatterns.ts";
 
 test("Fix My Itch catalog contains curated verified problems", () => {
   assert.ok(FIX_MY_ITCH_PROBLEMS.length >= 8);

@@ -168,7 +168,7 @@ export class EpistemicRobustVerifier {
           confidencePercent: 92
         });
       }
-      if (domain.archetype !== "b2b_saas" && domain.archetype !== "consumer_social") {
+      if (domain.archetype !== "b2b_saas" && domain.archetype !== "consumer_social" && domain.archetype !== "smb_commerce") {
         const text = (op.rationale + " " + op.fatalFlaws.join(" ")).toLowerCase();
         if (text.includes("freemium") || text.includes("self-serve signups")) {
           testTimeSelfCorrections++;

@@ -29,8 +29,8 @@
   },
   "scripts": {
     "compile": "tsc",
-    "build:css": "npx -y tailwindcss@3.4.17 -i ./public/styles.css -o ./public/dist.css --content './public/**/*.{html,js}' --minify",
-    "build": "npm run build:css && tsc && (git rev-parse --short HEAD > dist/.version 2>/dev/null || true) && cp src/tools/decision_model.py dist/tools/ && mkdir -p dist/scripts && cp scripts/simulate_monte_carlo.py scripts/simulate_sobol.py scripts/export_pdf.py dist/scripts/ || node -e 'if (!require(\"fs\").existsSync(\"dist/server.js\")) process.exit(1); console.log(\"Using pre-built dist\")'",
+    "build:css": "tailwindcss -i ./public/styles.css -o ./public/dist.css --content './public/**/*.{html,js}' --minify",
+    "build": "pnpm run build:css && tsc && pnpm run build:assets && (git rev-parse --short HEAD > dist/.version 2>/dev/null || true)",
     "start": "node dist/server.js",
     "dev": "tsx src/server.ts",
     "start:prod": "node dist/server.js",
@@ -44,8 +44,12 @@
     "replay:diff": "tsx scripts/replay_diff.ts",
     "monitor": "tsx scripts/monitor.ts",
     "test:stress": "tsx src/stress-test.ts",
-    "test:decision": "NODE_ENV=test node --test test/decision_model.test.mjs",
-    "test": "NODE_ENV=test node --test test/*.test.mjs"
+    "test:decision": "NODE_ENV=test node --import tsx --test test/decision_model.test.mjs",
+    "test": "NODE_ENV=test node --import tsx --test test/*.test.mjs",
+    "build:assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/tools',{recursive:true});fs.mkdirSync('dist/scripts',{recursive:true});fs.copyFileSync('src/tools/decision_model.py','dist/tools/decision_model.py');for(const f of ['simulate_monte_carlo.py','simulate_sobol.py','export_pdf.py'])fs.copyFileSync('scripts/'+f,'dist/scripts/'+f)\"",
+    "typecheck": "tsc --noEmit",
+    "eval": "tsx scripts/run_eval.ts",
+    "eval:heuristic": "EVAL_LLM=0 tsx scripts/run_eval.ts"
   },
   "keywords": [
     "ai-agent",
@@ -57,10 +61,12 @@
   "author": "sanjeevafk",
   "license": "Apache-2.0",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.0"
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
+    "tailwindcss": "3.4.17",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   }

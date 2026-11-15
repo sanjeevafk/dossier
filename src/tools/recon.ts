@@ -10,6 +10,7 @@
  */
 
 import { dossierStorage } from "../services/storage.js";
+import { debug } from "../utils/log.js";
 
 export interface ReconSourceResult {
   title: string;
@@ -195,7 +196,9 @@ export async function performLiveWebRecon(
             collected.push({ ...result, queryLabel: q === 0 ? "competitive" : "sentiment" });
             if (collected.length >= MAX_TOTAL_RESULTS) break;
           }
-        } catch {}
+        } catch (err) {
+          debug("DuckDuckGo fallback query failed", err);
+        }
       }
       if (collected.length > 0) {
         return { provider: "duckduckgo", queries: cleanQueries, results: collected };

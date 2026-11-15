@@ -22,6 +22,13 @@ export const ARCHETYPE_BASE_RATES: Record<IdeaDomainArchetype, ArchetypeBaseRate
     baseRate: 0.62,
     source: "SaaS LTV/CAC golden ratio + 2026 CAC/churn/NRR medians (revoptima.io, stealthagents.com)"
   },
+  smb_commerce: {
+    p50LtvCac: 2.5,
+    churn30d: 0.07,
+    cacMedianUsd: 60,
+    baseRate: 0.40,
+    source: "Analyst prior for low-ticket SMB software/fintech (unvalidated): between consumer and B2B SaaS on churn and CAC"
+  },
   consumer_social: {
     p50LtvCac: 0.8,
     churn30d: 0.12,

@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { contradictionScore, getNli } from "../dist/tools/nli.js";
-import { extractCompetitors } from "../dist/tools/search.js";
-import { EpistemicRobustVerifier } from "../dist/core/verifier.js";
+import { contradictionScore, getNli } from "../src/tools/nli.ts";
+import { extractCompetitors } from "../src/tools/search.ts";
+import { EpistemicRobustVerifier } from "../src/core/verifier.ts";
 
 test("NLI returns null offline so tiers stay unchanged", async () => {
   const nli = await getNli();

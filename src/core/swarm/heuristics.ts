@@ -244,6 +244,16 @@ export function generateHeuristicOpinion(
             rationale = `High pilot abandonment risk: Enterprise buyers express enthusiasm in discovery but face procurement bottlenecks.`;
             break;
 
+          case "smb_commerce":
+            score = econSurvivesStress ? 50 : (isEconomicsAvailable && (ltvCac ?? 0) < 2.5 ? 34 : 42);
+            verdict = "LEAN_KILL";
+            fatalFlaws = [
+              `Merchant Onboarding CAC Trap: Signing small merchants one at a time through field sales or demos costs more than a low-ticket subscription earns back unless activation is fully self-serve.`,
+              `Rail and Platform Dependence: The core flow rides on WhatsApp and UPI. A policy, pricing or API-limit change by Meta or NPCI can break the product without warning.`
+            ];
+            rationale = `Low ticket sizes make acquisition cost and merchant churn the binding constraints, and the product depends on payment and messaging rails it does not control.`;
+            break;
+
           case "b2g_govtech":
             score = 30;
             verdict = "STRONG_KILL";

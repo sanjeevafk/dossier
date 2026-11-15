@@ -7,6 +7,7 @@ delete process.env.ORCAROUTER_API_KEY;
 delete process.env.OPENAI_API_KEY;
 delete process.env.GEMINI_API_KEY;
 delete process.env.GROQ_API_KEY;
+delete process.env.MODEL_API_KEY;
 delete process.env.OPENROUTER_API_KEY;
 delete process.env.LOCAL_LLM_URL;
 delete process.env.OLLAMA_URL;
@@ -19,13 +20,14 @@ process.env.DOSSIER_LLM_BACKEND = "api";
 process.env.NODE_ENV = "test";
 
 test("Chat stream serves SSE chunks + done with honest heuristic fallback", async () => {
-  const { default: app } = await import("../dist/server.js");
+  const { default: app } = await import("../src/server.ts");
   // Force the no-LLM path so the stream serves the honest heuristic reply.
   // Note: llm.ts loads dotenv on import, so env vars must be cleared after import too.
   delete process.env.ORCAROUTER_API_KEY;
   delete process.env.OPENAI_API_KEY;
   delete process.env.GEMINI_API_KEY;
   delete process.env.GROQ_API_KEY;
+  delete process.env.MODEL_API_KEY;
   delete process.env.OPENROUTER_API_KEY;
   delete process.env.LOCAL_LLM_URL;
   delete process.env.OLLAMA_URL;
@@ -76,7 +78,7 @@ test("Chat stream serves SSE chunks + done with honest heuristic fallback", asyn
 });
 
 test("Chat stream rejects missing message with 400", async () => {
-  const { default: app } = await import("../dist/server.js");
+  const { default: app } = await import("../src/server.ts");
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, resolve));
   const port = server.address().port;

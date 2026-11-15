@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { performLiveWebRecon } from "../dist/tools/recon.js";
-import { composeDebateTrailDeterministic } from "../dist/core/debate.js";
-import { performMarketResearch } from "../dist/tools/search.js";
-import { queryCommunitySentiment } from "../dist/tools/community.js";
+import { performLiveWebRecon } from "../src/tools/recon.ts";
+import { composeDebateTrailDeterministic } from "../src/core/debate.ts";
+import { performMarketResearch } from "../src/tools/search.ts";
+import { queryCommunitySentiment } from "../src/tools/community.ts";
 
 function opinion(overrides) {
   return {
@@ -84,7 +84,7 @@ test("Market research degrades honestly when no recon provider exists", async ()
   delete process.env.EXA_API_KEY;
   delete process.env.TAVILY_API_KEY;
 
-  const findings = await performMarketResearch("PawSitter", ["urban professionals"]);
+  const findings = await performMarketResearch({ title: "PawSitter", targetAudience: "urban professionals" });
   assert.equal(findings.dataSource, "none");
   assert.equal(findings.identifiedCompetitors.length, 0, "No fake competitor lists");
   assert.equal(findings.marketSignals.length, 0, "No fake market signals");

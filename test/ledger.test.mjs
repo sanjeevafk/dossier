@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { IdeaSwarmOrchestrator } from "../dist/core/swarm.js";
-import { forecastLedger, extractForecasts } from "../dist/services/ledger.js";
+import { IdeaSwarmOrchestrator } from "../src/core/swarm.ts";
+import { forecastLedger, extractForecasts } from "../src/services/ledger.ts";
 
 test("Compiled dossiers register dated falsifiable forecasts in the ledger", async () => {
   const orchestrator = new IdeaSwarmOrchestrator();

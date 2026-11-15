@@ -17,6 +17,8 @@ services:
     envVars:
       - key: PORT
         value: 3000
+      - key: TRUST_PROXY
+        value: "true"
       - key: NODE_ENV
         value: production
       - key: NODE_OPTIONS

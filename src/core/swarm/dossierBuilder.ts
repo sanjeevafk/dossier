@@ -26,13 +26,16 @@ import { forecastLedger } from "../../services/ledger.js";
 import { dossierStorage } from "../../services/storage.js";
 import { buildExternalEvidenceSources } from "./evidence.js";
 import { VOI_EXPERIMENT_MAP } from "./schemas.js";
-import { getLLMStatus } from "../../services/llm.js";
+import { currentLlmUsage, estimateCostUsd } from "../../services/llm.js";
 import { SandboxExecutionResult } from "../../tools/sandbox.js";
+import { warn } from "../../utils/log.js";
 
 export interface AssembleDossierParams {
   idea: IdeaInput;
   domain: DomainClassification;
-  evaluationMode: "LIVE_LLM" | "HEURISTIC_ENGINE";
+  evaluationMode: "LIVE_LLM" | "MIXED" | "HEURISTIC_ENGINE";
+  provenance: { llmRoles: string[]; heuristicRoles: string[]; fallbackReasons: Record<string, string> };
+  economicsInputs: NonNullable<IdeaDossier["economicsInputs"]>;
   pricing: number;
   cac: number;
   churn: number;
@@ -75,6 +78,8 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     idea,
     domain,
     evaluationMode,
+    provenance,
+    economicsInputs,
     pricing,
     cac,
     churn,
@@ -117,7 +122,8 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     overallVerdict,
     riskLevel,
     confidenceScore,
-    swarmDissent
+    swarmDissent,
+    verdictBasis
   } = scoringResult;
 
   const fatalUntestedCount = epistemicSummary.hasUnvalidatedFatalAssumptions ? 1 : 0;
@@ -218,7 +224,7 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     mustTestBeforeBuilding: [cheapestValidationExperiment.title],
     rationale: `Swarm consensus for [${domain.archetypeLabel}]: Concept has strong technical grounding (${technicalFeasibility}/100) and regulatory fit (${defensibilityAndMoat}/100), but must resolve commercial procurement and habit inertia (${demandAndAdoption}/100) before committing full MVP engineering.`,
     telemetryMetadata: {
-      modelId: evaluationMode === "LIVE_LLM" ? (getLLMStatus().activeModel || "live-llm") : "deterministic-heuristics",
+      modelId: evaluationMode === "HEURISTIC_ENGINE" ? "deterministic-heuristics" : "deterministic-synthesis",
       latencyMs: Date.now() - synthesisStart,
       claimsVerified: evidenceFeed.length,
       threatSeverity: riskLevel
@@ -259,6 +265,14 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     decisionEvaluation.economicsAvailability = isEconomicsAvailable ? "available" : "unavailable";
   }
 
+  // Headline confidence is the weakest of: agent agreement, verifier pass rate, and a cap for runs that were not (fully) LLM-driven.
+  const verifierPct = audit.totalClaimsAudited > 0 ? audit.verificationConfidencePercent : undefined;
+  const provenanceCap = evaluationMode === "HEURISTIC_ENGINE" ? 35 : evaluationMode === "MIXED" ? 55 : 100;
+  const honestConfidence = {
+    value: Math.max(5, Math.min(confidenceScore, verifierPct ?? 100, provenanceCap)),
+    basis: { agreement: confidenceScore, verifier: verifierPct, provenanceCap: provenanceCap < 100 ? provenanceCap : undefined }
+  };
+
   const dossier: IdeaDossier = {
     id: `DOSSIER-${Date.now().toString().slice(-6)}`,
     dossierCode: `DOS-${domain.archetype.toUpperCase().slice(0, 3)}`,
@@ -267,7 +281,10 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     pSuccess: Math.round(compositeScore) / 100,
     baseRate: getBaseRate(domain.archetype).baseRate,
     fatalsResolved: fatalUntestedCount === 0,
-    costUsd: evaluationMode === "LIVE_LLM" ? 0.3 : 0.0,
+    costUsd: estimateCostUsd(currentLlmUsage()),
+    llmUsage: currentLlmUsage(),
+    provenance,
+    economicsInputs,
     externalEvidenceSources,
     identifiedCompetitors: marketResearch.identifiedCompetitors,
     idea,
@@ -275,8 +292,10 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     epistemicSummary,
     verificationAudit: audit,
     killScore: compositeScore,
-    confidenceScore,
+    confidenceScore: honestConfidence.value,
+    confidenceBasis: honestConfidence.basis,
     swarmDissent,
+    verdictBasis,
     outsideView,
     decisionEvaluation,
     overallVerdict,
@@ -376,14 +395,14 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
   try {
     const forecasts = await forecastLedger.persistDossierForecasts(dossier);
     dossier.forecastIds = forecasts.map((f: { id: string }) => f.id);
-  } catch {
-    // non-blocking
+  } catch (err) {
+    warn("forecast persistence failed (non-blocking)", err);
   }
 
   try {
     await dossierStorage.saveDossier(dossier);
-  } catch {
-    // non-blocking storage save
+  } catch (err) {
+    warn("dossier save failed; result will not be retrievable by id", err);
   }
 
   emit({ type: "dossier_complete", dossier });

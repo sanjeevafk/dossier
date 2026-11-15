@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { queryManifoldUnified } from "../dist/tools/markets/manifold.js";
-import { queryOpenAlex } from "../dist/tools/openalex.js";
-import { queryEdgarFormD } from "../dist/tools/edgar.js";
-import { queryHuggingFace } from "../dist/tools/huggingface.js";
-import { queryClinicalEvidence } from "../dist/tools/clinical.js";
-import { queryMacroData } from "../dist/tools/macro.js";
-import { extractDomainTokens, getSearchQueryCandidates } from "../dist/tools/queryTokens.js";
+import { queryManifoldUnified } from "../src/tools/markets/manifold.ts";
+import { queryOpenAlex } from "../src/tools/openalex.ts";
+import { queryEdgarFormD } from "../src/tools/edgar.ts";
+import { queryHuggingFace } from "../src/tools/huggingface.ts";
+import { queryClinicalEvidence } from "../src/tools/clinical.ts";
+import { queryMacroData } from "../src/tools/macro.ts";
+import { extractDomainTokens, getSearchQueryCandidates } from "../src/tools/queryTokens.ts";
 
 function fetchMock(payload, ok = true) {
   return async () => ({

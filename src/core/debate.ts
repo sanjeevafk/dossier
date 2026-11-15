@@ -23,10 +23,10 @@ const VALID_ROLES = new Set<string>(["analyst", "customer", "architect", "invest
 const VALID_STATUSES = new Set<string>(["OPEN", "REBUTTED", "CONCEDED"]);
 
 function validateDebateClashes(input: unknown): { success: true; data: { clashes: LlmClash[] } } | { success: false } {
-  if (!input || typeof input !== "object" || !("clashes" in input) || !Array.isArray((input as any).clashes)) {
+  if (!input || typeof input !== "object" || !("clashes" in input) || !Array.isArray((input as { clashes: unknown }).clashes)) {
     return { success: false };
   }
-  const clashes = (input as any).clashes;
+  const clashes = (input as { clashes: LlmClash[] }).clashes; // shape is verified field-by-field below
   if (clashes.length < 3 || clashes.length > 4) return { success: false };
   for (const c of clashes) {
     if (!c || typeof c !== "object") return { success: false };

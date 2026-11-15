@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sanitizeReconQuery } from "../dist/tools/recon.js";
-import { dossierStorage } from "../dist/services/storage.js";
+import { sanitizeReconQuery } from "../src/tools/recon.ts";
+import { dossierStorage } from "../src/services/storage.ts";
 
 test("Recon queries strip PII and normalize for cache keys", () => {
   assert.equal(

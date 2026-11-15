@@ -1,0 +1,63 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { decideVerdictV2, isEvidencedStructuralFatal, ratingToScore, ratingToVerdict, hasFindings } from "../src/core/swarm/verdict.ts";
+
+const f = (over = {}) => ({ claim: "c", severity: "MAJOR", kind: "VALIDATABLE", evidence: { type: "REASONING", ref: "reasoning" }, ...over });
+const op = (rating, findings = []) => ({ role: "x", rating, findings, score: ratingToScore(rating), verdict: ratingToVerdict(rating, false) });
+const lanes = (r, extra = {}) => ({ analyst: op(r), customer: op(r), architect: op(r), investor: op(r), redteam: op(r), expert: op(r), ...extra });
+const fatal = (type = "STATED_INPUT", ref = "founder says $4/mo and CAC $40") => f({ severity: "FATAL", kind: "STRUCTURAL", evidence: { type, ref }, cheapestTest: "t" });
+
+test("reasoning-only or placeholder-computation fatals cannot kill", () => {
+  assert.equal(isEvidencedStructuralFatal(fatal("REASONING", "because"), true), false);
+  assert.equal(isEvidencedStructuralFatal(fatal("COMPUTATION", "ltv/cac 0.3"), false), false);
+  assert.equal(isEvidencedStructuralFatal(fatal("COMPUTATION", "ltv/cac 0.3"), true), true);
+  assert.equal(isEvidencedStructuralFatal(fatal("SOURCE", ""), true), false, "a source needs a reference");
+});
+
+test("mixed ideas with validatable risks land in REFINE, not KILL", () => {
+  const op3 = (findings) => op(3, findings);
+  const d = decideVerdictV2({
+    opinions: lanes(3, { customer: op3([f({ severity: "FATAL", kind: "VALIDATABLE", cheapestTest: "10 interviews" })]) }),
+    compositeScore: 50, economicsGrounded: false, invariantGated: false
+  });
+  assert.equal(d.verdict, "REFINE");
+});
+
+test("two independent lanes with evidenced structural fatals kill", () => {
+  const d = decideVerdictV2({
+    opinions: lanes(2, { investor: op(2, [fatal("STATED_INPUT")]), customer: op(2, [fatal("SOURCE", "https://example.com/pricing")]) }),
+    compositeScore: 45, economicsGrounded: false, invariantGated: false
+  });
+  assert.equal(d.verdict, "KILL");
+  assert.deepEqual(d.evidencedFatalLanes.sort(), ["customer", "investor"]);
+});
+
+test("one lane kills alone only on stated input, a computation or a source, not on precedent", () => {
+  const stated = decideVerdictV2({ opinions: lanes(3, { investor: op(1, [fatal("STATED_INPUT")]) }), compositeScore: 50, economicsGrounded: false, invariantGated: false });
+  assert.equal(stated.verdict, "KILL");
+  const precedent = decideVerdictV2({ opinions: lanes(3, { investor: op(1, [fatal("PRECEDENT", "Quibi")]) }), compositeScore: 50, economicsGrounded: false, invariantGated: false });
+  assert.equal(precedent.verdict, "REFINE");
+});
+
+test("invariant gates always kill; strong consensus with no fatals can reach BUILD_IF_VALIDATED", () => {
+  assert.equal(decideVerdictV2({ opinions: lanes(4), compositeScore: 80, economicsGrounded: true, invariantGated: true }).verdict, "KILL");
+  assert.equal(decideVerdictV2({ opinions: lanes(4), compositeScore: 70, economicsGrounded: true, invariantGated: false }).verdict, "BUILD_IF_VALIDATED");
+  assert.equal(decideVerdictV2({ opinions: lanes(4, { customer: op(4, [f({ severity: "FATAL", cheapestTest: "t" })]) }), compositeScore: 70, economicsGrounded: true, invariantGated: false }).verdict, "REFINE");
+});
+
+test("a bottom-band composite kills; findings are required for the v2 rules", () => {
+  assert.equal(decideVerdictV2({ opinions: lanes(1), compositeScore: 20, economicsGrounded: false, invariantGated: false }).verdict, "KILL");
+  assert.equal(hasFindings(lanes(3)), true);
+  assert.equal(hasFindings({ analyst: { score: 50 }, customer: { score: 50 } }), false);
+});
+
+test("three independent lanes with structural problems grounded in the stated idea kill", () => {
+  const sm = () => f({ severity: "MAJOR", kind: "STRUCTURAL", evidence: { type: "STATED_INPUT", ref: "over a billion dollars committed" }, cheapestTest: "t" });
+  const d = decideVerdictV2({
+    opinions: lanes(2, { customer: op(2, [sm()]), investor: op(2, [sm()]), redteam: op(2, [sm()]) }),
+    compositeScore: 45, economicsGrounded: false, invariantGated: false
+  });
+  assert.equal(d.verdict, "KILL");
+  const two = decideVerdictV2({ opinions: lanes(2, { customer: op(2, [sm()]), investor: op(2, [sm()]) }), compositeScore: 45, economicsGrounded: false, invariantGated: false });
+  assert.equal(two.verdict, "REFINE");
+});

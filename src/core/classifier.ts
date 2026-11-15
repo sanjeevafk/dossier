@@ -1,100 +1,100 @@
 import { DomainClassification, IdeaDomainArchetype, IdeaInput } from "../types/index.js";
 
+type ScoredArchetype = Exclude<IdeaDomainArchetype, "general_startup">;
+
+interface KeywordRule {
+  /** Terms that identify the domain on their own (weight 3). */
+  strong: string[];
+  /** Terms that only hint at the domain (weight 1). */
+  weak: string[];
+}
+
+// Ties go to the archetype listed first (same precedence the old if/else chain had).
+const ARCHETYPE_RULES: Record<ScoredArchetype, KeywordRule> = {
+  consumer_social: {
+    strong: ["dating", "matchmaking", "matrimony", "social", "creator", "influencer", "consumer app"],
+    weak: ["chat", "consumer", "extension", "freemium", "meeting notes", "habit"]
+  },
+  deeptech_research: {
+    strong: ["research paper", "formal verification", "deeptech", "algorithm"],
+    weak: ["research", "solver", "theorem"]
+  },
+  b2b_saas: {
+    strong: ["cybersecurity", "ciso", "rag security", "prompt injection", "defense-in-depth", "b2b", "enterprise", "saas", "soc2", "crm", "developers", "sdk"],
+    weak: ["security", "compliance", "invoice", "workflow", "dashboard", "api"]
+  },
+  smb_commerce: {
+    strong: ["kirana", "retailer", "shopkeeper", "merchant", "upi", "gst", "point of sale", "sme", "smb", "small business", "mom-and-pop", "local store", "corner shop", "whatsapp"],
+    weak: ["store", "shop", "invoice", "billing", "distributor", "inventory", "payments", "wholesale", "ledger"]
+  },
+  healthcare_clinical: {
+    strong: ["clinical", "triage", "patient", "doctor", "hospital", "medical", "imci", "asha", "healthcare"],
+    weak: ["health"]
+  },
+  hardware_robotics: {
+    strong: ["drone", "robot", "hardware", "lidar", "uav", "slam", "wildfire", "ndrf"],
+    weak: ["sensor", "patrol", "disaster"]
+  },
+  b2g_govtech: {
+    strong: ["government", "b2g", "ministry", "tender", "sih", "nhm", "public sector"],
+    weak: ["district", "state health"]
+  },
+  web3_defi: {
+    strong: ["web3", "defi", "crypto", "smart contract", "solidity", "tokenomics", "erc20"],
+    weak: ["escrow"]
+  }
+};
+
+const B2B_MODEL_TERMS = ["b2b", "enterprise", "saas", "soc2", "ciso"];
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Start-of-word match, so "invoice" never fires inside another word but "retailers" still matches "retailer". */
+function hasTerm(text: string, term: string): boolean {
+  return new RegExp(`(?<![a-z0-9])${escapeRegex(term)}`).test(text);
+}
+
+function scoreArchetypes(text: string, idea: IdeaInput): Map<ScoredArchetype, number> {
+  const scores = new Map<ScoredArchetype, number>();
+  for (const [archetype, rule] of Object.entries(ARCHETYPE_RULES) as Array<[ScoredArchetype, KeywordRule]>) {
+    let score = 0;
+    for (const term of rule.strong) if (hasTerm(text, term)) score += 3;
+    for (const term of rule.weak) if (hasTerm(text, term)) score += 1;
+    scores.set(archetype, score);
+  }
+  if (idea.projectType === "Research") scores.set("deeptech_research", (scores.get("deeptech_research") ?? 0) + 5);
+  return scores;
+}
+
+/** Exported for tests and debugging: the winning archetype and the full score table. */
+export function explainClassification(idea: IdeaInput): { archetype: IdeaDomainArchetype; scores: Record<string, number> } {
+  const text = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization} ${idea.techStack || ""}`.toLowerCase();
+  const scores = scoreArchetypes(text, idea);
+  let best: IdeaDomainArchetype = "general_startup";
+  let bestScore = 1; // a score of 2+ (one strong signal, or two weak ones) is needed to leave the generic bucket
+  for (const [archetype, score] of scores) {
+    if (score > bestScore) {
+      best = archetype;
+      bestScore = score;
+    }
+  }
+  // An explicit B2B business-model term ("enterprise", "saas", ...) outranks industry-domain terms,
+  // as it did in the original rule chain: a clinical-documentation SaaS for hospitals is sold as B2B software.
+  const DOMAIN_ARCHETYPES: IdeaDomainArchetype[] = ["healthcare_clinical", "hardware_robotics", "b2g_govtech", "web3_defi"];
+  if (DOMAIN_ARCHETYPES.includes(best) && B2B_MODEL_TERMS.some((term) => hasTerm(text, term))) {
+    best = "b2b_saas";
+  }
+  return { archetype: best, scores: Object.fromEntries(scores) };
+}
+
 /**
  * Classifies an incoming concept into a domain archetype with tailored specialist agent mandates,
  * regulatory contexts, and realistic procurement/economics models.
  */
 export function classifyIdeaDomain(idea: IdeaInput): DomainClassification {
-  const text = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization} ${idea.techStack || ""}`.toLowerCase();
-
-  let archetype: IdeaDomainArchetype = "general_startup";
-
-  if (
-    text.includes("dating") ||
-    text.includes("matchmaking") ||
-    text.includes("matrimony") ||
-    text.includes("social") ||
-    text.includes("chat") ||
-    text.includes("consumer")
-  ) {
-    archetype = "consumer_social";
-  } else if (idea.projectType === "Research" || (text.includes("research") && !text.includes("saas") && !text.includes("cybersecurity")) || text.includes("research paper") || text.includes("formal verification") || text.includes("deeptech") || text.includes("algorithm")) {
-    archetype = "deeptech_research";
-  } else if (
-    text.includes("cybersecurity") ||
-    text.includes("ciso") ||
-    text.includes("rag security") ||
-    text.includes("prompt injection") ||
-    text.includes("defense-in-depth") ||
-    text.includes("b2b") ||
-    text.includes("enterprise") ||
-    text.includes("saas") ||
-    text.includes("soc2") ||
-    text.includes("crm") ||
-    text.includes("security") ||
-    text.includes("compliance") ||
-    text.includes("invoice")
-  ) {
-    archetype = "b2b_saas";
-  } else if (
-    text.includes("health") ||
-    text.includes("clinical") ||
-    text.includes("triage") ||
-    text.includes("doctor") ||
-    text.includes("patient") ||
-    text.includes("asha") ||
-    text.includes("imci") ||
-    text.includes("hospital") ||
-    text.includes("medical")
-  ) {
-    archetype = "healthcare_clinical";
-  } else if (
-    text.includes("drone") ||
-    text.includes("robot") ||
-    text.includes("hardware") ||
-    text.includes("sensor") ||
-    text.includes("lidar") ||
-    text.includes("uav") ||
-    text.includes("slam") ||
-    text.includes("patrol") ||
-    text.includes("wildfire") ||
-    text.includes("disaster") ||
-    text.includes("ndrf")
-  ) {
-    archetype = "hardware_robotics";
-  } else if (
-    text.includes("government") ||
-    text.includes("b2g") ||
-    text.includes("ministry") ||
-    text.includes("district") ||
-    text.includes("tender") ||
-    text.includes("sih") ||
-    text.includes("state health") ||
-    text.includes("nhm") ||
-    text.includes("public sector")
-  ) {
-    archetype = "b2g_govtech";
-  } else if (
-    text.includes("web3") ||
-    text.includes("defi") ||
-    text.includes("crypto") ||
-    text.includes("smart contract") ||
-    text.includes("solidity") ||
-    text.includes("escrow") ||
-    text.includes("tokenomics") ||
-    text.includes("erc20")
-  ) {
-    archetype = "web3_defi";
-  } else if (
-    text.includes("consumer") ||
-    text.includes("social") ||
-    text.includes("chat") ||
-    text.includes("extension") ||
-    text.includes("meeting notes") ||
-    text.includes("freemium")
-  ) {
-    archetype = "consumer_social";
-  }
+  const archetype = explainClassification(idea).archetype;
 
   switch (archetype) {
     case "healthcare_clinical":
@@ -166,6 +166,24 @@ export function classifyIdeaDomain(idea: IdeaInput): DomainClassification {
           investor: { number: "04", title: "VENTURE CAPITALIST", mandate: "Gross margins, CAC payback period, net revenue retention (NRR), defensibility." },
           redteam: { number: "05", title: "RED TEAM CHURN ADVERSARY", mandate: "Incumbent feature commoditization, pilot abandonment, procurement vetoes." },
           expert: { number: "06", title: "ENTERPRISE SECURITY SPECIALIST", mandate: "Data isolation, audit logging, zero-trust RBAC, vendor risk assessments." }
+        }
+      };
+
+    case "smb_commerce":
+      return {
+        archetype,
+        archetypeLabel: "SMB Commerce & Fintech",
+        primaryCustomer: "Small merchants, shopkeepers & local retailers",
+        procurementCycle: "Self-serve onboarding via WhatsApp or field sales (days to weeks)",
+        regulatoryEnvironment: "RBI/NPCI UPI rules, GST e-invoicing, DPDP Act 2023",
+        unitEconomicsModel: "Low-ticket subscription or transaction take-rate ($5–$30/mo per store)",
+        specialistRoleLabels: {
+          analyst: { number: "01", title: "SMB MARKET ANALYST", mandate: "Merchant density, distributor concentration, willingness to pay at low ticket sizes." },
+          customer: { number: "02", title: "SHOPKEEPER ADVOCATE", mandate: "Owner time poverty, literacy and language fit, habit of paper ledgers and phone calls." },
+          architect: { number: "03", title: "PAYMENTS & MESSAGING ARCHITECT", mandate: "WhatsApp Business API limits, UPI integration, OCR accuracy on messy invoices." },
+          investor: { number: "04", title: "SMB UNIT ECONOMICS INVESTOR", mandate: "Field-sales CAC vs low ticket, merchant churn, take-rate ceilings." },
+          redteam: { number: "05", title: "RED TEAM MERCHANT ADVERSARY", mandate: "Free competing apps, platform and payment-rail policy changes, merchant churn." },
+          expert: { number: "06", title: "PAYMENTS COMPLIANCE SPECIALIST", mandate: "NPCI/RBI constraints, GST invoicing rules, data protection for merchant records." }
         }
       };
 

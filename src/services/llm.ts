@@ -1,5 +1,7 @@
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
+import { AsyncLocalStorage } from "node:async_hooks";
+import crypto from "node:crypto";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -37,7 +39,7 @@ export interface LLMProviderConfig {
   apiKey: string;
   baseURL: string;
   defaultModel: string;
-  kind?: "api" | "cli";
+  kind?: "api" | "cli" | "responses";
   extraHeaders?: Record<string, string>;
 }
 
@@ -46,6 +48,112 @@ export interface LLMGenerateOptions {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean;
+}
+
+export interface LlmUsage {
+  calls: number;
+  failedCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  models: Record<string, number>;
+  /** Responses served from the response cache: real API burn stays 0 for them. */
+  cacheHits: number;
+  startedAt: number;
+}
+
+const usageStore = new AsyncLocalStorage<LlmUsage>();
+
+/** Run `fn` with a fresh usage tracker; every LLM call made inside (including parallel ones) is recorded on it. */
+export function runWithUsageTracking<T>(fn: () => Promise<T>): Promise<T> {
+  return usageStore.run({ calls: 0, failedCalls: 0, inputTokens: 0, outputTokens: 0, models: {}, cacheHits: 0, startedAt: Date.now() }, fn);
+}
+
+export function currentLlmUsage(): LlmUsage | undefined {
+  return usageStore.getStore();
+}
+
+/**
+ * Per-evaluation spend guardrails, enforced only inside a usage tracker (so chat and CLI
+ * paths are unaffected). On breach the call throws; the swarm marks the remaining roles
+ * as heuristic fallbacks and the dossier completes with honest degraded provenance.
+ */
+export function enforceEvaluationBudget(): void {
+  const u = usageStore.getStore();
+  if (!u) return;
+  const maxTokens = Number(process.env.DOSSIER_MAX_EVAL_TOKENS);
+  if (Number.isFinite(maxTokens) && maxTokens > 0 && u.inputTokens + u.outputTokens >= maxTokens) {
+    throw new Error(
+      `Evaluation LLM budget exceeded: ${u.inputTokens + u.outputTokens} >= ${Math.round(maxTokens)} tokens (DOSSIER_MAX_EVAL_TOKENS); remaining roles fall back to heuristics`
+    );
+  }
+  const deadline = Number(process.env.DOSSIER_EVAL_TIMEOUT_MS);
+  if (Number.isFinite(deadline) && deadline > 0 && u.startedAt && Date.now() - u.startedAt >= deadline) {
+    throw new Error(
+      `Evaluation LLM deadline exceeded: ${Math.round((Date.now() - u.startedAt) / 1000)}s >= ${Math.round(deadline / 1000)}s (DOSSIER_EVAL_TIMEOUT_MS); remaining roles fall back to heuristics`
+    );
+  }
+}
+
+// ---- response cache (opt-in via DOSSIER_RESPONSE_CACHE=1) --------------------------------------
+// Content-addressed, file-backed cache of non-streaming turns. Serving a hit records zero
+// tokens (no API burn) and bumps usage.cacheHits. Deterministic re-runs (e.g. CI metric
+// regen) become free; variance experiments must leave it off.
+
+interface CacheEntry {
+  text: string;
+  provider: string;
+  model: string;
+  createdAt: string;
+}
+
+const cacheDir = () => process.env.DOSSIER_CACHE_DIR || ".llm-cache";
+
+function responseCacheKey(systemPrompt: string, userPrompt: string, options: LLMGenerateOptions): string {
+  return crypto.createHash("sha256").update(JSON.stringify({ systemPrompt, userPrompt, options })).digest("hex");
+}
+
+function responseCacheGet(key: string): CacheEntry | null {
+  try {
+    const file = path.join(cacheDir(), `${key}.json`);
+    if (!fs.existsSync(file)) return null;
+    const entry = JSON.parse(fs.readFileSync(file, "utf8")) as CacheEntry;
+    if (typeof entry.text !== "string" || !entry.text.trim()) return null;
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function responseCachePut(key: string, entry: CacheEntry): void {
+  try {
+    fs.mkdirSync(cacheDir(), { recursive: true });
+    fs.writeFileSync(path.join(cacheDir(), `${key}.json`), JSON.stringify(entry));
+  } catch {
+    // cache write failures must never break a call
+  }
+}
+
+function recordUsage(provider: string, model: string, inputTokens = 0, outputTokens = 0): void {
+  const u = usageStore.getStore();
+  if (!u) return;
+  u.calls += 1;
+  u.inputTokens += Number(inputTokens) || 0;
+  u.outputTokens += Number(outputTokens) || 0;
+  const key = `${provider}/${model}`;
+  u.models[key] = (u.models[key] || 0) + 1;
+}
+
+function recordFailure(): void {
+  const u = usageStore.getStore();
+  if (u) u.failedCalls += 1;
+}
+
+/** USD cost from measured tokens, or undefined when no per-million-token prices are configured. */
+export function estimateCostUsd(usage: LlmUsage | undefined): number | undefined {
+  const pin = Number(process.env.LLM_PRICE_IN_PER_M);
+  const pout = Number(process.env.LLM_PRICE_OUT_PER_M);
+  if (!usage || !Number.isFinite(pin) || !Number.isFinite(pout) || (!pin && !pout)) return undefined;
+  return Math.round(((usage.inputTokens * pin + usage.outputTokens * pout) / 1_000_000) * 10_000) / 10_000;
 }
 
 let cliAvailableCache: boolean | null = null;
@@ -87,6 +195,17 @@ function resolveProviders(): LLMProviderConfig[] {
   const forceApi = backend === "api" || backend === "llm";
 
   if (!forceCli) {
+    // Meta Muse via the OpenAI "Responses" API shape (MODEL_API_KEY)
+    if (process.env.MODEL_API_KEY) {
+      providers.push({
+        name: "meta",
+        kind: "responses",
+        apiKey: process.env.MODEL_API_KEY,
+        baseURL: process.env.META_BASE_URL || "https://api.meta.ai/v1",
+        defaultModel: process.env.META_MODEL || "muse-ember-1.0"
+      });
+    }
+
     // 0. Generic OpenAI-compatible endpoint (vLLM, LiteLLM, LMStudio, Ollama, custom proxy)
     if (process.env.LLM_BASE_URL) {
       providers.push({
@@ -260,11 +379,16 @@ export const llmClient = {
   apiKey: primary.apiKey
 };
 
-// Rotation state: free tiers enforce per-minute limits, so consecutive turns
-// spread across the healthy provider chain instead of hammering the first one.
-// The order stays stable; failures mark a provider unhealthy until its cooldown.
+// Rotation state. Providers that have answered recently share the load (free tiers enforce per-minute
+// limits); providers that fail are benched with an escalating cooldown, and bad credentials (401/403)
+// are benched for an hour so a dead key stops costing a failed request on every call.
 const PROVIDER_COOLDOWN_MS = 60_000;
+const AUTH_COOLDOWN_MS = 60 * 60_000;
+const MAX_COOLDOWN_MS = 15 * 60_000;
+const PROVEN_WINDOW_MS = 30 * 60_000;
 const providerCooldowns = new Map<string, number>();
+const providerFailures = new Map<string, number>();
+const providerLastOk = new Map<string, number>();
 let rotationCursor = 0;
 
 function providerHealthy(name: string): boolean {
@@ -272,18 +396,45 @@ function providerHealthy(name: string): boolean {
   return Date.now() >= until;
 }
 
-function markProviderUnhealthy(name: string): void {
-  providerCooldowns.set(name, Date.now() + PROVIDER_COOLDOWN_MS);
+function isAuthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  return /\((401|403)\)|invalid[_ ]api[_ ]key|user not found|unauthori[sz]ed/i.test(msg);
 }
 
-/** Ordered candidate list starting at the rotation cursor, unhealthy providers last. */
+function markProviderUnhealthy(name: string, err?: unknown): void {
+  const failures = (providerFailures.get(name) || 0) + 1;
+  providerFailures.set(name, failures);
+  const cooldown = isAuthError(err)
+    ? AUTH_COOLDOWN_MS
+    : Math.min(MAX_COOLDOWN_MS, PROVIDER_COOLDOWN_MS * 2 ** Math.min(failures - 1, 4));
+  providerCooldowns.set(name, Date.now() + cooldown);
+}
+
+function markProviderOk(name: string): void {
+  providerFailures.set(name, 0);
+  providerCooldowns.delete(name);
+  providerLastOk.set(name, Date.now());
+}
+
+/** Test hook: forget all provider health state. */
+export function resetProviderHealth(): void {
+  providerCooldowns.clear();
+  providerFailures.clear();
+  providerLastOk.clear();
+  rotationCursor = 0;
+}
+
+/** Proven providers first (round-robin among them), then untried ones in configured order, benched ones last. */
 function rotationOrder(providers: LLMProviderConfig[]): LLMProviderConfig[] {
   const healthy = providers.filter((p) => providerHealthy(p.name));
   const cooling = providers.filter((p) => !providerHealthy(p.name));
-  if (healthy.length === 0) return providers; // everything cooling — try anyway rather than give up
-  const start = rotationCursor % healthy.length;
-  rotationCursor = (rotationCursor + 1) % Math.max(1, healthy.length);
-  return [...healthy.slice(start), ...healthy.slice(0, start), ...cooling];
+  if (healthy.length === 0) return providers; // everything benched — try anyway rather than give up
+  const now = Date.now();
+  const proven = healthy.filter((p) => now - (providerLastOk.get(p.name) || 0) < PROVEN_WINDOW_MS);
+  const untried = healthy.filter((p) => !proven.includes(p));
+  const start = proven.length ? rotationCursor % proven.length : 0;
+  rotationCursor = (rotationCursor + 1) % Math.max(1, proven.length || 1);
+  return [...proven.slice(start), ...proven.slice(0, start), ...untried, ...cooling];
 }
 
 async function fetchChatCompletion(
@@ -320,7 +471,59 @@ async function fetchChatCompletion(
   }
 
   const json: any = await res.json();
+  recordUsage(provider.name, model, json.usage?.prompt_tokens, json.usage?.completion_tokens);
   return json.choices?.[0]?.message?.content || "";
+}
+
+/** Responses-API turn (POST /responses). Reasoning tokens count against the output budget, so leave headroom. */
+async function fetchResponsesTurn(
+  provider: LLMProviderConfig,
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+  options: LLMGenerateOptions
+): Promise<string> {
+  const url = `${provider.baseURL.replace(/\/+$/, "")}/responses`;
+  const instructions = options.jsonMode
+    ? `${systemPrompt}\n\nRespond with a single valid JSON object and no other text.`
+    : systemPrompt;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${provider.apiKey}`,
+      ...(provider.extraHeaders || {})
+    },
+    body: JSON.stringify({
+      model,
+      instructions,
+      input: [{ role: "user", content: [{ type: "input_text", text: userPrompt }] }],
+      temperature: options.temperature ?? 0.7,
+      max_output_tokens: Math.min(32000, (options.maxTokens || 2500) + 14000),
+      stream: false
+    }),
+    signal: AbortSignal.timeout(90000)
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`LLM ${provider.name} (${res.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const json: any = await res.json();
+  recordUsage(provider.name, model, json.usage?.input_tokens, json.usage?.output_tokens);
+  if (json.error) throw new Error(`LLM ${provider.name}: ${JSON.stringify(json.error).slice(0, 300)}`);
+  const text = (json.output || [])
+    .filter((item: any) => item?.type === "message")
+    .flatMap((item: any) => item.content || [])
+    .filter((part: any) => part?.type === "output_text")
+    .map((part: any) => part.text || "")
+    .join("");
+  // A truncated answer is a failed answer: partial JSON would parse as garbage or not at all.
+  if (json.status === "incomplete") {
+    throw new Error(`LLM ${provider.name}: response incomplete (${json.incomplete_details?.reason || "unknown"})`);
+  }
+  return text;
 }
 
 async function fetchChatStream(
@@ -420,7 +623,7 @@ export async function streamAgentTurn(
     throw new Error("No live LLM configured (API keys, LLM_BASE_URL, LOCAL_LLM_URL, or LLM_CLI_CMD)");
   }
 
-  let lastError: Error | null = null;
+  const errors: string[] = [];
 
   for (const provider of rotationOrder(providers)) {
     try {
@@ -437,16 +640,32 @@ export async function streamAgentTurn(
         ? options.model
         : provider.defaultModel;
 
+      if (provider.kind === "responses") {
+        const text = await fetchResponsesTurn(provider, model, systemPrompt, userPrompt, options);
+        if (text.trim()) {
+          lastSuccessfulProvider = provider.name;
+          lastSuccessfulModel = model;
+          markProviderOk(provider.name);
+          onChunk(text);
+          return text;
+        }
+        throw new Error(`provider ${provider.name} returned nothing`);
+      }
+
       const full = await fetchChatStream(provider, model, systemPrompt, userPrompt, options, onChunk);
-      if (full.trim()) return full;
+      if (full.trim()) {
+        markProviderOk(provider.name);
+        return full;
+      }
       throw new Error(`provider ${provider.name} streamed nothing`);
     } catch (err: any) {
-      markProviderUnhealthy(provider.name);
-      lastError = err;
+      markProviderUnhealthy(provider.name, err);
+      recordFailure();
+      errors.push(`${provider.name}: ${(err?.cause?.code || err?.message || "error").toString().slice(0, 160)}`);
     }
   }
 
-  throw lastError || new Error("All configured LLM providers failed to stream a completion");
+  throw new Error(`All LLM providers failed to stream — ${errors.join(" | ")}`);
 }
 
 /**
@@ -454,43 +673,75 @@ export async function streamAgentTurn(
  * Round-robin rotation spreads load over free tiers; automatic fallback moves
  * to the next healthy provider on any failure or empty response.
  */
-export async function generateAgentTurn(
+export async function generateAgentTurnDetailed(
   systemPrompt: string,
   userPrompt: string,
   options: LLMGenerateOptions = {}
-): Promise<string> {
+): Promise<{ text: string; provider: string; model: string }> {
   const providers = resolveProviders();
 
   if (providers.length === 0) {
     throw new Error("No live LLM configured (API keys, LLM_BASE_URL, LOCAL_LLM_URL, or LLM_CLI_CMD)");
   }
 
-  let lastError: Error | null = null;
+  const cacheEnabled = process.env.DOSSIER_RESPONSE_CACHE === "1";
+  const cacheKey = cacheEnabled ? responseCacheKey(systemPrompt, userPrompt, options) : null;
+  if (cacheKey) {
+    const hit = responseCacheGet(cacheKey);
+    if (hit) {
+      const u = usageStore.getStore();
+      if (u) u.cacheHits += 1;
+      return { text: hit.text, provider: hit.provider, model: hit.model };
+    }
+  }
+
+  // A cache hit costs nothing, so the budget is enforced only for calls that would hit the API.
+  enforceEvaluationBudget();
+
+  const errors: string[] = [];
 
   for (const provider of rotationOrder(providers)) {
     try {
       let content: string;
+      let usedModel = provider.defaultModel;
       if (provider.kind === "cli") {
         content = await runGenericCliTurn(provider, systemPrompt, userPrompt, options);
+        usedModel = options.model || provider.defaultModel;
       } else {
         const model = (options.model && (options.model.startsWith(provider.name) || !options.model.includes("/")))
           ? options.model
           : provider.defaultModel;
+        usedModel = model;
 
-        content = await fetchChatCompletion(provider, model, systemPrompt, userPrompt, options);
+        content = provider.kind === "responses"
+          ? await fetchResponsesTurn(provider, model, systemPrompt, userPrompt, options)
+          : await fetchChatCompletion(provider, model, systemPrompt, userPrompt, options);
       }
 
       if (content.trim()) {
         lastSuccessfulProvider = provider.name;
-        lastSuccessfulModel = provider.kind === "cli" ? (options.model || provider.defaultModel) : (options.model || provider.defaultModel);
-        return content;
+        lastSuccessfulModel = usedModel;
+        markProviderOk(provider.name);
+        if (cacheKey) responseCachePut(cacheKey, { text: content, provider: provider.name, model: usedModel, createdAt: new Date().toISOString() });
+        return { text: content, provider: provider.name, model: usedModel };
       }
-      markProviderUnhealthy(provider.name); // empty response — treat as unhealthy, rotate
+      errors.push(`${provider.name}: empty response`);
+      recordFailure();
+      markProviderUnhealthy(provider.name, "empty response"); // empty response — treat as unhealthy, rotate
     } catch (err: any) {
-      lastError = err;
-      markProviderUnhealthy(provider.name); // error (rate limit, 402, timeout) — cooldown, rotate
+      errors.push(`${provider.name}: ${(err?.cause?.code || err?.message || "error").toString().slice(0, 160)}`);
+      recordFailure();
+      markProviderUnhealthy(provider.name, err); // error (rate limit, 402, timeout, bad key) — cooldown, rotate
     }
   }
 
-  throw lastError || new Error("All configured LLM providers failed to generate completion");
+  throw new Error(`All LLM providers failed — ${errors.join(" | ")}`);
+}
+
+export async function generateAgentTurn(
+  systemPrompt: string,
+  userPrompt: string,
+  options: LLMGenerateOptions = {}
+): Promise<string> {
+  return (await generateAgentTurnDetailed(systemPrompt, userPrompt, options)).text;
 }

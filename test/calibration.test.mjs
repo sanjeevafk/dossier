@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getBaseRate, shrinkTowardBaseRate } from "../dist/core/baseRates.js";
-import { brierScore, expectedCalibrationError, summarizeCalibration } from "../dist/services/calibration.js";
+import { getBaseRate, shrinkTowardBaseRate } from "../src/core/baseRates.ts";
+import { brierScore, expectedCalibrationError, summarizeCalibration } from "../src/services/calibration.ts";
 
 test("Base rates shrink heuristic scores toward the reference class", () => {
   const base = getBaseRate("b2b_saas");

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { detectJurisdiction } from "../dist/tools/geo.js";
+import { detectJurisdiction } from "../src/tools/geo.ts";
 
 test("detectJurisdiction accurately detects India (IN) from Kirana/UPI signals", () => {
   const geo = detectJurisdiction(

@@ -55,6 +55,7 @@ scripts/evaluate_*.ts
 docs/local/
 local/
 local
+.llm-cache/
 
 # Runtime Local State
 *.db

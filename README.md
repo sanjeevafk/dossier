@@ -1,8 +1,10 @@
 # Dossier
 
-Dossier is an adversarial multi-agent evaluation platform that stress-tests startup concepts, product features, and technical proposals before engineering effort or capital is committed.
+Dossier is an adversarial risk reviewer for startup concepts, product features, and technical proposals. It finds the specific, evidenced ways an idea could fail, separates fatal problems from ones a cheap test can settle, and names that cheapest test for each, before engineering effort or capital is committed.
 
-The platform deploys seven specialized analytical perspectives to challenge assumptions, runs quantitative unit economics simulations in an isolated Python sandbox, verifies factual claims against empirical sources, and outputs a concrete 7-day falsification roadmap.
+Six specialist lenses each report evidenced findings from their own lane. An isolated Python sandbox runs unit-economics simulations when you supply real price and CAC, and the output is a falsification roadmap you can run in a week.
+
+**What it is not:** a predictor of success. On held-out, neutrally written cases the verdict does not separate eventual successes from eventual failures better than chance (see [docs/EVALUATION.md](docs/EVALUATION.md)). Read the findings and the tests; treat the verdict as a rough screen. Confidence is uncalibrated and no probability of success is shown.
 
 Live Deployment: https://dossier.worksforme.tech
 
@@ -44,8 +46,8 @@ Live Deployment: https://dossier.worksforme.tech
                                       |
                                       v
                       +--------------------------------+
-                      |  Final Idea Resilience Dossier |
-                      |   Score (0-100), Kill Flags,   |
+                      |     Risk Dossier: Findings,    |
+                      |  Screening Verdict, Cheapest   |
                       |  7-Day Falsification Roadmap   |
                       +--------------------------------+
 ```
@@ -54,7 +56,7 @@ Live Deployment: https://dossier.worksforme.tech
 
 ## Swarm Perspectives
 
-- **Synthesizer (Agent 00):** Resolves perspective contradictions, computes the composite Resilience Score (0–100), and structures the 7-day falsification plan.
+- **Synthesizer (Agent 00):** Resolves perspective contradictions, computes the composite screening score (0–100, uncalibrated), and structures the 7-day falsification plan.
 - **Analyst (Agent 01):** Maps competitor landscapes, addressable market sizing, organic search intent, and whitespace opportunities.
 - **Customer Advocate (Agent 02):** Evaluates user friction, switching costs, workflow disruption, and empirical willingness to pay.
 - **Technical Architect (Agent 03):** Audits engineering feasibility, compute and token unit economics, and architectural bottlenecks.
@@ -134,7 +136,7 @@ Dossier is fully pluggable and model-agnostic. It can connect to any OpenAI-comp
 | `GEMINI_API_KEY` | Google Gemini API key | Optional |
 | `ORCAROUTER_API_KEY` | OrcaRouter API key | Optional |
 | `EXA_API_KEY` | Exa AI neural search key | Optional |
-| `DOSSIER_API_KEY` | Authentication bearer token required in production for non-GET endpoints | Optional |
+| `DOSSIER_API_KEY` | Optional bearer token; set it (or REQUIRE_AUTH=true) to protect the API for non-GET endpoints | Optional |
 | `PORT` | HTTP server port | `3000` |
 | `DOSSIER_DATA_DIR` | SQLite database and generated PDF export storage directory | `./data` |
 
@@ -196,21 +198,15 @@ npx tsx scripts/backtest_real_startups.ts
 pnpm run benchmark
 ```
 
-### Historical Backtest Results
+### What the evaluation shows
 
-The repository contains a **9-case retrospective development benchmark** covering Stripe, Figma, Vanta, Airbnb, Quibi, Fast, Juicero, Theranos, and Zume Pizza (4 real-world breakout successes and 5 real-world failures).
+`src/evaluation/` holds 139 ideas written as neutral founder pitches (no outcome, no cause of death), with a deterministic dev / validation / frozen-test split. Run it with `pnpm eval -- --split dev`, and compare against a one-prompt baseline with `--baseline`.
 
-The current recorded results on this retrospective set are:
+On the dev split (12 eventual successes, 15 eventual failures) the full pipeline's score gives **AUROC 0.50 (95% CI 0.27 to 0.74)**, which is no better than chance, and the one-prompt baseline gives 0.40. The pipeline does keep most successes alive (33% wrongly killed against 100% for the baseline), but it also passes 60% of the failures. The full table, method and limits are in [docs/EVALUATION.md](docs/EVALUATION.md).
 
-- **Overall classification accuracy:** 8/9 correct (88.9%).
-- **Failure detection (Specificity / True Negatives):** 5/5 (100%) — correctly flagged Quibi, Fast, Juicero, Theranos, and Zume Pizza as fatal risks.
-- **Success identification (Sensitivity / True Positives):** 3/4 (75%) — correctly cleared Stripe, Figma, and Vanta; conservative false negative on Airbnb (tripped trust/regulatory gates).
+Earlier versions of this README quoted 8/9 accuracy on a hand-picked set of famous companies (Stripe, Quibi, Juicero and others). That set uses names a language model may recall and its descriptions carried hints of the outcome, so it is **not evidence of accuracy**. It remains in `scripts/backtest_real_startups.ts` only as a regression check.
 
-These numbers are **not production accuracy, specificity, or sensitivity estimates**. The sample is small, retrospective, and deliberately composed of well-known historical cases. It is used primarily as a regression and sanity-check suite.
-
-In particular, the benchmark should not claim that Dossier identified the exact historical cause of a company's failure unless the recorded evidence actually supports that causal claim.
-
-Before making stronger performance claims, Dossier needs a larger reproducible dataset with predefined labels, held-out cases, confidence intervals, and calibration metrics such as Brier score and reliability curves.
+Before any stronger claim: blind rewrites of the pitches, verifiable sources for successes, human grading of the findings, and a real outcome ledger so confidence can be calibrated (Brier score, reliability curves).
 
 ---
 

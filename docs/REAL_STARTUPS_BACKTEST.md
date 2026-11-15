@@ -1,5 +1,7 @@
 # Dossier Historical Startup Backtest Report
 
+> **Read first:** this is a development regression report, not evidence of accuracy. On neutral held-out cases the verdict does not separate eventual successes from eventual failures better than chance; see [EVALUATION.md](EVALUATION.md).
+
 **Execution Date:** 2026-10-30T10:21:29.282Z  
 **Evaluator:** Dossier Adversarial Intelligence Swarm  
 **Sample Set:** 9 Iconic Startups with Verified Real-World Outcomes (4 Billion-Dollar Successes, 5 Famous Failures)  
