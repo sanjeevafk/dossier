@@ -61,3 +61,31 @@ test("three independent lanes with structural problems grounded in the stated id
   const two = decideVerdictV2({ opinions: lanes(2, { customer: op(2, [sm()]), investor: op(2, [sm()]) }), compositeScore: 45, economicsGrounded: false, invariantGated: false });
   assert.equal(two.verdict, "REFINE");
 });
+
+test("executive summary is composed from real findings in plain language", async () => {
+  const { composeExecutiveSummary } = await import("../src/core/swarm/verdict.ts");
+  const s = composeExecutiveSummary({
+    overallVerdict: "KILL",
+    findings: [
+      { severity: "MINOR", kind: "EXECUTION", claim: "Minor ops risk", evidence: { type: "REASONING" } },
+      { severity: "FATAL", kind: "STRUCTURAL", claim: "Unit economics are insolvent at the stated price.", evidence: { type: "STATED_INPUT" }, cheapestTest: "Pre-sell 10 annual plans at the stated price." },
+      { severity: "MAJOR", kind: "VALIDATABLE", claim: "Habit inertia is untested", evidence: { type: "REASONING" }, cheapestTest: "Interview 5 target users" }
+    ]
+  });
+  assert.match(s, /Screening verdict: kill/);
+  assert.match(s, /founder's own numbers/);
+  assert.match(s, /Unit economics are insolvent at the stated price/);
+  assert.match(s, /Do this first: Pre-sell 10 annual plans/);
+  assert.match(s, /screening review of the idea as written/);
+  assert.ok(!s.includes("Swarm consensus"), "old template must be gone");
+});
+
+test("executive summary with no serious findings says so plainly", async () => {
+  const { composeExecutiveSummary } = await import("../src/core/swarm/verdict.ts");
+  const s = composeExecutiveSummary({
+    overallVerdict: "REFINE",
+    findings: [{ severity: "MINOR", kind: "EXECUTION", claim: "x", evidence: { type: "REASONING" } }]
+  });
+  assert.match(s, /No evidenced dealbreaker/);
+  assert.ok(!s.includes("Do this first"));
+});

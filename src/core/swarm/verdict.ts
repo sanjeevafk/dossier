@@ -137,3 +137,69 @@ export function decideVerdictV2(input: VerdictInput): VerdictDecision {
   );
   return { verdict: "REFINE", riskLevel: compositeScore < 45 ? "HIGH" : "MEDIUM", reasons, evidencedFatalLanes };
 }
+
+// ---- executive summary (plain language) --------------------------------------------------------
+// A real brief composed from the dossier's own findings — replaces the old template sentence.
+// Deterministic and free: no extra LLM call, same text in the UI, CLI and markdown export.
+
+const VERDICT_PLAIN: Record<ValidationVerdict, string> = {
+  KILL: "the review found structural problems this idea cannot survive as written",
+  REFINE: "no proven dealbreaker, but real risks to settle before building",
+  BUILD_IF_VALIDATED: "no structural dealbreaker found; settle the named uncertainties first, then build",
+  BUILD: "no major structural risks surfaced (rare — treat with suspicion)"
+};
+
+const EVIDENCE_PLAIN: Record<FindingEvidenceType, string> = {
+  STATED_INPUT: "by the founder's own numbers",
+  COMPUTATION: "by the unit-economics math",
+  SOURCE: "by a cited source",
+  PRECEDENT: "by a named precedent",
+  REASONING: "by argument alone"
+};
+
+export interface ExecutiveSummaryFinding {
+  severity: Finding["severity"];
+  kind: Finding["kind"];
+  claim: string;
+  evidence: Pick<Finding["evidence"], "type">;
+  cheapestTest?: Finding["cheapestTest"];
+}
+
+export interface ExecutiveSummaryInput {
+  overallVerdict: ValidationVerdict;
+  findings: ExecutiveSummaryFinding[];
+}
+
+function summaryRank(f: ExecutiveSummaryFinding): number {
+  const severity = f.severity === "FATAL" ? 0 : 1;
+  const kind = f.kind === "STRUCTURAL" ? 0 : f.kind === "VALIDATABLE" ? 1 : 2;
+  const evidence = f.evidence.type === "REASONING" ? 1 : 0;
+  return severity * 100 + kind * 10 + evidence;
+}
+
+export function composeExecutiveSummary(input: ExecutiveSummaryInput): string {
+  const top = input.findings
+    .filter((f) => f.severity !== "MINOR")
+    .sort((a, b) => summaryRank(a) - summaryRank(b))
+    .slice(0, 3);
+
+  const parts: string[] = [];
+  parts.push(
+    `Screening verdict: ${input.overallVerdict.replace(/_/g, " ").toLowerCase()} — ${VERDICT_PLAIN[input.overallVerdict] ?? "see the findings below"}.`
+  );
+
+  if (top.length > 0) {
+    const killers = top.map((f) => `${f.claim.trim().replace(/\.+$/, "")} (${EVIDENCE_PLAIN[f.evidence.type]})`);
+    parts.push(`What could kill it: ${killers.join("; ")}.`);
+  } else {
+    parts.push("No evidenced dealbreaker was found; the findings below are validation and execution risks, not proof the idea fails.");
+  }
+
+  const tests = top.filter((f) => f.cheapestTest).slice(0, 3).map((f) => f.cheapestTest!.trim().replace(/\.+$/, ""));
+  if (tests.length > 0) parts.push(`Do this first: ${tests.join("; ")}.`);
+
+  parts.push(
+    "This is a screening review of the idea as written, not a prediction: it cannot see execution, timing or team, and its confidence is uncalibrated."
+  );
+  return parts.join(" ");
+}

@@ -19,6 +19,7 @@ import {
 } from "../../types/index.js";
 import { type AdversarialInvariants } from "./invariants.js";
 import { type DimensionalScoringResult } from "./dimensionalScoring.js";
+import { LANES, composeExecutiveSummary } from "./verdict.js";
 import { getBaseRate } from "../baseRates.js";
 import { buildOutsideViewPanel } from "../outside-view.js";
 import { buildMutationProposals } from "../mutator.js";
@@ -211,6 +212,11 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     ...(crossfireContradiction ? [crossfireContradiction] : [])
   ];
 
+  const composedExecutiveSummary = composeExecutiveSummary({
+    overallVerdict,
+    findings: LANES.flatMap((l) => (verifiedOpinions as Record<string, AgentOpinion>)[l]?.findings ?? [])
+  });
+
   const executiveSynthesizerOpinion: AgentOpinion = {
     role: "synthesizer",
     roleNumber: "00",
@@ -222,7 +228,7 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     keyAssumptions: [weakestAssumption.statement],
     competitiveRisks: [`Entrenched incumbents with existing ${domain.regulatoryEnvironment} certifications.`],
     mustTestBeforeBuilding: [cheapestValidationExperiment.title],
-    rationale: `Swarm consensus for [${domain.archetypeLabel}]: Concept has strong technical grounding (${technicalFeasibility}/100) and regulatory fit (${defensibilityAndMoat}/100), but must resolve commercial procurement and habit inertia (${demandAndAdoption}/100) before committing full MVP engineering.`,
+    rationale: composedExecutiveSummary,
     telemetryMetadata: {
       modelId: evaluationMode === "HEURISTIC_ENGINE" ? "deterministic-heuristics" : "deterministic-synthesis",
       latencyMs: Date.now() - synthesisStart,
@@ -300,7 +306,7 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     decisionEvaluation,
     overallVerdict,
     riskLevel,
-    executiveSummary: executiveSynthesizerOpinion.rationale,
+    executiveSummary: composedExecutiveSummary,
     roleAssessments: {
       analyst: verifiedOpinions.analyst,
       customer: verifiedOpinions.customer,
