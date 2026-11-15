@@ -591,6 +591,11 @@ function renderDossier(dossier) {
     }
   }
 
+  // Lane provenance chips, validation checklist, merged findings table
+  renderLaneChips(dossier);
+  renderValidationChecklist(dossier);
+  renderFindingsTable(dossier);
+
   // Mutation Engine Panel
   const mutSection = document.getElementById('resMutationSection');
   const mutGrid = document.getElementById('resMutationGrid');
@@ -628,6 +633,117 @@ function renderDossier(dossier) {
         </span>
       </div>
     `).join('');
+  }
+}
+
+const EVIDENCE_PLAIN_WORDS = {
+  STATED_INPUT: "founder's own numbers",
+  COMPUTATION: "unit-economics math",
+  SOURCE: "cited source",
+  PRECEDENT: "named precedent",
+  REASONING: "argument alone"
+};
+
+const SEVERITY_CHIP = {
+  FATAL: 'bg-bad-soft text-bad',
+  MAJOR: 'bg-warn-soft text-warn',
+  MINOR: 'bg-muted text-ink-3'
+};
+
+function renderLaneChips(dossier) {
+  const el = document.getElementById('resLaneChips');
+  if (!el) return;
+  const prov = dossier.provenance || {};
+  const llm = new Set(prov.llmRoles || []);
+  const heuristic = new Set(prov.heuristicRoles || []);
+  const models = prov.laneModels || {};
+  const labels = { analyst: 'Market Recon', customer: 'Customer', architect: 'Architect', investor: 'Financial VC', redteam: 'Skeptic', expert: 'Domain Expert' };
+  const roles = Object.keys(labels);
+  el.innerHTML = roles.map((role) => {
+    const live = llm.has(role);
+    const fallback = heuristic.has(role);
+    const model = models[role] || '';
+    const cls = fallback ? 'border-bad-line text-bad' : 'border-ok-line text-ok';
+    const tag = fallback ? 'heuristic' : 'live';
+    const title = fallback && prov.fallbackReasons && prov.fallbackReasons[role] ? ` — ${prov.fallbackReasons[role]}` : '';
+    return `<span class="px-2 py-1 rounded border ${cls} text-xs font-mono" title="${escapeHtml(labels[role] + (model ? ` (${model})` : '') + title)}">${labels[role]}: ${tag}</span>`;
+  }).join('');
+}
+
+function renderValidationChecklist(dossier) {
+  const list = document.getElementById('resChecklist');
+  const copyBtn = document.getElementById('resChecklistCopy');
+  if (!list) return;
+  const items = dossier.validationChecklist || [];
+  if (items.length === 0) {
+    list.innerHTML = '<div class="text-xs text-ink-3 font-sans">No cheap tests were produced for this run.</div>';
+    if (copyBtn) copyBtn.classList.add('hidden');
+    return;
+  }
+  list.innerHTML = items.map((item, i) => `
+    <label class="flex items-start gap-3 p-3 bg-page border border-line rounded-lg cursor-pointer hover:border-line-strong transition">
+      <input type="checkbox" class="mt-0.5 cursor-pointer shrink-0" data-check-item="${i}">
+      <span class="space-y-1">
+        <span class="block text-xs text-ink font-sans leading-relaxed checklist-text">${escapeHtml(item.test)}</span>
+        ${item.killCriterion ? `<span class="block text-xs text-ink-3 font-sans leading-relaxed"><span class="font-mono text-bad">kill if:</span> ${escapeHtml(item.killCriterion)}</span>` : ''}
+        <span class="block font-mono text-ink-3 text-xs">${escapeHtml(item.lane)} · ${item.severity.toLowerCase()}</span>
+      </span>
+    </label>
+  `).join('');
+  if (copyBtn) copyBtn.classList.remove('hidden');
+}
+
+function checklistAsMarkdown(dossier) {
+  const items = dossier.validationChecklist || [];
+  if (items.length === 0) return '';
+  return `Validation checklist — ${dossier.idea.title}\n${items.map((c, i) => `${i + 1}. [ ] ${c.test}${c.killCriterion ? `\n   kill if: ${c.killCriterion}` : ''} [${c.lane}]`).join('\n')}\n(Screening review only — not a prediction. Confidence uncalibrated.)`;
+}
+
+function copyChecklist() {
+  if (!currentRenderedDossier) return;
+  const text = checklistAsMarkdown(currentRenderedDossier);
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('resChecklistCopy');
+    if (btn) {
+      const old = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = old; }, 1500);
+    }
+  }).catch(() => {});
+}
+
+function renderFindingsTable(dossier) {
+  const table = document.getElementById('resFindingsTable');
+  const note = document.getElementById('resFilteredNote');
+  if (!table) return;
+  const rows = dossier.findingsTable || [];
+  if (rows.length === 0) {
+    table.innerHTML = '<div class="p-4 text-xs text-ink-3 font-sans">No serious findings were reported for this run.</div>';
+  } else {
+    table.innerHTML = rows.map((r) => {
+      const basis = EVIDENCE_PLAIN_WORDS[r.evidenceType] || r.evidenceType.toLowerCase();
+      const refIsUrl = /^https?:\/\//.test(r.evidenceRef || '');
+      const refHtml = refIsUrl
+        ? `<a href="${escapeHtml(r.evidenceRef)}" target="_blank" rel="noopener" class="text-ok underline decoration-dotted hover:text-ink break-all">source</a>`
+        : `<span class="truncate max-w-64 inline-block align-bottom" title="${escapeHtml(r.evidenceRef)}">${escapeHtml((r.evidenceRef || '').slice(0, 90))}</span>`;
+      return `
+        <div class="p-4 space-y-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2 py-0.5 rounded text-xs font-mono font-medium ${SEVERITY_CHIP[r.severity] || 'bg-muted text-ink-3'}">${r.severity}</span>
+            <span class="px-2 py-0.5 rounded text-xs font-mono bg-muted text-ink-2">${r.kind.toLowerCase()}</span>
+            <span class="text-xs font-mono text-ink-3">${escapeHtml(r.lanes.join(', '))}</span>
+            <span class="text-xs font-mono text-ink-3 ml-auto">basis: ${basis}${r.evidenceRef ? ` · ${refHtml}` : ''}</span>
+          </div>
+          <div class="text-xs text-ink font-sans leading-relaxed">${formatClaimWithHyperlinks(r.claim)}</div>
+          ${r.cheapestTest ? `<div class="text-xs text-ink-2 font-sans leading-relaxed"><span class="font-mono text-ink-3">cheapest test:</span> ${escapeHtml(r.cheapestTest)}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+  if (note) {
+    const n = (dossier.filteredEvidence || []).length;
+    const titles = (dossier.filteredEvidence || []).map((f) => f.title).slice(0, 3).join(' | ');
+    note.textContent = n > 0 ? `ignored ${n} same-name search result${n === 1 ? '' : 's'}` : '';
+    note.title = titles;
   }
 }
 

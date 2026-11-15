@@ -377,6 +377,27 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
         </div>
       </div>
 
+      <!-- Lane provenance chips: which lanes answered live vs fell back -->
+      <div id="resLaneChips" class="flex flex-wrap items-center gap-2"></div>
+
+      <!-- Validation checklist: the founder's to-do list -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-mono text-xs font-medium text-ink">Validation checklist (do these first)</h3>
+          <button id="resChecklistCopy" onclick="copyChecklist()" class="text-xs font-mono text-ink-3 hover:text-ink px-2 py-1 rounded border border-line hover:border-line-strong transition cursor-pointer hidden">Copy checklist</button>
+        </div>
+        <div id="resChecklist" class="space-y-2"></div>
+      </div>
+
+      <!-- Merged findings table -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-mono text-xs font-medium text-ink">All findings, merged across lanes</h3>
+          <span id="resFilteredNote" class="text-xs font-mono text-ink-3"></span>
+        </div>
+        <div id="resFindingsTable" class="border border-line rounded-xl overflow-hidden divide-y divide-line bg-surface"></div>
+      </div>
+
       <!-- 5-Dimensional Resilience Breakdown -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">

@@ -475,6 +475,22 @@ export class DossierStorageService {
 
 ${d.executiveSummary}
 
+### Validation checklist
+${(d.validationChecklist ?? []).length > 0
+    ? (d.validationChecklist ?? []).map((c, i) => `${i + 1}. ${c.test}${c.killCriterion ? ` — *kill if:* ${c.killCriterion}` : ""} \`[${c.lane}]\``).join("\n")
+    : "_No cheap tests were produced for this run._"}
+
+### Merged findings
+${(d.findingsTable ?? []).length > 0
+    ? (d.findingsTable ?? [])
+        .map(
+          (r, i) =>
+            `${i + 1}. **[${r.severity}/${r.kind}]** ${r.claim} — *basis: ${r.evidenceType.toLowerCase().replace("_", " ")}* \`${r.lanes.join(", ")}\`${r.cheapestTest ? `\n   - Cheapest test: ${r.cheapestTest}` : ""}`
+        )
+        .join("\n")
+    : "_No serious findings were reported._"}
+${(d.filteredEvidence ?? []).length > 0 ? `\n> Note: ${d.filteredEvidence!.length} same-name search result(s) were removed by the entity-relevance filter before review.` : ""}
+
 ### Domain Classification
 - **Domain Archetype:** ${domain.archetypeLabel}
 - **Primary Customer:** ${domain.primaryCustomer}

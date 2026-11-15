@@ -35,6 +35,27 @@ export interface DomainClassification {
   };
 }
 
+/** One merged row of the report's findings table: near-duplicate cross-lane findings collapsed. */
+export interface FindingsTableRow {
+  claim: string;
+  severity: "FATAL" | "MAJOR" | "MINOR";
+  kind: "STRUCTURAL" | "VALIDATABLE" | "EXECUTION";
+  evidenceType: "STATED_INPUT" | "COMPUTATION" | "SOURCE" | "PRECEDENT" | "REASONING";
+  evidenceRef: string;
+  lanes: string[];
+  cheapestTest?: string;
+  killCriterion?: string;
+}
+
+/** One to-do on the validation checklist. */
+export interface ValidationChecklistItem {
+  test: string;
+  lane: string;
+  severity: "FATAL" | "MAJOR" | "MINOR";
+  claim: string;
+  killCriterion?: string;
+}
+
 export interface IdeaInput {
   title: string;
   summary: string;
@@ -396,7 +417,13 @@ export interface IdeaDossier {
   /** Why the verdict is what it is: the findings and rules that decided it. */
   verdictBasis?: { engine: "findings_v2" | "legacy_score"; reasons: string[] };
   /** Which role opinions came from the LLM and which fell back to rules, with the reasons. */
-  provenance?: { llmRoles: string[]; heuristicRoles: string[]; fallbackReasons: Record<string, string> };
+  provenance?: { llmRoles: string[]; heuristicRoles: string[]; fallbackReasons: Record<string, string>; laneModels?: Record<string, string> };
+  /** Serious findings merged across lanes (near-duplicates collapsed), ranked fatal-structural first. */
+  findingsTable?: FindingsTableRow[];
+  /** Ordered validation to-do list: the cheapest test for each serious finding, plus the value-of-information experiment. */
+  validationChecklist?: ValidationChecklistItem[];
+  /** Same-name search results the entity-relevance filter removed (transparency). */
+  filteredEvidence?: Array<{ title: string; reason: string }>;
   /** Actually-retrieved external sources backing this dossier (empty when no recon provider ran). */
   externalEvidenceSources?: ExternalEvidenceSource[];
   /** Competitors discovered through Market Analyst live web recon. */

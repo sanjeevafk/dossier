@@ -20,6 +20,7 @@ import {
 import { type AdversarialInvariants } from "./invariants.js";
 import { type DimensionalScoringResult } from "./dimensionalScoring.js";
 import { LANES, composeExecutiveSummary } from "./verdict.js";
+import { buildFindingsTable, buildValidationChecklist } from "./report.js";
 import { getBaseRate } from "../baseRates.js";
 import { buildOutsideViewPanel } from "../outside-view.js";
 import { buildMutationProposals } from "../mutator.js";
@@ -217,6 +218,15 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     findings: LANES.flatMap((l) => (verifiedOpinions as Record<string, AgentOpinion>)[l]?.findings ?? [])
   });
 
+  const laneFindings = LANES.flatMap((l) =>
+    ((verifiedOpinions as Record<string, AgentOpinion>)[l]?.findings ?? []).map((f) => ({ ...f, lane: l }))
+  );
+  const laneModels = Object.fromEntries(
+    LANES.map((l) => [l, (verifiedOpinions as Record<string, AgentOpinion>)[l]?.telemetryMetadata?.modelId]).filter(
+      (pair): pair is [string, string] => Boolean(pair[1])
+    )
+  );
+
   const executiveSynthesizerOpinion: AgentOpinion = {
     role: "synthesizer",
     roleNumber: "00",
@@ -289,7 +299,10 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
     fatalsResolved: fatalUntestedCount === 0,
     costUsd: estimateCostUsd(currentLlmUsage()),
     llmUsage: currentLlmUsage(),
-    provenance,
+    provenance: { ...provenance, laneModels },
+    findingsTable: buildFindingsTable(laneFindings),
+    validationChecklist: buildValidationChecklist(laneFindings, cheapestValidationExperiment),
+    filteredEvidence: (marketResearch?.filteredOut ?? []).slice(0, 5),
     economicsInputs,
     externalEvidenceSources,
     identifiedCompetitors: marketResearch.identifiedCompetitors,
