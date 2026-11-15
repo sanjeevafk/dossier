@@ -208,6 +208,11 @@ async function executeOneShotEvaluation() {
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
+    // Persist across chunks: an event's "event:" line and its "data:" line can arrive in
+    // different network chunks (the final dossier event is large), so parser state must not
+    // reset per chunk or those events are silently dropped.
+    let currentEvent = null;
+    let currentData = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -216,9 +221,6 @@ async function executeOneShotEvaluation() {
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop(); // Keep partial line in buffer
-
-      let currentEvent = null;
-      let currentData = null;
 
       for (const line of lines) {
         if (line.startsWith('event: ')) {
