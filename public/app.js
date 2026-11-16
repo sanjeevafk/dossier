@@ -213,6 +213,7 @@ async function executeOneShotEvaluation() {
     // reset per chunk or those events are silently dropped.
     let currentEvent = null;
     let currentData = null;
+    let doneDossierId = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -233,6 +234,8 @@ async function executeOneShotEvaluation() {
           }
         } else if (line === '') {
           if (currentEvent && currentData) {
+            if (currentEvent === 'dossier_complete' && currentData.dossier) doneDossierId = currentData.dossier.id;
+            if (currentEvent === 'done' && currentData.dossierId) doneDossierId = currentData.dossierId;
             handleStreamEvent(currentEvent, currentData);
           }
           currentEvent = null;
@@ -241,9 +244,16 @@ async function executeOneShotEvaluation() {
       }
     }
 
+    // The dossier is persisted server-side before the stream ends. If the connection dropped
+    // before the report rendered (proxy timeout, network blip), recover it instead of failing.
+    if (!document.getElementById('resultsSection') || document.getElementById('resSubjectTitle').textContent.trim() === 'Idea title') {
+      await recoverDossierAfterStream(doneDossierId);
+    }
+
   } catch (err) {
     appendStreamLog(`Error: ${err.message}`, 'text-red-400 font-medium');
-    alert(`Evaluation failed: ${err.message}`);
+    const recovered = await recoverDossierAfterStream(null);
+    if (!recovered) alert(`Evaluation failed: ${err.message}`);
   } finally {
     if (timerInterval) clearInterval(timerInterval);
     if (runBtn) runBtn.disabled = false;
@@ -254,6 +264,32 @@ async function executeOneShotEvaluation() {
       navStatus.textContent = "Standby";
       navStatus.className = "";
     }
+  }
+}
+
+/** The dossier is saved server-side before the stream ends; fetch it if the stream dropped. */
+async function recoverDossierAfterStream(dossierId) {
+  try {
+    let id = dossierId;
+    if (!id) {
+      const res = await fetch('/api/dossiers');
+      const j = await res.json();
+      const list = j.dossiers || j;
+      id = Array.isArray(list) && list.length ? list[0].id : null;
+    }
+    if (!id) return false;
+    const r = await fetch(`/api/dossiers/${encodeURIComponent(id)}`);
+    if (!r.ok) return false;
+    const data = await r.json();
+    const dossier = data.dossier || data;
+    if (!dossier || !dossier.id) return false;
+    appendStreamLog('Stream closed early; loaded the saved dossier instead.', 'text-amber-400');
+    renderDossier(dossier);
+    document.getElementById('resultsSection')?.scrollIntoView({ behavior: 'smooth' });
+    loadRecentDossiers();
+    return true;
+  } catch {
+    return false;
   }
 }
 

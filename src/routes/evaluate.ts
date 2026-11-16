@@ -116,14 +116,24 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
       res.flushHeaders?.();
 
       let isClientConnected = true;
+      let finished = false;
       res.on("close", () => {
         isClientConnected = false;
       });
 
       const sendSSE = (event: string, data: any) => {
-        if (!isClientConnected) return;
+        if (!isClientConnected || finished) return;
         res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       };
+
+      // Dossier assembly can go silent for tens of seconds between the last stage event and
+      // dossier_complete. Proxies (Cloudflare/Render) drop idle streams, which surfaced as a
+      // client-side "network error" with no report rendered. A comment heartbeat keeps it open.
+      const heartbeat = setInterval(() => {
+        if (!isClientConnected || finished) return;
+        res.write(": heartbeat\n\n");
+      }, 10_000);
+      heartbeat.unref?.();
 
       const ideaInput: IdeaInput = {
         title,
@@ -149,13 +159,18 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
           }
         });
 
+        // The dossier is already persisted: if the connection dropped mid-stream the client
+        // can still fetch it by id, so name it in the done event even when writes were skipped.
         sendSSE("done", { success: true, dossierId: dossier.id });
+        finished = true;
         res.end();
       } catch (error: unknown) {
         log.error({ err: error }, "evaluateIdea stream error");
         sendSSE("error", { error: error instanceof Error ? error.message : "Evaluation stream failed" });
+        finished = true;
         res.end();
       } finally {
+        clearInterval(heartbeat);
         releaseEvaluationSlot();
       }
       return;
