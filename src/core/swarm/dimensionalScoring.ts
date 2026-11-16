@@ -1,4 +1,5 @@
 import { LANES, hasFindings, decideVerdictV2, isEvidencedStructuralFatal, type Lane } from "./verdict.js";
+import { auditFounderEconomicsVsBaseRate } from "../baseRates.js";
 import {
   AgentOpinion,
   SwarmRole,
@@ -28,6 +29,9 @@ export interface DimensionalScoringInput {
   evidenceFeed: EvidenceItem[];
   /** True only when price AND CAC come from the founder or a source, not from archetype defaults. */
   economicsGrounded: boolean;
+  cac?: number;
+  churn?: number;
+  insufficientInputs?: boolean;
 }
 
 export interface DimensionalScoringResult {
@@ -57,7 +61,10 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
     isEconomicsAvailable,
     invariants,
     evidenceFeed,
-    economicsGrounded
+    economicsGrounded,
+    cac = 0,
+    churn = 0,
+    insufficientInputs = false
   } = input;
 
   const technicalFeasibility = Math.max(10, Math.min(100, Math.round(
@@ -277,13 +284,20 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
     }
   }
 
+  const optimismFindings = auditFounderEconomicsVsBaseRate(domain.archetype, cac, churn, economicsGrounded);
+  if (optimismFindings.length > 0 && Array.isArray(verifiedOpinions.investor?.findings)) {
+    verifiedOpinions.investor.findings.push(...optimismFindings);
+  }
+
   let verdictBasis: { engine: "findings_v2" | "legacy_score"; reasons: string[] } = { engine: "legacy_score", reasons: [] };
   if (useFindings) {
     const decision = decideVerdictV2({
       opinions: verifiedOpinions as Partial<Record<Lane, AgentOpinion>>,
       compositeScore,
       economicsGrounded,
-      invariantGated
+      invariantGated,
+      optimisticEconomics: optimismFindings.length > 0,
+      insufficientInputs
     });
     overallVerdict = decision.verdict;
     riskLevel = decision.riskLevel;

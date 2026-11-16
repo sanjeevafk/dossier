@@ -1,4 +1,4 @@
-import { IdeaDomainArchetype } from "../types/index.js";
+import { Finding, IdeaDomainArchetype } from "../types/index.js";
 
 export interface ArchetypeBaseRate {
   p50LtvCac: number;
@@ -91,4 +91,47 @@ export function getBaseRate(archetype: IdeaDomainArchetype): ArchetypeBaseRate {
 export function shrinkTowardBaseRate(rawScore: number, archetype: IdeaDomainArchetype): number {
   const base = getBaseRate(archetype).baseRate * 100;
   return Math.round(rawScore * 0.7 + base * 0.3);
+}
+
+/**
+ * Audit founder-stated unit economics against archetype reference-class medians.
+ * Prevents wildly optimistic unverified numbers from defusing kill/refine gates.
+ */
+export function auditFounderEconomicsVsBaseRate(
+  archetype: IdeaDomainArchetype,
+  cac: number,
+  churn: number,
+  economicsGrounded: boolean
+): Finding[] {
+  if (!economicsGrounded) return [];
+  const base = getBaseRate(archetype);
+  const findings: Finding[] = [];
+
+  if (cac > 0 && cac < base.cacMedianUsd * 0.35) {
+    findings.push({
+      claim: `Founder-stated CAC ($${Math.round(cac)}) is less than 35% of the ${archetype} reference median ($${base.cacMedianUsd}) — unverified acquisition optimism.`,
+      severity: "MAJOR",
+      kind: "VALIDATABLE",
+      evidence: {
+        type: "STATED_INPUT",
+        ref: `Stated CAC $${Math.round(cac)} vs ${archetype} median $${base.cacMedianUsd}`
+      },
+      cheapestTest: "Spend $100 on your primary acquisition channel to measure real activated CAC before scaling."
+    });
+  }
+
+  if (churn > 0 && churn < base.churn30d * 0.4) {
+    findings.push({
+      claim: `Assumed monthly churn (${(churn * 100).toFixed(1)}%) is less than 40% of the ${archetype} reference median (${(base.churn30d * 100).toFixed(1)}%) — retention may be overstated.`,
+      severity: "MAJOR",
+      kind: "VALIDATABLE",
+      evidence: {
+        type: "STATED_INPUT",
+        ref: `Assumed churn ${(churn * 100).toFixed(1)}% vs ${archetype} median ${(base.churn30d * 100).toFixed(1)}%`
+      },
+      cheapestTest: "Track 30-day cohort retention on 20–50 early users before committing to the LTV model."
+    });
+  }
+
+  return findings;
 }

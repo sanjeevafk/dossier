@@ -484,6 +484,7 @@ export class IdeaSwarmOrchestrator {
     const synthesisStart = Date.now();
     notify("07 VERDICT", "Synthesizing transparent 5-dimensional resilience breakdown & factor attribution...");
 
+    const economicsGrounded = economicsInputs.pricingSource !== "archetype_default" && economicsInputs.cacSource !== "archetype_default";
     const scoringResult = computeDimensionalResilience({
       verifiedOpinions,
       domain,
@@ -493,7 +494,10 @@ export class IdeaSwarmOrchestrator {
       invariants,
       graveyardMatches,
       evidenceFeed,
-      economicsGrounded: economicsInputs.pricingSource !== "archetype_default" && economicsInputs.cacSource !== "archetype_default"
+      economicsGrounded,
+      cac,
+      churn,
+      insufficientInputs: economicsInputs.pricingSource === "archetype_default" && economicsInputs.cacSource === "archetype_default"
     });
 
     // 08 ASSEMBLE DOSSIER & PERSIST

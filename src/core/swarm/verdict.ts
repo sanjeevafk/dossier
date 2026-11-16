@@ -46,6 +46,10 @@ export interface VerdictInput {
   economicsGrounded: boolean;
   /** A hard deterministic gate fired (physical impossibility, prompt injection, wrapper with no moat). */
   invariantGated: boolean;
+  /** True when founder-stated CAC/churn is far below archetype medians. */
+  optimisticEconomics?: boolean;
+  /** True when the pitch lacks core buyer/pricing/CAC inputs so sparse text isn't auto-killed. */
+  insufficientInputs?: boolean;
 }
 
 export interface VerdictDecision {
@@ -61,7 +65,7 @@ export function hasFindings(opinions: Partial<Record<Lane, AgentOpinion>>): bool
 }
 
 export function decideVerdictV2(input: VerdictInput): VerdictDecision {
-  const { opinions, compositeScore, economicsGrounded, invariantGated } = input;
+  const { opinions, compositeScore, economicsGrounded, invariantGated, optimisticEconomics = false, insufficientInputs = false } = input;
   const reasons: string[] = [];
 
   const evidencedFatalLanes: Lane[] = [];
@@ -121,11 +125,23 @@ export function decideVerdictV2(input: VerdictInput): VerdictDecision {
   }
 
   if (compositeScore < 30) {
+    if (insufficientInputs) {
+      reasons.push("Insufficient grounded inputs to kill or approve: supply target buyer, pricing, and CAC to evaluate.");
+      return { verdict: "REFINE", riskLevel: "HIGH", reasons, evidencedFatalLanes };
+    }
     reasons.push(`Composite ${compositeScore} is in the bottom band: every lane rates the idea poor.`);
     return { verdict: "KILL", riskLevel: "HIGH", reasons, evidencedFatalLanes };
   }
 
   if (compositeScore >= 68 && !anyFatal) {
+    if (!economicsGrounded) {
+      reasons.push("Core unit economics are ungrounded (using archetype defaults): validate real pricing and CAC before building.");
+      return { verdict: "REFINE", riskLevel: "MEDIUM", reasons, evidencedFatalLanes };
+    }
+    if (optimisticEconomics) {
+      reasons.push("Founder-stated CAC or churn is far below archetype medians: validate on a live cohort before building.");
+      return { verdict: "REFINE", riskLevel: "MEDIUM", reasons, evidencedFatalLanes };
+    }
     reasons.push(`Composite ${compositeScore} with no fatal finding; remaining risks are validatable.`);
     return { verdict: "BUILD_IF_VALIDATED", riskLevel: "MEDIUM", reasons, evidencedFatalLanes };
   }

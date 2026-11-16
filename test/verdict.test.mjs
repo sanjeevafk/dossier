@@ -89,3 +89,34 @@ test("executive summary with no serious findings says so plainly", async () => {
   assert.match(s, /No evidenced dealbreaker/);
   assert.ok(!s.includes("Do this first"));
 });
+
+test("ungrounded or optimistic founder economics block BUILD_IF_VALIDATED", async () => {
+  const { auditFounderEconomicsVsBaseRate } = await import("../src/core/baseRates.ts");
+  // b2b_saas median CAC is $1200, churn30d is 5%
+  const findings = auditFounderEconomicsVsBaseRate("b2b_saas", 100, 0.01, true);
+  assert.equal(findings.length, 2);
+  assert.equal(findings[0].severity, "MAJOR");
+  assert.equal(findings[0].kind, "VALIDATABLE");
+  assert.equal(auditFounderEconomicsVsBaseRate("b2b_saas", 100, 0.01, false).length, 0);
+  assert.equal(auditFounderEconomicsVsBaseRate("b2b_saas", 1000, 0.05, true).length, 0);
+
+  assert.equal(
+    decideVerdictV2({ opinions: lanes(4), compositeScore: 75, economicsGrounded: false, invariantGated: false }).verdict,
+    "REFINE"
+  );
+  assert.equal(
+    decideVerdictV2({ opinions: lanes(4), compositeScore: 75, economicsGrounded: true, invariantGated: false, optimisticEconomics: true }).verdict,
+    "REFINE"
+  );
+});
+
+test("insufficientInputs prevents bottom-band KILL without evidenced structural fatals", () => {
+  const d = decideVerdictV2({
+    opinions: lanes(1),
+    compositeScore: 20,
+    economicsGrounded: false,
+    invariantGated: false,
+    insufficientInputs: true
+  });
+  assert.equal(d.verdict, "REFINE");
+});
