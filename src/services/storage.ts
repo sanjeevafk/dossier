@@ -351,7 +351,9 @@ export class DossierStorageService {
             this.setCache(id, target);
             return target;
           }
-        } catch {}
+        } catch {
+          // Skip unreadable or malformed dossier JSON
+        }
       }
       return null;
     }
@@ -445,9 +447,13 @@ export class DossierStorageService {
               timestamp: d.timestamp || new Date().toISOString()
             });
           }
-        } catch {}
+        } catch {
+          // Skip unreadable or malformed dossier JSON
+        }
       }
-    } catch {}
+    } catch {
+      // Storage directory may not exist yet
+    }
 
     // Sort descending by timestamp
     summaries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

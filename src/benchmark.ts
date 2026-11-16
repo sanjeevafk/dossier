@@ -419,7 +419,7 @@ export async function runDossierBenchmark(options: { replay?: boolean } = {}): P
 
   if (replay) {
     // Verdict-replay regression: diff this run against the last recorded snapshot.
-    let previous: { results?: Array<{ id: string; score: number; verdict: string }> } | null = null;
+    let previous: { results?: Array<{ id: string; score: number; verdict: string }> } | null;
     try {
       previous = JSON.parse(fs.readFileSync(REPLAY_SNAPSHOT_PATH, "utf-8"));
     } catch {

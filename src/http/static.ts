@@ -25,7 +25,7 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 export function serveStaticFile(pathname: string, req: IncomingMessage, res: ServerResponse): boolean {
-  let relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+  const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const targetPath = path.resolve(publicDir, relativePath);
 
   // Guard against directory traversal

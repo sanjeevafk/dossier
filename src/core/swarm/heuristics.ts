@@ -30,13 +30,13 @@ export function generateHeuristicOpinion(
   const isEconomicsAvailable = Boolean(sandboxSim && !sandboxSim.degraded && sandboxSim.runtime !== "unavailable" && sandboxSim.exitCode === 0);
   const ltvCac = isEconomicsAvailable ? sandboxSim.metrics.ltvCacRatio : null;
 
-  let score = 70;
-  let verdict: Verdict = "VIABLE_WITH_RISK";
+  let score: number;
+  let verdict: Verdict;
   let fatalFlaws: string[] = [];
-  let keyAssumptions: string[] = [];
-  let competitiveRisks: string[] = [];
-  let mustTestBeforeBuilding: string[] = [];
-  let rationale = "";
+  let keyAssumptions: string[];
+  let competitiveRisks: string[];
+  let mustTestBeforeBuilding: string[];
+  let rationale: string;
 
   switch (role) {
     case "analyst": {

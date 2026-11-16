@@ -180,7 +180,9 @@ export async function queryGitHubTraction(
 
       try {
         dossierStorage.setReconCache(cacheKey, "gh-cli", { repos });
-      } catch {}
+      } catch {
+        // Cache write is best-effort
+      }
 
       return repos;
     }
@@ -214,7 +216,9 @@ export async function queryGitHubTraction(
 
       try {
         dossierStorage.setReconCache(cacheKey, "github-api", { repos });
-      } catch {}
+      } catch {
+        // Cache write is best-effort
+      }
 
       return repos;
     }

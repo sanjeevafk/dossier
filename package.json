@@ -47,6 +47,7 @@
     "test": "NODE_ENV=test node --import tsx --test test/*.test.mjs",
     "build:assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/tools',{recursive:true});fs.mkdirSync('dist/scripts',{recursive:true});fs.copyFileSync('src/tools/decision_model.py','dist/tools/decision_model.py');for(const f of ['simulate_monte_carlo.py','simulate_sobol.py','export_pdf.py'])fs.copyFileSync('scripts/'+f,'dist/scripts/'+f)\"",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "eval": "tsx scripts/run_eval.ts",
     "eval:heuristic": "EVAL_LLM=0 tsx scripts/run_eval.ts"
   },
@@ -64,9 +65,12 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.13.5",
+    "eslint": "^10.15.0",
     "tailwindcss": "3.4.17",
     "tsx": "^4.19.3",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.72.2"
   }
 }

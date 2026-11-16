@@ -246,8 +246,8 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
   // EPISTEMIC VERDICT DECISION MATRIX:
   // Core Invariant: Unresolved fatal assumptions, unknowns, or contradictions MUST constrain the verdict.
   // Core Invariant: If Red Team, Architect, or Investor issues a STRONG_KILL, verdict MUST be KILL.
-  let overallVerdict: ValidationVerdict = "REFINE";
-  let riskLevel: RiskLevel = "MEDIUM";
+  let overallVerdict: ValidationVerdict;
+  let riskLevel: RiskLevel;
 
   // A STRONG_KILL forces the verdict only when it is a finding: produced by the LLM, by a hard invariant gate,
   // or by the simulation showing insolvency. A per-archetype template opinion is a prior, not evidence.

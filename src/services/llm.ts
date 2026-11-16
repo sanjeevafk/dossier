@@ -23,7 +23,9 @@ function loadEnvFile(envPath: string) {
         process.env[key] = val;
       }
     }
-  } catch {}
+  } catch {
+    // Ignore unreadable or missing .env file
+  }
 }
 
 loadEnvFile(path.resolve(process.cwd(), ".env"));
@@ -585,7 +587,9 @@ async function fetchChatStream(
           full += delta;
           onChunk(delta);
         }
-      } catch {}
+      } catch {
+    // Ignore unreadable or missing .env file
+  }
     }
   }
 
@@ -599,7 +603,9 @@ async function fetchChatStream(
           full += delta;
           onChunk(delta);
         }
-      } catch {}
+      } catch {
+    // Ignore unreadable or missing .env file
+  }
     }
   }
 

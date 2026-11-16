@@ -29,7 +29,7 @@ function offline(): boolean {
 async function loadNli(): Promise<NliPipeline | null> {
   if (offline()) return null;
   try {
-    // @ts-ignore
+    // @ts-expect-error optional @xenova/transformers peer dependency
     const { pipeline } = await import("@xenova/transformers");
     const pipe = (await pipeline("text-classification", "Xenova/nli-deberta-v3-small", {
       quantized: true
