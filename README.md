@@ -130,12 +130,14 @@ Dossier is fully pluggable and model-agnostic. It can connect to any OpenAI-comp
 | `LLM_MODEL` | Target model name for custom endpoint | `default` |
 | `LLM_CLI_CMD` | External CLI execution command | None |
 | `DOSSIER_LLM_BACKEND` | Runtime selection: `api` or `cli` | `auto` |
+| `MODEL_API_KEY` | Meta Muse API key (Responses API, used first when set) | Optional |
 | `GROQ_API_KEY` | Groq API key | Optional |
 | `OPENROUTER_API_KEY` | OpenRouter API key | Optional |
 | `OPENAI_API_KEY` | OpenAI API key | Optional |
 | `GEMINI_API_KEY` | Google Gemini API key | Optional |
 | `ORCAROUTER_API_KEY` | OrcaRouter API key | Optional |
 | `EXA_API_KEY` | Exa AI neural search key | Optional |
+| `TAVILY_API_KEY` | Tavily web search key | Optional |
 | `DOSSIER_API_KEY` | Optional bearer token; set it (or REQUIRE_AUTH=true) to protect the API for non-GET endpoints | Optional |
 | `PORT` | HTTP server port | `3000` |
 | `DOSSIER_DATA_DIR` | SQLite database and generated PDF export storage directory | `./data` |
@@ -147,14 +149,18 @@ Dossier is fully pluggable and model-agnostic. It can connect to any OpenAI-comp
 The server runs on native Node.js HTTP (`node:http`) with zero Express dependencies.
 
 - `GET /health` - Health check and LLM provider status.
-- `GET /metrics` - Prometheus metrics.
+- `GET /api/llm/models` - Read-only diagnostic listing models each configured provider key can use.
+- `GET /metrics` - Calibration and monitor metrics.
 - `POST /api/evaluate` - Synchronous complete dossier evaluation.
 - `POST /api/evaluate/stream` - Server-Sent Events streaming evaluation.
+- `POST /api/chat` - Synchronous interactive adversary chat turn.
 - `POST /api/chat/stream` - Interactive adversary chat turn streaming.
 - `GET /api/dossiers` - List persisted evaluation dossiers.
 - `GET /api/dossiers/:id` - Fetch dossier record by ID.
 - `GET /api/dossiers/:id/export/markdown` - Export evaluation report.
 - `GET /api/dossiers/:id/export/pdf` - Export evaluation report as PDF.
+- `GET /api/forecasts` - List recorded forecast ledger entries.
+- `GET /api/calibration` - Forecast calibration summary (Brier score and reliability buckets).
 
 ---
 
@@ -192,9 +198,9 @@ Dossier includes a Model Context Protocol (MCP) server for integration with Curs
 The codebase maintains automated test suites covering decision model invariants, statistical bounds, and empirical startup outcomes:
 
 ```bash
-npm test
-npm run test:stress
-npx tsx scripts/backtest_real_startups.ts
+pnpm test
+pnpm run test:stress
+pnpm exec tsx scripts/backtest_real_startups.ts
 pnpm run benchmark
 ```
 
