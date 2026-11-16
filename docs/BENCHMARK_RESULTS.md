@@ -1,6 +1,6 @@
 # Dossier Domain-Aware Adversarial Benchmark Report
 
-> **Read first:** this is a development regression report, not evidence of accuracy. On neutral held-out cases the verdict does not separate eventual successes from eventual failures better than chance; see [EVALUATION.md](EVALUATION.md).
+> **Read first:** this is a development regression report, not evidence of accuracy. A short pitch alone cannot predict startup survival (on neutral held-out cases, scores rank eventual winners vs. losers near chance, AUROC `0.46–0.63`); treat Dossier as a risk-review and test-planning screen, see [EVALUATION.md](EVALUATION.md).
 
 **Execution Date:** 2026-10-26T09:16:00.357Z  
 **Agent Harness:** Dossier Swarm Runtime  

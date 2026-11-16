@@ -77,6 +77,25 @@ Recon used to search the idea's (often invented) brand name. That surfaced unrel
 
 Measured on 10 labelled dev cases, live Exa, precision@5 under a mechanical relevance proxy (≥2 summary terms in the result; a lower bound, since paraphrases score 0): old-style 17%, new style 21%, with every name-collision result in the sample removed. Fixture suite incl. the "Asha Health" clinic collision: `test/evidence_quality.test.mjs`; measurement: `scripts/precision_search_eval.ts`.
 
+## Hardening & Nov 16 Live-LLM Check (dev, n = 89)
+
+To address the verdict skews above (confident/optimistic founder numbers defusing kill gates, and sparse pitches getting killed for missing details), four deterministic guardrails were added:
+
+1. **Reference-class optimism audit (`auditFounderEconomicsVsBaseRate`):** Flags founder-stated CAC `< 35%` or monthly churn `< 40%` of the archetype median as `MAJOR` / `VALIDATABLE` findings and blocks `BUILD_IF_VALIDATED` until live-tested.
+2. **Sandbox break-even boundaries (`scripts/simulate_monte_carlo.py`):** Computes `maxSurvivableCacUsd`, `cacHeadroomRatio`, and `maxSurvivableMonthlyChurn` at 24-month LTV/CAC = `1.0`, surfacing a `MAJOR` finding when CAC headroom is `< 1.5x`.
+3. **Sparse-pitch guard (`insufficientInputs`):** Prevents bottom-band (`< 30`) `KILL`s when pricing and CAC fell back to archetype defaults and no evidenced structural fatal or invariant gate fired.
+4. **Missing-info `STATED_INPUT` guard:** Rejects `STATED_INPUT` refs that merely report missing/unspecified fields (e.g. `"pricing not specified"`) from triggering a `KILL`.
+
+Re-running the full 89-case dev split on `meta/muse-ember-1.0` (`2026-11-16`, `0` errors, `5.10M` tokens):
+
+- **Verdict mix:** `27 KILL / 62 REFINE / 0 BUILD_IF_VALIDATED` (vs. `30 KILL / 59 REFINE` on Nov 15)
+- **Strict false passes (`BUILD` on failures):** `0%` (`0 / 55`)
+- **Successes wrongly killed:** `35.7%` (`10 / 28`, 95% CI `20.7%–54.2%`)
+- **Failures in `REFINE`:** `69.1%` (`38 / 55`, 95% CI `56.0%–79.7%`)
+- **Score AUROC (higher = better separation, `0.50` = random):** `0.46` (95% CI `0.33–0.58`; mean score `46.2` for successes vs. `46.5` for failures)
+
+In plain terms: the guardrails stopped rubber-stamped `BUILD`s and missing-info `KILL`s, but a 1-paragraph pitch still does not carry enough real-world execution or distribution signal for a score to separate winners from losers. Further gains come from **findings/test quality** and **outcome calibration**, not tuning `KILL`/`REFINE` thresholds on pitch text.
+
 ## What would make this trustworthy
 
 1. Blind rewrites of the pitches by someone who does not know the outcomes, and a second person checking the labels.
