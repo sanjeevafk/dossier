@@ -52,6 +52,11 @@ export interface SandboxExecutionResult {
     voi?: ValueOfInformationStats;
     monteCarlo?: MonteCarloStats;
     stressMetrics?: SandboxStressStats;
+    breakEven?: {
+      maxSurvivableCacUsd: number;
+      cacHeadroomRatio: number;
+      maxSurvivableMonthlyChurn: number;
+    };
   };
 }
 
@@ -168,6 +173,7 @@ export async function runEconomicsSimulation(
         sobol,
         voi: parsed.valueOfInformation,
         stressMetrics: parsed.stressMetrics,
+        breakEven: parsed.breakEven,
         monteCarlo: {
           iterations: parsed.iterations,
           survivalProbability12Mo: parsed.survivalProbability12Mo,

@@ -120,3 +120,19 @@ test("insufficientInputs prevents bottom-band KILL without evidenced structural 
   });
   assert.equal(d.verdict, "REFINE");
 });
+
+test("missing-info STATED_INPUT refs cannot trigger KILL", () => {
+  assert.equal(isEvidencedStructuralFatal(fatal("STATED_INPUT", "pricing not specified in pitch"), true), false);
+  assert.equal(isEvidencedStructuralFatal(fatal("STATED_INPUT", "no buyer stated"), true), false);
+  assert.equal(isEvidencedStructuralFatal(fatal("STATED_INPUT", "founder says $4/mo and CAC $40"), true), true);
+});
+
+test("sandbox returns breakEven fragility boundaries", async () => {
+  const { runEconomicsSimulation } = await import("../src/tools/sandbox.ts");
+  const sim = await runEconomicsSimulation(99, 0.05, 200, 500, 1500, 30);
+  assert.equal(sim.exitCode, 0);
+  assert.ok(sim.metrics.breakEven, "breakEven must be present");
+  assert.ok(sim.metrics.breakEven.maxSurvivableCacUsd > 200);
+  assert.ok(sim.metrics.breakEven.cacHeadroomRatio > 1.0);
+  assert.ok(sim.metrics.breakEven.maxSurvivableMonthlyChurn > 0.05);
+});

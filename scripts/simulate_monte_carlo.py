@@ -156,6 +156,23 @@ def run_simulation(data):
     stress_net_monthly = (users * stress_margin) - infra_monthly - (users * stress_churn * stress_cac)
     stress_cash_24 = starting_cash + stress_net_monthly * 24.0
 
+    # Break-even fragility boundaries: how much error the model tolerates before 24-month LTV < CAC.
+    p50_ltv = float(np.percentile(cohort_ltv, 50))
+    max_survivable_cac = round(p50_ltv, 2)
+    cac_headroom_ratio = round(p50_ltv / max(1.0, cac_mean), 2)
+    lo_c, hi_c = 0.001, 0.50
+    for _ in range(20):
+        mid_c = (lo_c + hi_c) / 2.0
+        _, mid_ratio, _, _ = cohort_metrics(
+            np.array([pricing]), np.array([mid_c]), np.array([cac_mean]), np.array([1.0]),
+            token_cost_per_user, gross_margin_target, churn_decay
+        )
+        if float(mid_ratio[0]) >= 1.0:
+            lo_c = mid_c
+        else:
+            hi_c = mid_c
+    max_survivable_churn = round(lo_c, 4)
+
     result = {
         "iterations": iterations,
         "survivalProbability12Mo": round(survival_12, 4),
@@ -188,6 +205,11 @@ def run_simulation(data):
         "ltvCacRatio": round(base_p50, 2),
         "estimatedPaybackMonths": round(float(np.percentile(payback, 50)), 1),
         "monthlyInfraCostUsd": round(float(infra_monthly), 2),
+        "breakEven": {
+            "maxSurvivableCacUsd": max_survivable_cac,
+            "cacHeadroomRatio": cac_headroom_ratio,
+            "maxSurvivableMonthlyChurn": max_survivable_churn,
+        },
         "tamEstimateUsd": "UNKNOWN — no citable TAM source for this archetype",
         "simulationNotes": (
             "24-month cohort Monte Carlo: %d runs, seed %d, churn ~ N(%.3f, %.3f) decay %.2f, "

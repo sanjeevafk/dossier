@@ -22,10 +22,14 @@ export function ratingToScore(rating: number): number {
 /** Evidence types that can ground a kill. REASONING alone cannot. */
 const KILL_GRADE_EVIDENCE: FindingEvidenceType[] = ["STATED_INPUT", "COMPUTATION", "SOURCE", "PRECEDENT"];
 
+/** Missing-information phrasing cannot masquerade as a STATED_INPUT structural kill. */
+const MISSING_INFO_REF_RE = /\b(not\s+(specified|stated|provided|mentioned|given)|no\s+(pricing|cac|buyer|budget|monetization)\s+(stated|specified|provided)|unspecified|missing|unknown|n\/a)\b/i;
+
 export function isEvidencedStructuralFatal(f: Finding, economicsGrounded: boolean): boolean {
   if (f.severity !== "FATAL" || f.kind !== "STRUCTURAL") return false;
   if (!KILL_GRADE_EVIDENCE.includes(f.evidence.type)) return false;
   if (!f.evidence.ref || f.evidence.ref.trim().length < 3) return false;
+  if (f.evidence.type === "STATED_INPUT" && MISSING_INFO_REF_RE.test(f.evidence.ref)) return false;
   // A computation on placeholder inputs is not evidence.
   if (f.evidence.type === "COMPUTATION" && !economicsGrounded) return false;
   return true;

@@ -285,6 +285,19 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
   }
 
   const optimismFindings = auditFounderEconomicsVsBaseRate(domain.archetype, cac, churn, economicsGrounded);
+  const breakEven = sandboxSim.metrics?.breakEven;
+  if (economicsGrounded && isEconomicsAvailable && breakEven && breakEven.cacHeadroomRatio > 0 && breakEven.cacHeadroomRatio < 1.5) {
+    optimismFindings.push({
+      claim: `Thin CAC headroom (${breakEven.cacHeadroomRatio}x): 24-month unit economics break even at $${breakEven.maxSurvivableCacUsd} CAC or ${(breakEven.maxSurvivableMonthlyChurn * 100).toFixed(1)}%/mo churn.`,
+      severity: "MAJOR",
+      kind: "VALIDATABLE",
+      evidence: {
+        type: "COMPUTATION",
+        ref: `Break-even max CAC $${breakEven.maxSurvivableCacUsd} vs $${Math.round(cac)} (${breakEven.cacHeadroomRatio}x headroom)`
+      },
+      cheapestTest: "Validate real CAC on 20–50 paid clicks before committing engineering spend."
+    });
+  }
   if (optimismFindings.length > 0 && Array.isArray(verifiedOpinions.investor?.findings)) {
     verifiedOpinions.investor.findings.push(...optimismFindings);
   }
