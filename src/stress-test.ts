@@ -1,19 +1,8 @@
 import { pc } from "./utils/colors.js";
 import { IdeaSwarmOrchestrator } from "./core/swarm.js";
 import { runEconomicsSimulation } from "./tools/sandbox.js";
-import { EpistemicRobustVerifier } from "./core/verifier.js";
-import { classifyIdeaDomain } from "./core/classifier.js";
 import fs from "node:fs";
 import path from "node:path";
-
-interface StressTestCase {
-  id: string;
-  name: string;
-  category: "PROMPT_INJECTION" | "IMPOSSIBLE_PHYSICS" | "SANDBOX_SECURITY" | "ECONOMIC_FUZZING" | "BURST_CONCURRENCY";
-  description: string;
-  payload: any;
-  assertion: (result: any) => { passed: boolean; details: string };
-}
 
 export async function runStressTestSuite() {
   console.log(pc.bold(pc.cyan("\n=======================================================")));

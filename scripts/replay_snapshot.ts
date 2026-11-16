@@ -66,8 +66,8 @@ async function main() {
         fatalRisk: dossier.weakestAssumption.fatalRisk
       });
       console.log(`  ${item.id}  ${String(dossier.overallVerdict).padEnd(20)} ${dossier.killScore}/100  (${Date.now() - t0}ms)`);
-    } catch (err: any) {
-      console.error(`  ${item.id}  FAILED: ${err?.message || "evaluation error"}`);
+    } catch (err: unknown) {
+      console.error(`  ${item.id}  FAILED: ${err instanceof Error ? err.message : "evaluation error"}`);
     }
   }
 

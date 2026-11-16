@@ -1,4 +1,4 @@
-import http, { IncomingMessage, ServerResponse } from "node:http";
+import { IncomingMessage, ServerResponse } from "node:http";
 import { sendJson } from "./respond.js";
 
 // Bounded Concurrency Guard (protects single-vCPU/512MB instances from OOM starvation)

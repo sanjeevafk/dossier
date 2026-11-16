@@ -13,14 +13,18 @@ import {
 } from "../../types/index.js";
 import { AdversarialInvariants } from "./invariants.js";
 
+import type { SandboxExecutionResult } from "../../tools/sandbox.js";
+import type { GraveyardPrecedent } from "../../data/graveyardAntipatterns.js";
+import type { MonteCarloStats } from "../../types/index.js";
+
 export interface DimensionalScoringInput {
   verifiedOpinions: Record<SwarmRole, AgentOpinion>;
   domain: DomainClassification;
-  sandboxSim: any;
-  mc?: any;
+  sandboxSim: SandboxExecutionResult;
+  mc?: MonteCarloStats;
   isEconomicsAvailable: boolean;
   invariants: AdversarialInvariants;
-  graveyardMatches: any[];
+  graveyardMatches: GraveyardPrecedent[];
   evidenceFeed: EvidenceItem[];
   /** True only when price AND CAC come from the founder or a source, not from archetype defaults. */
   economicsGrounded: boolean;
@@ -52,7 +56,6 @@ export function computeDimensionalResilience(input: DimensionalScoringInput): Di
     mc,
     isEconomicsAvailable,
     invariants,
-    graveyardMatches,
     evidenceFeed,
     economicsGrounded
   } = input;

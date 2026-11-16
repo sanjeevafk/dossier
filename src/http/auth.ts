@@ -1,4 +1,4 @@
-import http, { IncomingMessage, ServerResponse } from "node:http";
+import { IncomingMessage, ServerResponse } from "node:http";
 import crypto from "node:crypto";
 import { sendJson } from "./respond.js";
 

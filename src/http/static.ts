@@ -1,4 +1,4 @@
-import http, { IncomingMessage, ServerResponse } from "node:http";
+import { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";

@@ -22,10 +22,11 @@ import {
   DebateChallenge,
   Contradiction as ContradictionEntry,
   SwarmEvent,
-  SandboxStressStats
+  SandboxStressStats,
+  DomainClassification
 } from "../types/index.js";
 import { classifyIdeaDomain } from "./classifier.js";
-import { performMarketResearch } from "../tools/search.js";
+import { performMarketResearch, type ResearchFindings } from "../tools/search.js";
 import { queryUnifiedPredictionMarkets } from "../tools/markets/index.js";
 import { queryNewsHeadlines } from "../tools/news.js";
 import { queryAgentReachIntel } from "../tools/agentReach.js";
@@ -37,7 +38,7 @@ import { queryHuggingFace } from "../tools/huggingface.js";
 import { queryClinicalEvidence } from "../tools/clinical.js";
 import { queryMacroData } from "../tools/macro.js";
 import { queryFloviaIntelligence } from "../tools/flovia.js";
-import { runEconomicsSimulation } from "../tools/sandbox.js";
+import { runEconomicsSimulation, type SandboxExecutionResult } from "../tools/sandbox.js";
 import { EpistemicRobustVerifier } from "./verifier.js";
 import { runDecisionModel } from "../tools/decision-runner.js";
 import { parseMonetization } from "./economics.js";
@@ -77,9 +78,9 @@ export class IdeaSwarmOrchestrator {
   public generateHeuristicOpinion(
     role: SwarmRole,
     idea: IdeaInput,
-    domain: any,
-    marketResearch: any,
-    sandboxSim: any,
+    domain: DomainClassification,
+    marketResearch: ResearchFindings,
+    sandboxSim: SandboxExecutionResult,
     pricing: number,
     cac: number,
     invariants: AdversarialInvariants

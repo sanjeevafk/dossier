@@ -43,7 +43,7 @@ function makeEl(id) {
     innerHTML: "",
     children: [],
     classList: {
-      add: (c) => makeEl(id).classes, // replaced below
+      add: (_c) => makeEl(id).classes, // replaced below
       remove: () => {},
       contains: () => false
     },

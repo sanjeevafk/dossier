@@ -290,8 +290,8 @@ export async function runDossierBenchmark(options: { replay?: boolean } = {}): P
 
         runScores.push(dossier.killScore);
         console.log(`       -> Domain: [${dossier.domainClassification.archetypeLabel}] | Verdict: ${dossier.overallVerdict} (${dossier.killScore}/100) | Rounds: ${dossier.convergenceRounds || 1} | Latency: ${elapsed}ms`);
-      } catch (err: any) {
-        console.log(`       [FAIL] FAILED: ${err?.message || "evaluation error"} — excluded from aggregation`);
+      } catch (err: unknown) {
+        console.log(`       [FAIL] FAILED: ${err instanceof Error ? err.message : "evaluation error"} — excluded from aggregation`);
       }
     }
 
@@ -462,8 +462,8 @@ export async function runDossierBenchmark(options: { replay?: boolean } = {}): P
       results: results.map((r) => ({ id: r.id, score: r.score, verdict: r.verdict, verdictBand: verdictBand(r.verdict) }))
     }, null, 2));
     console.log(`Replay snapshot saved: ${REPLAY_SNAPSHOT_PATH}`);
-  } catch (err: any) {
-    console.warn(`Could not save replay snapshot: ${err?.message}`);
+  } catch (err: unknown) {
+    console.warn(`Could not save replay snapshot: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // Export to Markdown Report

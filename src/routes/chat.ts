@@ -9,7 +9,7 @@ import { buildChatTurn, generateHeuristicChatReply } from "../http/chatReply.js"
 
 /** Returns true if this group handled the request. */
 export async function handleChat(ctx: RouteContext): Promise<boolean> {
-  const { req, res, method, pathname, parsedUrl } = ctx;
+  const { req, res, method, pathname } = ctx;
   let handled = true;
   // Each route block ends with `return` once it has responded; falling through means "not mine".
   await (async (): Promise<void> => {
@@ -18,11 +18,11 @@ export async function handleChat(ctx: RouteContext): Promise<boolean> {
       if (!chatLimiter(req, res)) return;
       if (!checkAuth(req, res)) return;
 
-      let body: any;
+      let body: unknown;
       try {
         body = await readJsonBody(req);
-      } catch (err: any) {
-        sendJson(res, 400, { error: err.message || "Invalid JSON" });
+      } catch (err: unknown) {
+        sendJson(res, 400, { error: err instanceof Error ? err.message : "Invalid JSON" });
         return;
       }
 
@@ -75,8 +75,8 @@ export async function handleChat(ctx: RouteContext): Promise<boolean> {
           domain: domain.archetypeLabel,
           timestamp: new Date().toISOString()
         });
-      } catch (error: any) {
-        sendJson(res, 500, { success: false, error: error.message || "Playground chat failed" });
+      } catch (error: unknown) {
+        sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : "Playground chat failed" });
       }
       return;
     }
@@ -86,11 +86,11 @@ export async function handleChat(ctx: RouteContext): Promise<boolean> {
       if (!chatLimiter(req, res)) return;
       if (!checkAuth(req, res)) return;
 
-      let body: any;
+      let body: unknown;
       try {
         body = await readJsonBody(req);
-      } catch (err: any) {
-        sendJson(res, 400, { error: err.message || "Invalid JSON" });
+      } catch (err: unknown) {
+        sendJson(res, 400, { error: err instanceof Error ? err.message : "Invalid JSON" });
         return;
       }
 
@@ -113,7 +113,7 @@ export async function handleChat(ctx: RouteContext): Promise<boolean> {
         isClientConnected = false;
       });
 
-      const send = (event: string, data: any) => {
+      const send = (event: string, data: unknown) => {
         if (!isClientConnected) return;
         res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       };
@@ -161,8 +161,8 @@ export async function handleChat(ctx: RouteContext): Promise<boolean> {
             finishHeuristic();
           }
         }
-      } catch (error: any) {
-        send("error", { error: error.message || "Chat stream failed" });
+      } catch (error: unknown) {
+        send("error", { error: error instanceof Error ? error.message : "Chat stream failed" });
         res.end();
       }
       return;

@@ -7,17 +7,6 @@ const rows = db.prepare("SELECT id, title, verdict, score, dossier_json FROM dos
 console.log(`Found ${rows.length} dossiers in database.`);
 assert.ok(rows.length >= 5, "Database must contain at least 5 dossiers");
 
-// Simulate DOM and escapeHtml
-function escapeHtml(str) {
-  if (!str) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
 let testedCount = 0;
 
 for (const r of rows) {
@@ -31,7 +20,7 @@ for (const r of rows) {
   const conf = `${dossier.confidenceScore}%`;
   const risk = dossier.riskLevel;
   const score = `${dossier.killScore}/100`;
-  assert.ok(title && execSummary && dossierCode, "Header fields must exist");
+  assert.ok(title && execSummary && dossierCode && conf && risk && score, "Header fields must exist");
 
   // 2. Domain classification
   if (dossier.domainClassification) {
@@ -132,6 +121,7 @@ for (const r of rows) {
             { driver: "CAC Inflation", swingMonths: 3.1 },
             { driver: "Infra Cost", swingMonths: 1.4 }
           ]);
+  assert.ok(Array.isArray(tornadoDrivers) && tornadoDrivers.length > 0, "Tornado drivers must exist");
 
   // Test .toFixed calls
   const ltvFormatted = p50Ltv.toFixed(2);
@@ -142,8 +132,8 @@ for (const r of rows) {
   const p90PbFmt = p90Payback.toFixed(1);
   const survivalFmt = (survivalProb * 100).toFixed(1);
 
-  assert.ok(!isNaN(Number(ltvFormatted)), "LTV formatted must be valid number string");
-  assert.ok(!isNaN(Number(paybackFormatted)), "Payback formatted must be valid number string");
+  assert.ok(!isNaN(Number(ltvFormatted)) && !isNaN(Number(p10LtvFmt)) && !isNaN(Number(p90LtvFmt)), "LTV formatted must be valid number string");
+  assert.ok(!isNaN(Number(paybackFormatted)) && !isNaN(Number(p10PbFmt)) && !isNaN(Number(p90PbFmt)), "Payback formatted must be valid number string");
   assert.ok(!isNaN(Number(survivalFmt)), "Survival formatted must be valid number string");
 
   console.log(`  -> Simulation parsed successfully: P50 LTV/CAC=${ltvFormatted}x, P50 Payback=${paybackFormatted}mo, Survival=${survivalFmt}%`);

@@ -28,6 +28,17 @@ import { forecastLedger } from "../../services/ledger.js";
 import { dossierStorage } from "../../services/storage.js";
 import { buildExternalEvidenceSources } from "./evidence.js";
 import { VOI_EXPERIMENT_MAP } from "./schemas.js";
+import type { ResearchFindings } from "../../tools/search.js";
+import type { UnifiedMarketResult } from "../../tools/markets/types.js";
+import type { OpenAlexReconResult } from "../../tools/openalex.js";
+import type { EdgarReconResult } from "../../tools/edgar.js";
+import type { HfReconResult } from "../../tools/huggingface.js";
+import type { ClinicalReconResult } from "../../tools/clinical.js";
+import type { FloviaReconResult } from "../../tools/flovia.js";
+import type { NewsReconResult } from "../../tools/news.js";
+import type { AgentReachResult } from "../../tools/agentReach.js";
+import type { FixMyItchProblem } from "../../data/fixMyItchProblems.js";
+import type { GraveyardPrecedent } from "../../data/graveyardAntipatterns.js";
 import { currentLlmUsage, estimateCostUsd } from "../../services/llm.js";
 import { SandboxExecutionResult } from "../../tools/sandbox.js";
 import { warn } from "../../utils/log.js";
@@ -52,17 +63,17 @@ export interface AssembleDossierParams {
   convergenceRounds: number;
   crossfireToolTraces: string[];
   crossfireContradiction: ContradictionEntry | null;
-  marketResearch: any;
-  unifiedMarkets: any;
-  openAlexSignals: any;
-  edgarSignals: any;
-  hfSignals: any;
-  clinicalSignals: any;
-  floviaSignals: any;
-  newsSignals: any;
-  reachSignals: any;
-  itchMatches: any[];
-  graveyardMatches: any[];
+  marketResearch: ResearchFindings;
+  unifiedMarkets: UnifiedMarketResult;
+  openAlexSignals: OpenAlexReconResult;
+  edgarSignals: EdgarReconResult;
+  hfSignals: HfReconResult;
+  clinicalSignals: ClinicalReconResult;
+  floviaSignals: FloviaReconResult;
+  newsSignals: NewsReconResult;
+  reachSignals: AgentReachResult;
+  itchMatches: FixMyItchProblem[];
+  graveyardMatches: GraveyardPrecedent[];
   sandboxSim: SandboxExecutionResult;
   stressMetrics: SandboxStressStats;
   isEconomicsAvailable: boolean;
@@ -115,9 +126,6 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
   } = params;
 
   const {
-    technicalFeasibility,
-    demandAndAdoption,
-    defensibilityAndMoat,
     compositeScore,
     resilienceBreakdown,
     epistemicSummary,
@@ -343,7 +351,7 @@ export async function assembleDossier(params: AssembleDossierParams): Promise<Id
         : "Unified Prediction Oracle",
       macroSentiment: unifiedMarkets.macroSentiment,
       keyTakeaway: unifiedMarkets.keyTakeaway,
-      marketsFound: (unifiedMarkets.signals ?? []).map((s: any) => ({
+      marketsFound: (unifiedMarkets.signals ?? []).map((s) => ({
         title: `[${s.source.toUpperCase()}] ${s.title}`,
         probabilityYesPercent: s.probabilityYesPercent,
         volumeUsd: s.volumeUsd,

@@ -58,7 +58,7 @@ async function hnAlgoliaSearch(query: string, fetchImpl: FetchImpl): Promise<Com
     const res = await fetchImpl(url, { signal: controller.signal });
     if (!res.ok) throw new Error(`HN Algolia HTTP ${res.status}`);
     const data = await res.json();
-    const hits: any[] = Array.isArray(data?.hits) ? data.hits : [];
+    const hits = (Array.isArray(data?.hits) ? data.hits : []) as Array<Record<string, unknown>>;
 
     const tokens = significantTokens(query);
     const discussions: CommunityDiscussion[] = [];
@@ -167,8 +167,8 @@ export async function queryCommunitySentiment(
   try {
     const hn = await queryHackerNews(query, fetchImpl);
     discussions.push(...hn);
-  } catch (err: any) {
-    errors.push(`hackernews: ${err?.message || "query failed"}`);
+  } catch (err: unknown) {
+    errors.push(`hackernews: ${err instanceof Error ? err.message : "query failed"}`);
   }
 
   const [reddit, twitter] = await Promise.all([bridgeReddit(query), bridgeTwitter(query)]);

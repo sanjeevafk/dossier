@@ -208,8 +208,9 @@ Market & Prediction Signals: ${marketContext}`;
         }
       }
     };
-  } catch (err: any) {
-    return { opinion: null, fallbackReason: `LLM turn failed: ${err?.message || "unknown provider error"}` };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "unknown provider error";
+    return { opinion: null, fallbackReason: `LLM turn failed: ${msg}` };
   }
 }
 

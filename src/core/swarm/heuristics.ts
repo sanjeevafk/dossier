@@ -11,6 +11,9 @@ import {
   DOMAIN_REGULATORY_DRAG
 } from "./invariants.js";
 
+import type { ResearchFindings } from "../../tools/search.js";
+import type { SandboxExecutionResult } from "../../tools/sandbox.js";
+
 /**
  * Domain-calibrated heuristic evaluator when live LLM is offline or ungrounded.
  * Evaluates pricing, unit economics, physics sanity, prompt injection defense, and domain procurement.
@@ -19,8 +22,8 @@ export function generateHeuristicOpinion(
   role: SwarmRole,
   idea: IdeaInput,
   domain: DomainClassification,
-  marketResearch: any,
-  sandboxSim: any,
+  marketResearch: ResearchFindings,
+  sandboxSim: SandboxExecutionResult,
   pricing: number,
   cac: number,
   invariants: AdversarialInvariants

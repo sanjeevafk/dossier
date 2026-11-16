@@ -1,4 +1,4 @@
-import { getSearchQueryCandidates, extractDomainTokens } from "./queryTokens.js";
+import { getSearchQueryCandidates } from "./queryTokens.js";
 import { dossierStorage } from "../services/storage.js";
 
 export interface NewsArticle {

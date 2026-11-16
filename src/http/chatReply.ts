@@ -1,15 +1,14 @@
-import path from "node:path";
 import { SWARM_ROLES } from "../config/prompts.js";
-import { SwarmRole } from "../types/index.js";
+import { DomainClassification, SwarmRole } from "../types/index.js";
 
 // Shared chat turn construction for /api/chat and /api/chat/stream.
 export function buildChatTurn(
   role: string,
   message: string,
-  ideaContext: any,
+  ideaContext: unknown,
   ideaTitle: string,
   ideaSummary: string,
-  domain: any
+  domain: DomainClassification
 ): { systemPrompt: string; agentName: string } {
   const rolePrompt = role === "all"
     ? "Consensus of 6 adversarial agents (Skeptic, Investor, Architect, Market, Customer, Founder)"
@@ -34,7 +33,7 @@ export function generateHeuristicChatReply(
   role: string,
   ideaTitle: string,
   ideaSummary: string,
-  domain: any
+  domain: DomainClassification
 ): { reply: string; agentName: string; epistemicState: string } {
   if (role === "skeptic" || role === "redteam") {
     return {

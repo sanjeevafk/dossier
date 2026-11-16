@@ -1,5 +1,5 @@
 import { UnifiedMarketSignal, FetchImpl } from "./types.js";
-import { getSearchQueryCandidates, extractDomainTokens, isMarketTitleCorrelated } from "../queryTokens.js";
+import { extractDomainTokens, isMarketTitleCorrelated } from "../queryTokens.js";
 
 /**
  * Query Kalshi's CFTC-regulated prediction markets (v2 trade API, keyless public endpoint)
@@ -42,7 +42,6 @@ export async function queryKalshiMarkets(
     const signals: UnifiedMarketSignal[] = [];
 
     for (const ev of events) {
-      const eventText = `${ev.title || ""} ${ev.sub_title || ""} ${ev.category || ""}`.toLowerCase();
       const markets = Array.isArray(ev.markets) ? ev.markets : [];
 
       for (const m of markets) {

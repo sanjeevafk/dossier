@@ -61,7 +61,7 @@ function filteredResults(
   results: Array<{ title: string; snippet?: string }>,
   idea: { title: string; summary: string; targetAudience: string }
 ) {
-  const { kept, dropped } = filterEntityRelevant(results as any, idea);
+  const { kept, dropped } = filterEntityRelevant(results as Parameters<typeof filterEntityRelevant>[0], idea);
   return { kept: kept as Array<{ title: string; snippet?: string }>, droppedCount: dropped.length };
 }
 

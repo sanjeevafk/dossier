@@ -18,8 +18,8 @@ export async function handleForecasts(ctx: RouteContext): Promise<boolean> {
         const archetype = parsedUrl.searchParams.get("archetype") || undefined;
         const forecasts = forecastLedger.listForecasts({ status, archetype });
         sendJson(res, 200, { success: true, count: forecasts.length, forecasts });
-      } catch (error: any) {
-        sendJson(res, 500, { success: false, error: error.message });
+      } catch (error: unknown) {
+        sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : "Failed to list forecasts" });
       }
       return;
     }
@@ -29,11 +29,11 @@ export async function handleForecasts(ctx: RouteContext): Promise<boolean> {
     if (method === "POST" && resolveMatch) {
       if (!checkAuth(req, res)) return;
       const id = resolveMatch[1];
-      let body: any;
+      let body: unknown;
       try {
         body = await readJsonBody(req);
-      } catch (err: any) {
-        sendJson(res, 400, { error: err.message || "Invalid JSON" });
+      } catch (err: unknown) {
+        sendJson(res, 400, { error: err instanceof Error ? err.message : "Invalid JSON" });
         return;
       }
       const parsedResolve = parseBody(resolveSchema, body);
@@ -45,8 +45,8 @@ export async function handleForecasts(ctx: RouteContext): Promise<boolean> {
       try {
         const record = forecastLedger.resolveForecast(id, outcome, notes, resolvedBy);
         sendJson(res, 200, { success: true, forecast: record });
-      } catch (error: any) {
-        sendJson(res, 400, { success: false, error: error.message });
+      } catch (error: unknown) {
+        sendJson(res, 400, { success: false, error: error instanceof Error ? error.message : "Failed to resolve forecast" });
       }
       return;
     }
@@ -55,8 +55,8 @@ export async function handleForecasts(ctx: RouteContext): Promise<boolean> {
     if (method === "GET" && pathname === "/api/calibration") {
       try {
         sendJson(res, 200, { success: true, calibration: forecastLedger.calibrationSummary() });
-      } catch (error: any) {
-        sendJson(res, 500, { success: false, error: error.message });
+      } catch (error: unknown) {
+        sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : "Failed to list forecasts" });
       }
       return;
     }

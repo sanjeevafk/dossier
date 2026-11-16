@@ -1,24 +1,41 @@
 import {
+  AgentOpinion,
   DomainClassification,
   EvidenceItem,
   ExternalEvidenceSource,
-  DecisionModelOutput
+  DecisionModelOutput,
+  MonteCarloStats,
+  SandboxStressStats
 } from "../../types/index.js";
+import type { ResearchFindings } from "../../tools/search.js";
+import type { UnifiedMarketResult } from "../../tools/markets/types.js";
+import type { NewsReconResult } from "../../tools/news.js";
+import type { OpenAlexReconResult } from "../../tools/openalex.js";
+import type { EdgarReconResult } from "../../tools/edgar.js";
+import type { HfReconResult } from "../../tools/huggingface.js";
+import type { ClinicalReconResult } from "../../tools/clinical.js";
+import type { MacroReconResult } from "../../tools/macro.js";
+import type { FloviaReconResult } from "../../tools/flovia.js";
+import type { GeoJurisdiction } from "../../tools/geo.js";
+import type { AgentReachResult } from "../../tools/agentReach.js";
+import type { SandboxExecutionResult } from "../../tools/sandbox.js";
+import type { FixMyItchProblem } from "../../data/fixMyItchProblems.js";
+import type { GraveyardPrecedent } from "../../data/graveyardAntipatterns.js";
 
 export interface ReconContextInput {
-  marketResearch: any;
-  unifiedMarkets: any;
-  newsSignals: any;
-  openAlexSignals: any;
-  edgarSignals: any;
-  hfSignals: any;
-  clinicalSignals: any;
-  macroSignals: any;
-  floviaSignals: any;
-  geo: any;
-  reachSignals: any;
-  itchMatches: any[];
-  graveyardMatches: any[];
+  marketResearch: ResearchFindings;
+  unifiedMarkets: UnifiedMarketResult;
+  newsSignals: NewsReconResult;
+  openAlexSignals: OpenAlexReconResult;
+  edgarSignals: EdgarReconResult;
+  hfSignals: HfReconResult;
+  clinicalSignals: ClinicalReconResult;
+  macroSignals: MacroReconResult;
+  floviaSignals: FloviaReconResult;
+  geo: GeoJurisdiction;
+  reachSignals: AgentReachResult;
+  itchMatches: FixMyItchProblem[];
+  graveyardMatches: GraveyardPrecedent[];
   decisionEvaluation?: DecisionModelOutput | null;
   pricing: number;
   cac: number;
@@ -26,9 +43,9 @@ export interface ReconContextInput {
   isEconomicsAvailable: boolean;
   /** Price and CAC come from the founder or a source (not archetype defaults). */
   economicsGrounded?: boolean;
-  sandboxSim: any;
-  stressMetrics: any;
-  mc: any;
+  sandboxSim: SandboxExecutionResult;
+  stressMetrics: Partial<SandboxStressStats>;
+  mc?: MonteCarloStats;
 }
 
 export function formatReconContext(input: ReconContextInput): string {
@@ -60,55 +77,55 @@ export function formatReconContext(input: ReconContextInput): string {
   const reconSourceParts: string[] = [];
   if (marketResearch.dataSource === "live-web-recon" && marketResearch.rawResults.length > 0) {
     reconSourceParts.push(
-      `Live web recon (${marketResearch.reconProvider}): ${marketResearch.rawResults.slice(0, 3).map((r: any) => `"${r.title}" [${r.url}]`).join("; ")}`
+      `Live web recon (${marketResearch.reconProvider}): ${marketResearch.rawResults.slice(0, 3).map((r) => `"${r.title}" [${r.url}]`).join("; ")}`
     );
   } else {
     reconSourceParts.push(
       `No live web recon results were retrieved (${marketResearch.reconError || "provider unavailable"}) — treat competitive and demand statements as heuristic priors, not sourced evidence.`
     );
   }
-  if (marketResearch.filteredOut?.length > 0) {
+  if ((marketResearch.filteredOut?.length ?? 0) > 0) {
     reconSourceParts.push(
-      `Entity-relevance filter removed ${marketResearch.filteredOut.length} result(s) that matched the idea's name but not its content (e.g. "${marketResearch.filteredOut[0].title.slice(0, 80)}"): do not cite same-name-but-different-business entities as competitors or precedents.`
+      `Entity-relevance filter removed ${marketResearch.filteredOut!.length} result(s) that matched the idea's name but not its content (e.g. "${marketResearch.filteredOut![0].title.slice(0, 80)}"): do not cite same-name-but-different-business entities as competitors or precedents.`
     );
   }
   if (marketResearch.community.discussions.length > 0) {
     reconSourceParts.push(
-      `Community discussions (${marketResearch.community.provider}): ${marketResearch.community.discussions.slice(0, 3).map((d: any) => `"${d.title}"${typeof d.score === "number" ? ` (${d.score} pts${typeof d.comments === "number" ? `, ${d.comments} comments` : ""})` : ""} [${d.url}]`).join("; ")}`
+      `Community discussions (${marketResearch.community.provider}): ${marketResearch.community.discussions.slice(0, 3).map((d) => `"${d.title}"${typeof d.score === "number" ? ` (${d.score} pts${typeof d.comments === "number" ? `, ${d.comments} comments` : ""})` : ""} [${d.url}]`).join("; ")}`
     );
   } else {
     reconSourceParts.push("No community discussions (Reddit/HN/X) were retrievable for this concept.");
   }
   if (unifiedMarkets.signals.length > 0) {
     reconSourceParts.push(
-      `Prediction markets (${unifiedMarkets.activeSources.map((s: string) => s.toUpperCase()).join("/")}): ${unifiedMarkets.signals.slice(0, 3).map((m: any) => `"${m.title.slice(0, 70)}" @ ${m.probabilityYesPercent}% [${m.source}]`).join("; ")}. ${unifiedMarkets.keyTakeaway}`
+      `Prediction markets (${unifiedMarkets.activeSources.map((s: string) => s.toUpperCase()).join("/")}): ${unifiedMarkets.signals.slice(0, 3).map((m) => `"${m.title.slice(0, 70)}" @ ${m.probabilityYesPercent}% [${m.source}]`).join("; ")}. ${unifiedMarkets.keyTakeaway}`
     );
   } else {
     reconSourceParts.push(unifiedMarkets.keyTakeaway);
   }
   if (newsSignals.articles.length > 0) {
     reconSourceParts.push(
-      `Media coverage (${newsSignals.source}): ${newsSignals.articles.slice(0, 2).map((a: any) => `"${a.title.slice(0, 60)}" [${a.source}]`).join("; ")}.`
+      `Media coverage (${newsSignals.source}): ${newsSignals.articles.slice(0, 2).map((a) => `"${a.title.slice(0, 60)}" [${a.source}]`).join("; ")}.`
     );
   }
   if (openAlexSignals.papers.length > 0) {
     reconSourceParts.push(
-      `Academic grounding (OpenAlex, ${openAlexSignals.totalWorks.toLocaleString()} works): ${openAlexSignals.papers.slice(0, 2).map((p: any) => `"${p.title.slice(0, 80)}" (${p.year}, ${p.citations} cites)`).join("; ")}.`
+      `Academic grounding (OpenAlex, ${openAlexSignals.totalWorks.toLocaleString()} works): ${openAlexSignals.papers.slice(0, 2).map((p) => `"${p.title.slice(0, 80)}" (${p.year}, ${p.citations} cites)`).join("; ")}.`
     );
   }
   if (edgarSignals.filings.length > 0) {
     reconSourceParts.push(
-      `Fundraising evidence (SEC Form D): ${edgarSignals.filings.map((f: any) => `${f.company} filed ${f.filedDate}`).join("; ")}.`
+      `Fundraising evidence (SEC Form D): ${edgarSignals.filings.map((f) => `${f.company} filed ${f.filedDate}`).join("; ")}.`
     );
   }
   if (hfSignals.models.length > 0) {
     reconSourceParts.push(
-      `Open-source alternatives (HF Hub): ${hfSignals.models.map((m: any) => `"${m.id}" (${m.likes} likes, ${m.downloads} downloads)`).join("; ")}.`
+      `Open-source alternatives (HF Hub): ${hfSignals.models.map((m) => `"${m.id}" (${m.likes} likes, ${m.downloads} downloads)`).join("; ")}.`
     );
   }
   if (clinicalSignals.studies.length > 0 || clinicalSignals.clearances.length > 0) {
     reconSourceParts.push(
-      `Clinical evidence: ${clinicalSignals.studies.map((s: any) => `${s.nctId} (${s.status})`).join("; ")}${clinicalSignals.clearances.length > 0 ? `; 510(k): ${clinicalSignals.clearances.map((c: any) => c.deviceName.slice(0, 50)).join("; ")}` : ""}.`
+      `Clinical evidence: ${clinicalSignals.studies.map((s) => `${s.nctId} (${s.status})`).join("; ")}${clinicalSignals.clearances.length > 0 ? `; 510(k): ${clinicalSignals.clearances.map((c) => c.deviceName.slice(0, 50)).join("; ")}` : ""}.`
     );
   }
   if (macroSignals.indicators.length > 0) {
@@ -136,7 +153,7 @@ export function formatReconContext(input: ReconContextInput): string {
   }
   if (graveyardMatches.length > 0) {
     reconSourceParts.push(
-      `Startup Graveyard Forensics (Loot Drop): Matches failure pattern of ${graveyardMatches.map((g: any) => `"${g.companyName}" (${g.burnedCapitalUsd} burned, ${g.lifespan}): ${g.fatalFlaw}`).join("; ")}.`
+      `Startup Graveyard Forensics (Loot Drop): Matches failure pattern of ${graveyardMatches.map((g) => `"${g.companyName}" (${g.burnedCapitalUsd} burned, ${g.lifespan}): ${g.fatalFlaw}`).join("; ")}.`
     );
   }
   if (decisionEvaluation) {
@@ -162,24 +179,24 @@ export function formatReconContext(input: ReconContextInput): string {
 export interface EvidenceFeedInput {
   isEconomicsAvailable: boolean;
   economicsGrounded?: boolean;
-  sandboxSim: any;
+  sandboxSim: SandboxExecutionResult;
   pricing: number;
   cac: number;
   domain: DomainClassification;
-  unifiedMarkets: any;
-  marketResearch: any;
-  newsSignals: any;
-  openAlexSignals: any;
-  edgarSignals: any;
-  hfSignals: any;
-  clinicalSignals: any;
-  macroSignals: any;
-  floviaSignals: any;
-  reachSignals: any;
-  itchMatches: any[];
-  graveyardMatches: any[];
-  customerOpinion: any;
-  redTeamOpinion: any;
+  unifiedMarkets: UnifiedMarketResult;
+  marketResearch: ResearchFindings;
+  newsSignals: NewsReconResult;
+  openAlexSignals: OpenAlexReconResult;
+  edgarSignals: EdgarReconResult;
+  hfSignals: HfReconResult;
+  clinicalSignals: ClinicalReconResult;
+  macroSignals: MacroReconResult;
+  floviaSignals: FloviaReconResult;
+  reachSignals: AgentReachResult;
+  itchMatches: FixMyItchProblem[];
+  graveyardMatches: GraveyardPrecedent[];
+  customerOpinion?: AgentOpinion;
+  redTeamOpinion?: AgentOpinion;
   debateSource: string;
 }
 
@@ -227,7 +244,7 @@ export function buildEvidenceFeed(input: EvidenceFeedInput): EvidenceItem[] {
     });
     retrievedExternalCount++;
 
-    unifiedMarkets.signals.slice(0, 3).forEach((sig: any, idx: number) => {
+    unifiedMarkets.signals.slice(0, 3).forEach((sig, idx: number) => {
       externalEvidenceItems.push({
         id: `EV-03M${idx + 1}`,
         claim: `${sig.source.toUpperCase()} market: "${sig.title}" at ${sig.probabilityYesPercent}% ($${sig.volumeUsd.toLocaleString()} volume, status: ${sig.status}).`,
@@ -242,7 +259,7 @@ export function buildEvidenceFeed(input: EvidenceFeedInput): EvidenceItem[] {
   }
 
   if (marketResearch.dataSource === "live-web-recon" && marketResearch.rawResults.length > 0) {
-    marketResearch.rawResults.slice(0, 2).forEach((r: any, i: number) => {
+    marketResearch.rawResults.slice(0, 2).forEach((r, i: number) => {
       externalEvidenceItems.push({
         id: i === 0 ? "EV-04" : `EV-04${String.fromCharCode(65 + i)}`,
         claim: `Live web recon result (${marketResearch.reconProvider}): "${r.title}" — ${r.snippet}`,
@@ -256,7 +273,7 @@ export function buildEvidenceFeed(input: EvidenceFeedInput): EvidenceItem[] {
     });
   }
 
-  marketResearch.community.discussions.slice(0, 2).forEach((d: any, i: number) => {
+  marketResearch.community.discussions.slice(0, 2).forEach((d, i: number) => {
     const stats = [typeof d.score === "number" ? `${d.score} pts` : null, typeof d.comments === "number" ? `${d.comments} comments` : null]
       .filter(Boolean)
       .join(", ");
@@ -352,7 +369,7 @@ export function buildEvidenceFeed(input: EvidenceFeedInput): EvidenceItem[] {
   }
 
   if (floviaSignals.active && floviaSignals.signals.length > 0) {
-    floviaSignals.signals.forEach((sig: any, idx: number) => {
+    floviaSignals.signals.forEach((sig, idx: number) => {
       externalEvidenceItems.push({
         id: `EV-03F${idx + 1}`,
         claim: `On-chain market pricing (${floviaSignals.source}): ${sig.asset} trading at $${sig.priceUsd.toLocaleString()}${sig.change24hPercent !== undefined ? ` (${sig.change24hPercent > 0 ? "+" : ""}${sig.change24hPercent}% 24h)` : ""}.`,
@@ -506,7 +523,7 @@ export function buildEvidenceFeed(input: EvidenceFeedInput): EvidenceItem[] {
     },
     {
       id: "EV-08",
-      claim: `Unresolved contradiction: Customer Advocate assumes buyer urgency ("${customerOpinion.keyAssumptions[0] || customerOpinion.rationale}") while Red Team flags "${redTeamOpinion.fatalFlaws[0] || "unproven willingness to pay"}" — and no purchase commitment has been secured.`,
+      claim: `Unresolved contradiction: Customer Advocate assumes buyer urgency ("${customerOpinion?.keyAssumptions[0] || customerOpinion?.rationale || "unverified buyer urgency"}") while Red Team flags "${redTeamOpinion?.fatalFlaws[0] || "unproven willingness to pay"}" — and no purchase commitment has been secured.`,
       tier: "CONTRADICTED",
       claimType: "CONTRADICTED",
       provenance: `Customer Advocate vs Red Team Debate Clash (${debateSource})`,
@@ -530,17 +547,17 @@ export function buildEvidenceFeed(input: EvidenceFeedInput): EvidenceItem[] {
 }
 
 export function buildExternalEvidenceSources(input: {
-  marketResearch: any;
-  unifiedMarkets: any;
-  openAlexSignals: any;
-  edgarSignals: any;
-  hfSignals: any;
-  clinicalSignals: any;
-  floviaSignals: any;
-  newsSignals: any;
-  reachSignals: any;
-  itchMatches: any[];
-  graveyardMatches: any[];
+  marketResearch: ResearchFindings;
+  unifiedMarkets: UnifiedMarketResult;
+  openAlexSignals: OpenAlexReconResult;
+  edgarSignals: EdgarReconResult;
+  hfSignals: HfReconResult;
+  clinicalSignals: ClinicalReconResult;
+  floviaSignals: FloviaReconResult;
+  newsSignals: NewsReconResult;
+  reachSignals: AgentReachResult;
+  itchMatches: FixMyItchProblem[];
+  graveyardMatches: GraveyardPrecedent[];
 }): ExternalEvidenceSource[] {
   const {
     marketResearch,
@@ -557,19 +574,19 @@ export function buildExternalEvidenceSources(input: {
   } = input;
 
   return [
-    ...marketResearch.rawResults.map((r: any) => ({ title: r.title, url: r.url, provider: marketResearch.reconProvider })),
-    ...marketResearch.community.discussions.map((d: any) => ({ title: d.title, url: d.url, provider: d.platform })),
-    ...unifiedMarkets.signals.map((m: any) => ({ title: `[${m.source.toUpperCase()}] ${m.title.slice(0, 120)}`, url: m.url, provider: m.source })),
-    ...openAlexSignals.papers.slice(0, 3).map((p: any) => ({ title: p.title.slice(0, 120), url: p.openAccessUrl || "https://openalex.org", provider: "openalex" })),
-    ...edgarSignals.filings.map((f: any) => ({ title: `Form D: ${f.company}`, url: f.filingUrl, provider: "sec-edgar" })),
-    ...hfSignals.models.map((m: any) => ({ title: `Hub: ${m.id}`, url: m.modelUrl, provider: "huggingface" })),
-    ...clinicalSignals.studies.map((s: any) => ({ title: `${s.nctId}: ${s.title.slice(0, 100)}`, url: s.studyUrl, provider: "clinicaltrials" })),
-    ...floviaSignals.signals.map((s: any) => ({ title: `[Flovia / CoinGecko] ${s.asset}: $${s.priceUsd.toLocaleString()}`, url: "https://api.flovia.dev/mcp", provider: "flovia" })),
-    ...newsSignals.articles.map((a: any) => ({ title: `[NEWS] ${a.title.slice(0, 120)}`, url: a.url, provider: a.source })),
-    ...reachSignals.gitHubRepos.map((g: any) => ({ title: `[GitHub] ${g.fullName} (${g.stars}★): ${g.description.slice(0, 80)}`, url: g.url, provider: "github" })),
+    ...marketResearch.rawResults.map((r) => ({ title: r.title, url: r.url, provider: marketResearch.reconProvider })),
+    ...marketResearch.community.discussions.map((d) => ({ title: d.title, url: d.url, provider: d.platform })),
+    ...unifiedMarkets.signals.map((m) => ({ title: `[${m.source.toUpperCase()}] ${m.title.slice(0, 120)}`, url: m.url, provider: m.source })),
+    ...openAlexSignals.papers.slice(0, 3).map((p) => ({ title: p.title.slice(0, 120), url: p.openAccessUrl || "https://openalex.org", provider: "openalex" })),
+    ...edgarSignals.filings.map((f) => ({ title: `Form D: ${f.company}`, url: f.filingUrl, provider: "sec-edgar" })),
+    ...hfSignals.models.map((m) => ({ title: `Hub: ${m.id}`, url: m.modelUrl, provider: "huggingface" })),
+    ...clinicalSignals.studies.map((s) => ({ title: `${s.nctId}: ${s.title.slice(0, 100)}`, url: s.studyUrl, provider: "clinicaltrials" })),
+    ...floviaSignals.signals.map((s) => ({ title: `[Flovia / CoinGecko] ${s.asset}: $${s.priceUsd.toLocaleString()}`, url: "https://api.flovia.dev/mcp", provider: "flovia" })),
+    ...newsSignals.articles.map((a) => ({ title: `[NEWS] ${a.title.slice(0, 120)}`, url: a.url, provider: a.source })),
+    ...reachSignals.gitHubRepos.map((g) => ({ title: `[GitHub] ${g.fullName} (${g.stars}★): ${g.description.slice(0, 80)}`, url: g.url, provider: "github" })),
     ...(reachSignals.deepScrape ? [{ title: `[Jina Reader] ${reachSignals.deepScrape.title}`, url: reachSignals.deepScrape.url, provider: "jina-reader" }] : []),
-    ...reachSignals.regionalDiscussions.map((v: any) => ({ title: `[${v.platform.toUpperCase()}] ${v.title.slice(0, 100)}`, url: v.url, provider: v.platform })),
-    ...itchMatches.map((p: any) => ({ title: `[Razorpay Fix My Itch] ${p.problemStatement}`, url: p.sourceUrl, provider: "razorpay-fix-my-itch" })),
-    ...graveyardMatches.map((g: any) => ({ title: `[Loot Drop Graveyard] ${g.companyName} (${g.burnedCapitalUsd} burned): ${g.fatalFlaw.slice(0, 80)}`, url: g.sourceUrl, provider: "loot-drop-graveyard" }))
+    ...reachSignals.regionalDiscussions.map((v) => ({ title: `[${v.platform.toUpperCase()}] ${v.title.slice(0, 100)}`, url: v.url, provider: v.platform })),
+    ...itchMatches.map((p) => ({ title: `[Razorpay Fix My Itch] ${p.problemStatement}`, url: p.sourceUrl, provider: "razorpay-fix-my-itch" })),
+    ...graveyardMatches.map((g) => ({ title: `[Loot Drop Graveyard] ${g.companyName} (${g.burnedCapitalUsd} burned): ${g.fatalFlaw.slice(0, 80)}`, url: g.sourceUrl, provider: "loot-drop-graveyard" }))
   ];
 }

@@ -39,7 +39,7 @@ export async function runDecisionModel(
       ...parsed,
       runtimeMs: Date.now() - start
     };
-  } catch (err: any) {
+  } catch {
     // Graceful fallback to deterministic defaults if Python execution is interrupted
     return {
       engine: "FallbackHeuristics",

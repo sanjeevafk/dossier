@@ -1,4 +1,4 @@
-import http, { IncomingMessage, ServerResponse } from "node:http";
+import { IncomingMessage, ServerResponse } from "node:http";
 
 export function sendJson(res: ServerResponse, statusCode: number, data: unknown): void {
   res.statusCode = statusCode;
@@ -12,7 +12,7 @@ export function sendText(res: ServerResponse, statusCode: number, text: string, 
   res.end(text);
 }
 
-export function readJsonBody(req: IncomingMessage, maxBytes = 256 * 1024): Promise<any> {
+export function readJsonBody(req: IncomingMessage, maxBytes = 256 * 1024): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let receivedBytes = 0;
     const chunks: Buffer[] = [];

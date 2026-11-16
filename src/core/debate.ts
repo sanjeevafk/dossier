@@ -136,7 +136,7 @@ Six agent opinions: ${opinionsJson}`,
     const clashes = parsed.data.clashes.filter((c) => c.challenger !== c.target);
     if (clashes.length < 3) return null;
 
-    return clashes.map((c, i) => ({
+    return clashes.map((c) => ({
       challenger: c.challenger,
       target: c.target,
       round: 1,

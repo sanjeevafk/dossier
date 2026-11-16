@@ -34,7 +34,8 @@ async function runLiveStressTest() {
 
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(0, resolve));
-  const address = server.address() as any;
+  const address = server.address() as { port: number } | null;
+  if (!address) throw new Error("Failed to bind test server");
   const baseUrl = `http://127.0.0.1:${address.port}`;
   console.log(`\x1b[90mStarted in-memory test server at ${baseUrl}\x1b[0m\n`);
 
@@ -270,8 +271,11 @@ async function runLiveStressTest() {
         const hasDone = eventNames.includes("done");
 
         const doneEvent = events.find((e) => e.event === "done");
-        if (doneEvent && typeof doneEvent.data === "object" && (doneEvent.data as any).dossierId) {
-          lastCreatedDossierId = (doneEvent.data as any).dossierId;
+        const doneData = doneEvent && typeof doneEvent.data === "object" && doneEvent.data !== null
+          ? (doneEvent.data as { dossierId?: string })
+          : null;
+        if (doneData?.dossierId) {
+          lastCreatedDossierId = doneData.dossierId;
         }
 
         const domainEvent = events.find((e) => e.event === "domain");

@@ -12,7 +12,7 @@ const orchestrator = new IdeaSwarmOrchestrator();
 
 /** Returns true if this group handled the request. */
 export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
-  const { req, res, method, pathname, parsedUrl } = ctx;
+  const { req, res, method, pathname } = ctx;
   let handled = true;
   // Each route block ends with `return` once it has responded; falling through means "not mine".
   await (async (): Promise<void> => {
@@ -21,11 +21,11 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
       if (!evaluateLimiter(req, res)) return;
       if (!checkAuth(req, res)) return;
 
-      let body: any;
+      let body: unknown;
       try {
         body = await readJsonBody(req);
-      } catch (err: any) {
-        sendJson(res, 400, { error: err.message || "Invalid JSON" });
+      } catch (err: unknown) {
+        sendJson(res, 400, { error: err instanceof Error ? err.message : "Invalid JSON" });
         return;
       }
 
@@ -84,11 +84,11 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
       if (!evaluateLimiter(req, res)) return;
       if (!checkAuth(req, res)) return;
 
-      let body: any;
+      let body: unknown;
       try {
         body = await readJsonBody(req);
-      } catch (err: any) {
-        sendJson(res, 400, { error: err.message || "Invalid JSON" });
+      } catch (err: unknown) {
+        sendJson(res, 400, { error: err instanceof Error ? err.message : "Invalid JSON" });
         return;
       }
 
@@ -121,7 +121,7 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
         isClientConnected = false;
       });
 
-      const sendSSE = (event: string, data: any) => {
+      const sendSSE = (event: string, data: unknown) => {
         if (!isClientConnected || finished) return;
         res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       };

@@ -12,7 +12,7 @@ import { EpistemicRobustVerifier } from "./core/verifier.js";
 import { runEconomicsSimulation } from "./tools/sandbox.js";
 import { runStressTestSuite } from "./stress-test.js";
 import { dossierStorage } from "./services/storage.js";
-import { IdeaInput, AgentOpinion, DebateChallenge, EvidenceItem } from "./types/index.js";
+import { IdeaInput, AgentOpinion, DebateChallenge } from "./types/index.js";
 
 /**
  * Dossier Model Context Protocol (MCP) Server
@@ -353,7 +353,14 @@ class DossierMCPServer {
 
           case "verify_claims_epistemics": {
             const claims = Array.isArray(args?.claims) ? args.claims : [];
-            const audited = claims.map((c: any) => {
+            const audited = claims.map((raw) => {
+              const c = (raw && typeof raw === "object" ? raw : {}) as {
+                claim?: string;
+                source?: string;
+                isCalculation?: boolean;
+                hasExternalSource?: boolean;
+                isFact?: boolean;
+              };
               let state = "MODELLED_ASSUMPTION";
               if (c.isCalculation) {
                 state = "VERIFIED_COMPUTATION";
@@ -492,12 +499,12 @@ class DossierMCPServer {
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         return {
           content: [
             {
               type: "text",
-              text: `Error executing tool ${name}: ${err.message}`
+              text: `Error executing tool ${name}: ${err instanceof Error ? err.message : String(err)}`
             }
           ],
           isError: true

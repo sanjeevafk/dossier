@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { dossierStorage } from "../services/storage.js";
-import { extractDomainTokens, getSearchQueryCandidates } from "./queryTokens.js";
+import { extractDomainTokens } from "./queryTokens.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -206,8 +206,8 @@ export async function queryGitHubTraction(
 
     if (res.ok) {
       const data = await res.json();
-      const items = Array.isArray(data?.items) ? data.items : [];
-      const repos: GitHubRepoSignal[] = items.slice(0, 3).map((r: any) => ({
+      const items = (Array.isArray(data?.items) ? data.items : []) as Array<Record<string, unknown>>;
+      const repos: GitHubRepoSignal[] = items.slice(0, 3).map((r) => ({
         fullName: String(r.full_name || ""),
         stars: Number(r.stargazers_count) || 0,
         description: String(r.description || "").slice(0, 150),

@@ -122,7 +122,10 @@ console.log();
 
 // Ids must be unique even if the script is re-run with different seeds into the same tree.
 const seen = new Set<string>();
-const deduped = out.filter((c: any) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
+const deduped = out.filter((c) => {
+  const id = String((c as { id?: string }).id ?? "");
+  return seen.has(id) ? false : (seen.add(id), true);
+});
 const file = path.resolve("src/evaluation/cases_yc.ts");
 fs.writeFileSync(
   file,

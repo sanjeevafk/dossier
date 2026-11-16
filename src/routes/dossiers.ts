@@ -21,8 +21,8 @@ export async function handleDossiers(ctx: RouteContext): Promise<boolean> {
         const limit = limitParam ? parseInt(limitParam, 10) : 20;
         const dossiers = await dossierStorage.listDossiers(limit);
         sendJson(res, 200, { success: true, count: dossiers.length, dossiers });
-      } catch (error: any) {
-        sendJson(res, 500, { success: false, error: error.message });
+      } catch (error: unknown) {
+        sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : "Failed to list dossiers" });
       }
       return;
     }
@@ -76,8 +76,8 @@ export async function handleDossiers(ctx: RouteContext): Promise<boolean> {
           res.end(markdown);
           return;
         }
-      } catch (error: any) {
-        sendJson(res, 500, { success: false, error: error.message });
+      } catch (error: unknown) {
+        sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : "Export failed" });
         return;
       }
     }
@@ -93,8 +93,8 @@ export async function handleDossiers(ctx: RouteContext): Promise<boolean> {
           return;
         }
         sendJson(res, 200, { success: true, dossier });
-      } catch (error: any) {
-        sendJson(res, 500, { success: false, error: error.message });
+      } catch (error: unknown) {
+        sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : "Failed to list dossiers" });
       }
       return;
     }
@@ -104,11 +104,11 @@ export async function handleDossiers(ctx: RouteContext): Promise<boolean> {
     if (method === "POST" && outcomeMatch) {
       if (!checkAuth(req, res)) return;
       const id = outcomeMatch[1];
-      let body: any;
+      let body: unknown;
       try {
         body = await readJsonBody(req);
-      } catch (err: any) {
-        sendJson(res, 400, { error: err.message || "Invalid JSON" });
+      } catch (err: unknown) {
+        sendJson(res, 400, { error: err instanceof Error ? err.message : "Invalid JSON" });
         return;
       }
       const parsedOutcome = parseBody(outcomeSchema, body);

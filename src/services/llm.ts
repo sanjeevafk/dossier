@@ -472,7 +472,10 @@ async function fetchChatCompletion(
     throw new Error(`LLM ${provider.name} (${res.status}): ${errText.slice(0, 300)}`);
   }
 
-  const json: any = await res.json();
+  const json = (await res.json()) as {
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+    choices?: Array<{ message?: { content?: string } }>;
+  };
   recordUsage(provider.name, model, json.usage?.prompt_tokens, json.usage?.completion_tokens);
   return json.choices?.[0]?.message?.content || "";
 }
@@ -512,14 +515,23 @@ async function fetchResponsesTurn(
     throw new Error(`LLM ${provider.name} (${res.status}): ${errText.slice(0, 300)}`);
   }
 
-  const json: any = await res.json();
+  const json = (await res.json()) as {
+    usage?: { input_tokens?: number; output_tokens?: number };
+    error?: unknown;
+    status?: string;
+    incomplete_details?: { reason?: string };
+    output?: Array<{
+      type?: string;
+      content?: Array<{ type?: string; text?: string }>;
+    }>;
+  };
   recordUsage(provider.name, model, json.usage?.input_tokens, json.usage?.output_tokens);
   if (json.error) throw new Error(`LLM ${provider.name}: ${JSON.stringify(json.error).slice(0, 300)}`);
   const text = (json.output || [])
-    .filter((item: any) => item?.type === "message")
-    .flatMap((item: any) => item.content || [])
-    .filter((part: any) => part?.type === "output_text")
-    .map((part: any) => part.text || "")
+    .filter((item) => item?.type === "message")
+    .flatMap((item) => item.content || [])
+    .filter((part) => part?.type === "output_text")
+    .map((part) => part.text || "")
     .join("");
   // A truncated answer is a failed answer: partial JSON would parse as garbage or not at all.
   if (json.status === "incomplete") {
@@ -664,10 +676,11 @@ export async function streamAgentTurn(
         return full;
       }
       throw new Error(`provider ${provider.name} streamed nothing`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       markProviderUnhealthy(provider.name, err);
       recordFailure();
-      errors.push(`${provider.name}: ${(err?.cause?.code || err?.message || "error").toString().slice(0, 160)}`);
+      const errObj = err as { cause?: { code?: string }; message?: string } | null;
+      errors.push(`${provider.name}: ${(errObj?.cause?.code || errObj?.message || "error").toString().slice(0, 160)}`);
     }
   }
 
@@ -734,8 +747,9 @@ export async function generateAgentTurnDetailed(
       errors.push(`${provider.name}: empty response`);
       recordFailure();
       markProviderUnhealthy(provider.name, "empty response"); // empty response — treat as unhealthy, rotate
-    } catch (err: any) {
-      errors.push(`${provider.name}: ${(err?.cause?.code || err?.message || "error").toString().slice(0, 160)}`);
+    } catch (err: unknown) {
+      const errObj = err as { cause?: { code?: string }; message?: string } | null;
+      errors.push(`${provider.name}: ${(errObj?.cause?.code || errObj?.message || "error").toString().slice(0, 160)}`);
       recordFailure();
       markProviderUnhealthy(provider.name, err); // error (rate limit, 402, timeout, bad key) — cooldown, rotate
     }
@@ -784,10 +798,13 @@ export async function listProviderModels(): Promise<ProviderModelList[]> {
         out.push({ provider: provider.name, baseURL: provider.baseURL, configuredModel: provider.defaultModel, configuredModelListed: null, models: [], error: `HTTP ${resp.status}` });
         continue;
       }
-      const json: any = await resp.json();
+      const json = (await resp.json()) as {
+        data?: Array<string | { id?: string; name?: string }>;
+        models?: Array<string | { id?: string; name?: string }>;
+      };
       const models: string[] = (Array.isArray(json?.data) ? json.data : Array.isArray(json?.models) ? json.models : [])
-        .map((m: any) => (typeof m === "string" ? m : m?.id ?? m?.name))
-        .filter((m: unknown): m is string => typeof m === "string");
+        .map((m) => (typeof m === "string" ? m : m?.id ?? m?.name))
+        .filter((m): m is string => typeof m === "string");
       out.push({
         provider: provider.name,
         baseURL: provider.baseURL,
@@ -795,8 +812,9 @@ export async function listProviderModels(): Promise<ProviderModelList[]> {
         configuredModelListed: models.length ? models.includes(provider.defaultModel) : null,
         models: models.slice(0, 100)
       });
-    } catch (err: any) {
-      out.push({ provider: provider.name, baseURL: provider.baseURL, configuredModel: provider.defaultModel, configuredModelListed: null, models: [], error: (err?.message || "request failed").slice(0, 160) });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "request failed";
+      out.push({ provider: provider.name, baseURL: provider.baseURL, configuredModel: provider.defaultModel, configuredModelListed: null, models: [], error: msg.slice(0, 160) });
     }
   }
   return out;

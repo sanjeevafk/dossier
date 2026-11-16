@@ -14,7 +14,7 @@ import path from "node:path";
 // Keep evaluation dossiers out of the user's archive.
 process.env.DOSSIER_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "dossier-eval-"));
 
-const { casesFor, splitOf } = await import("../src/evaluation/index.ts");
+const { casesFor } = await import("../src/evaluation/index.ts");
 const { generateAgentTurn } = await import("../src/services/llm.ts");
 const { IdeaSwarmOrchestrator } = await import("../src/core/swarm.ts");
 const { getLLMStatus } = await import("../src/services/llm.ts");

@@ -253,8 +253,8 @@ async function runRealStartupsBacktest() {
       console.log(`${outcomeColor} Score: ${dossier.killScore}/100 (${dossier.overallVerdict}) in ${durationMs}ms`);
       console.log(`  \x1b[90mPrimary Red Team Flaw:\x1b[0m ${fatalFlawText.slice(0, 110)}...`);
       console.log(`  \x1b[90mWeakest Assumption:\x1b[0m    ${waText.slice(0, 110)}...\n`);
-    } catch (err: any) {
-      console.error(`\x1b[31mError evaluating ${c.name}: ${err.message}\x1b[0m`);
+    } catch (err: unknown) {
+      console.error(`\x1b[31mError evaluating ${c.name}: ${err instanceof Error ? err.message : String(err)}\x1b[0m`);
     }
   }
 

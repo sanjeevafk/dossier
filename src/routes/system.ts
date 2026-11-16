@@ -23,7 +23,7 @@ function getRevision(): string {
 
 /** Returns true if this group handled the request. */
 export async function handleSystem(ctx: RouteContext): Promise<boolean> {
-  const { req, res, method, pathname, parsedUrl } = ctx;
+  const { req, res, method, pathname } = ctx;
   let handled = true;
   // Each route block ends with `return` once it has responded; falling through means "not mine".
   await (async (): Promise<void> => {

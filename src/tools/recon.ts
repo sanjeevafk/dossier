@@ -35,7 +35,15 @@ function truncate(text: string, max = 320): string {
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
 
-async function fetchJson(url: string, init: RequestInit): Promise<any> {
+interface ReconRawItem {
+  url?: string;
+  title?: string;
+  text?: string;
+  summary?: string;
+  content?: string;
+}
+
+async function fetchJson(url: string, init: RequestInit): Promise<{ results?: ReconRawItem[] }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), RECON_TIMEOUT_MS);
   try {
@@ -43,7 +51,7 @@ async function fetchJson(url: string, init: RequestInit): Promise<any> {
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} from ${url}`);
     }
-    return await res.json();
+    return (await res.json()) as { results?: ReconRawItem[] };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -65,8 +73,8 @@ async function searchExa(apiKey: string, query: string): Promise<ReconSourceResu
 
   const results = Array.isArray(payload?.results) ? payload.results : [];
   return results
-    .filter((r: any) => r?.url)
-    .map((r: any) => ({
+    .filter((r): r is ReconRawItem & { url: string } => Boolean(r?.url))
+    .map((r) => ({
       title: truncate(String(r.title || r.url), 140),
       url: String(r.url),
       snippet: truncate(String(r.text || r.summary || ""))
@@ -87,8 +95,8 @@ async function searchTavily(apiKey: string, query: string): Promise<ReconSourceR
 
   const results = Array.isArray(payload?.results) ? payload.results : [];
   return results
-    .filter((r: any) => r?.url)
-    .map((r: any) => ({
+    .filter((r): r is ReconRawItem & { url: string } => Boolean(r?.url))
+    .map((r) => ({
       title: truncate(String(r.title || r.url), 140),
       url: String(r.url),
       snippet: truncate(String(r.content || ""))
@@ -247,8 +255,8 @@ export async function performLiveWebRecon(
         collected.push({ ...result, queryLabel: result.queryLabel || queryLabel });
         if (collected.length >= MAX_TOTAL_RESULTS) break;
       }
-    } catch (err: any) {
-      errors.push(`${query}: ${err?.message || "recon failed"}`);
+    } catch (err: unknown) {
+      errors.push(`${query}: ${err instanceof Error ? err.message : "recon failed"}`);
     }
     if (collected.length >= MAX_TOTAL_RESULTS) break;
   }

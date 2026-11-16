@@ -1,5 +1,3 @@
-import { getSearchQueryCandidates, extractDomainTokens } from "./queryTokens.js";
-
 export interface FloviaMarketSignal {
   asset: string;
   priceUsd: number;
@@ -143,7 +141,7 @@ export async function queryFloviaIntelligence(
       ],
       keyTakeaway: `On-chain liquidity & token market status: ${summaryParts.join("; ")}.`
     };
-  } catch (err: any) {
-    return empty(`Flovia query failed: ${err.message || String(err)}`);
+  } catch (err: unknown) {
+    return empty(`Flovia query failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }

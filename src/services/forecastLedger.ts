@@ -58,9 +58,9 @@ export class ForecastLedgerService {
     try {
       fs.mkdirSync(path.dirname(this.storagePath), { recursive: true });
       fs.appendFileSync(this.storagePath, `${JSON.stringify(event)}\n`, "utf-8");
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Storage failure must not break evaluation; the in-memory state stays usable.
-      console.warn(`[ForecastLedger] append failed: ${err?.message || err}`);
+      console.warn(`[ForecastLedger] append failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

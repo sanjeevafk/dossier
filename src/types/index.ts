@@ -552,7 +552,7 @@ export type SwarmEvent =
   | { type: "agent_opinion"; role: SwarmRole; roleTitle: string; verdict: Verdict; score: number; fatalFlaw?: string }
   | { type: "parse_fallback"; role: SwarmRole; reason: string }
   | { type: "sandbox_simulating"; iterationCount: number }
-  | { type: "sandbox_metrics"; metrics: any; runtime: string; exitCode: number }
+  | { type: "sandbox_metrics"; metrics: Record<string, unknown>; runtime: string; exitCode: number }
   | { type: "crossfire_start"; agentA: SwarmRole; agentB: SwarmRole; topic: string }
   | { type: "crossfire_clash"; challenger: string; target: string; challengePoint: string; rebuttal?: string; status: string }
   | { type: "crossfire_rebuttal"; agent: SwarmRole; argument: string; confidenceDelta: number }
