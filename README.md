@@ -4,7 +4,7 @@ Dossier is an adversarial risk reviewer for startup concepts, product features, 
 
 Six specialist lenses each report evidenced findings from their own lane. An isolated Python sandbox runs unit-economics simulations when you supply real price and CAC, and the output is a falsification roadmap you can run in a week.
 
-**What it is not:** a predictor of success. On held-out, neutrally written cases the verdict does not separate eventual successes from eventual failures better than chance (see [docs/EVALUATION.md](docs/EVALUATION.md)). Read the findings and the tests; treat the verdict as a rough screen. Confidence is uncalibrated and no probability of success is shown.
+**What it is not:** a predictor of startup survival. From a short pitch alone, Dossier’s 0–100 score ranks eventual winners and losers near chance (AUROC `0.46–0.63`; see [docs/EVALUATION.md](docs/EVALUATION.md))—it is a pre-mortem and validation-checklist tool, not an oracle. Read the findings, break-even limits, and 7-day tests; treat the verdict as a rough screen. Confidence is uncalibrated and no probability of success is shown.
 
 Live Deployment: https://dossier.worksforme.tech
 
@@ -68,7 +68,8 @@ Live Deployment: https://dossier.worksforme.tech
 
 ## Core Systems
 
-- **Sandboxed Unit Economics:** Executes isolated Python subprocesses with vectorized NumPy Monte Carlo simulations (10,000 runs) to model cash runway, LTV/CAC ratios, and payback percentiles under parameter uncertainty.
+- **Sandboxed Unit Economics & Break-Even Boundaries:** Executes isolated Python subprocesses with vectorized NumPy Monte Carlo simulations (10,000 runs) to model cash runway, LTV/CAC ratios, payback percentiles, and deterministic break-even limits (`maxSurvivableCacUsd`, `cacHeadroomRatio`, `maxSurvivableMonthlyChurn`).
+- **Reference-Class & Verdict Guardrails:** Audits founder-stated CAC and churn against archetype medians (`auditFounderEconomicsVsBaseRate`), blocks `BUILD_IF_VALIDATED` on ungrounded or overly optimistic assumptions, and prevents sparse pitches or "missing info" claims from triggering `KILL`.
 - **Global Sensitivity & VOI:** Calculates sensitivity and Expected Value of Perfect Information (EVPI) to rank which uncertain metrics carry the highest financial risk.
 - **Epistemic Claim Verification:** Classifies factual assertions into seven discrete evidence tiers (`VERIFIED_FACT`, `VERIFIED_COMPUTATION`, `EXTERNAL_EVIDENCE`, `MODELLED_ASSUMPTION`, `INFERENCE`, `UNKNOWN`, `CONTRADICTED`).
 - **Empirical Grounding & Graveyard Precedents:** Cross-references queries against curated failure case studies and real market evidence.
@@ -206,9 +207,9 @@ pnpm run benchmark
 
 ### What the evaluation shows
 
-`src/evaluation/` holds 139 ideas written as neutral founder pitches (no outcome, no cause of death), with a deterministic dev / validation / frozen-test split. Run it with `pnpm eval -- --split dev`, and compare against a one-prompt baseline with `--baseline`.
+`src/evaluation/` holds 197 ideas written as neutral founder pitches (no outcome, no cause of death), with a deterministic dev / validation / frozen-test split. Run it with `pnpm eval -- --split dev` (or `pnpm run eval:heuristic -- --split dev` offline), and compare against a one-prompt baseline with `--baseline`.
 
-On the dev split (12 eventual successes, 15 eventual failures) the full pipeline's score gives **AUROC 0.50 (95% CI 0.27 to 0.74)**, which is no better than chance, and the one-prompt baseline gives 0.40. The pipeline does keep most successes alive (33% wrongly killed against 100% for the baseline), but it also passes 60% of the failures. The full table, method and limits are in [docs/EVALUATION.md](docs/EVALUATION.md).
+On the 89-case dev split (28 eventual successes, 55 eventual failures, 6 ambiguous), Dossier’s 0–100 score ranks eventual winners and losers near chance (**AUROC 0.63** on the Nov 15 run; **0.46** on the Nov 16 hardened run, `meanScore` `46.2` vs. `46.5`), while keeping strict false passes (`BUILD` on failures) at **0%** (`27 KILL / 62 REFINE`). In plain terms: a 1-paragraph pitch does not contain enough execution or distribution signal to predict which startup will survive, so use Dossier for its **evidenced findings, break-even limits, and 7-day tests** rather than as a pass/fail oracle. The full tables, hardening details, and limits are in [docs/EVALUATION.md](docs/EVALUATION.md).
 
 Earlier versions of this README quoted 8/9 accuracy on a hand-picked set of famous companies (Stripe, Quibi, Juicero and others). That set uses names a language model may recall and its descriptions carried hints of the outcome, so it is **not evidence of accuracy**. It remains in `scripts/backtest_real_startups.ts` only as a regression check.
 
