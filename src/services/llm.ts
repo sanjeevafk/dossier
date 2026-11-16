@@ -367,20 +367,6 @@ async function runGenericCliTurn(
   throw new Error("CLI LLM command returned empty response");
 }
 
-// Backward-compatible default client stub
-const defaultProviders = resolveProviders();
-const primary = defaultProviders[0] || {
-  name: "fallback",
-  apiKey: "dummy-key",
-  baseURL: "https://api.orcarouter.ai/v1",
-  defaultModel: "orcarouter/auto"
-};
-
-export const llmClient = {
-  baseURL: primary.baseURL || "https://api.orcarouter.ai/v1",
-  apiKey: primary.apiKey
-};
-
 // Rotation state. Providers that have answered recently share the load (free tiers enforce per-minute
 // limits); providers that fail are benched with an escalating cooldown, and bad credentials (401/403)
 // are benched for an hour so a dead key stops costing a failed request on every call.

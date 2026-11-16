@@ -1,8 +1,7 @@
 import {
   ForecastRecord,
   ForecastSourceField,
-  IdeaDossier,
-  ValidationVerdict
+  IdeaDossier
 } from "../types/index.js";
 
 /**
@@ -115,9 +114,4 @@ export function extractForecasts(dossier: IdeaDossier): ForecastRecord[] {
   // Dedupe by id (defensive; ids are unique by construction).
   const seen = new Set<string>();
   return records.filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
-}
-
-/** Verdict-family helper used by tests and the ledger service. */
-export function isKillVerdict(verdict: ValidationVerdict): boolean {
-  return verdict === "KILL";
 }
