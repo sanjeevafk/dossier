@@ -745,3 +745,53 @@ export async function generateAgentTurn(
 ): Promise<string> {
   return (await generateAgentTurnDetailed(systemPrompt, userPrompt, options)).text;
 }
+
+export interface ProviderModelList {
+  provider: string;
+  baseURL: string;
+  configuredModel: string;
+  /** true when the configured model appears in the provider's own model list. */
+  configuredModelListed: boolean | null;
+  models: string[];
+  error?: string;
+}
+
+/**
+ * Read-only diagnostic: asks each configured provider which models this key can use.
+ * Answers the question a 404 "model_not_found" leaves open — is the model missing, or does
+ * this key simply not have access? Never returns or logs the key.
+ */
+export async function listProviderModels(): Promise<ProviderModelList[]> {
+  const out: ProviderModelList[] = [];
+  for (const provider of resolveProviders()) {
+    if (provider.kind === "cli") {
+      out.push({ provider: provider.name, baseURL: "cli", configuredModel: provider.defaultModel, configuredModelListed: null, models: [], error: "CLI provider: model listing not applicable" });
+      continue;
+    }
+    const url = `${provider.baseURL.replace(/\/+$/, "")}/models`;
+    try {
+      const resp = await fetch(url, {
+        headers: { Authorization: `Bearer ${provider.apiKey}`, ...(provider.extraHeaders ?? {}) },
+        signal: AbortSignal.timeout(15_000)
+      });
+      if (!resp.ok) {
+        out.push({ provider: provider.name, baseURL: provider.baseURL, configuredModel: provider.defaultModel, configuredModelListed: null, models: [], error: `HTTP ${resp.status}` });
+        continue;
+      }
+      const json: any = await resp.json();
+      const models: string[] = (Array.isArray(json?.data) ? json.data : Array.isArray(json?.models) ? json.models : [])
+        .map((m: any) => (typeof m === "string" ? m : m?.id ?? m?.name))
+        .filter((m: unknown): m is string => typeof m === "string");
+      out.push({
+        provider: provider.name,
+        baseURL: provider.baseURL,
+        configuredModel: provider.defaultModel,
+        configuredModelListed: models.length ? models.includes(provider.defaultModel) : null,
+        models: models.slice(0, 100)
+      });
+    } catch (err: any) {
+      out.push({ provider: provider.name, baseURL: provider.baseURL, configuredModel: provider.defaultModel, configuredModelListed: null, models: [], error: (err?.message || "request failed").slice(0, 160) });
+    }
+  }
+  return out;
+}

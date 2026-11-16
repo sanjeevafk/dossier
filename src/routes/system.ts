@@ -2,7 +2,8 @@ import path from "node:path";
 import fs from "node:fs";
 import { debug } from "../utils/log.js";
 import type { RouteContext } from "./context.js";
-import { getLLMStatus } from "../services/llm.js";
+import { getLLMStatus, listProviderModels } from "../services/llm.js";
+import { checkAuth } from "../http/auth.js";
 import { dossierStorage } from "../services/storage.js";
 import { summarizeCalibration } from "../services/calibration.js";
 import { sendJson } from "../http/respond.js";
@@ -47,7 +48,25 @@ export async function handleSystem(ctx: RouteContext): Promise<boolean> {
       return;
     }
 
-    // 2. Calibration & Monitor Metrics
+    // 2. Which models can each configured provider key actually use? (read-only diagnostic:
+    // a 404 model_not_found does not tell you whether the model is missing or access is.)
+    if (method === "GET" && pathname === "/api/llm/models") {
+      if (!checkAuth(req, res)) return;
+      try {
+        const providers = await listProviderModels();
+        sendJson(res, 200, {
+          success: true,
+          note: "Read-only: lists the models each configured key can use. Keys are never returned.",
+          providers
+        });
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "model listing failed";
+        sendJson(res, 500, { success: false, error: message });
+      }
+      return;
+    }
+
+    // 3. Calibration & Monitor Metrics
     if (method === "GET" && pathname === "/metrics") {
       try {
         const rows = dossierStorage.listLedger() as Array<{
