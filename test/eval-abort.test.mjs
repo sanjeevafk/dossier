@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { IdeaSwarmOrchestrator } from "../src/core/swarm.ts";
-import { enforceEvaluationBudget, runWithUsageTracking } from "../src/services/llm.ts";
+import { currentLlmUsage, enforceEvaluationBudget, runWithUsageTracking } from "../src/services/llm.ts";
 
 test("an aborted evaluation stops before spending more LLM calls", async () => {
   const ac = new AbortController();
@@ -9,6 +9,7 @@ test("an aborted evaluation stops before spending more LLM calls", async () => {
     enforceEvaluationBudget(); // fine while live
     ac.abort();
     assert.throws(() => enforceEvaluationBudget(), { name: "AbortError" });
+    assert.ok(!("signal" in JSON.parse(JSON.stringify(currentLlmUsage()))), "signal must not serialize into dossier llmUsage");
   }, ac.signal);
 });
 

@@ -69,7 +69,10 @@ const usageStore = new AsyncLocalStorage<LlmUsage>();
 
 /** Run `fn` with a fresh usage tracker; every LLM call made inside (including parallel ones) is recorded on it. */
 export function runWithUsageTracking<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-  return usageStore.run({ calls: 0, failedCalls: 0, inputTokens: 0, outputTokens: 0, models: {}, cacheHits: 0, startedAt: Date.now(), signal }, fn);
+  const usage: LlmUsage = { calls: 0, failedCalls: 0, inputTokens: 0, outputTokens: 0, models: {}, cacheHits: 0, startedAt: Date.now() };
+  // Non-enumerable: the usage object is serialized into dossiers and API responses; the signal must not leak into them.
+  if (signal) Object.defineProperty(usage, "signal", { value: signal, enumerable: false });
+  return usageStore.run(usage, fn);
 }
 
 /** Per-request timeout, also cut short when the surrounding evaluation is aborted. */
