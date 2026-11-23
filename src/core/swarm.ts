@@ -69,6 +69,8 @@ export interface SwarmExecutionOptions {
   /** BYOK recon keys (per-request headers); falls back to server env. */
   exaKey?: string;
   tavilyKey?: string;
+  /** Abort to stop spending: halts in-flight LLM requests and rejects at the next stage boundary. */
+  signal?: AbortSignal;
 }
 
 export class IdeaSwarmOrchestrator {
@@ -93,7 +95,7 @@ export class IdeaSwarmOrchestrator {
    */
   public evaluateIdea(idea: IdeaInput, options: SwarmExecutionOptions = {}): Promise<IdeaDossier> {
     // Fresh per-evaluation LLM usage tracker (async-local, so parallel evaluations never mix counts).
-    return runWithUsageTracking(() => this.runEvaluation(idea, options));
+    return runWithUsageTracking(() => this.runEvaluation(idea, options), options.signal);
   }
 
   private async runEvaluation(
@@ -234,6 +236,7 @@ export class IdeaSwarmOrchestrator {
     });
 
     // 03 INVESTIGATE (Domain-Tailored Specialist Subagents)
+    options.signal?.throwIfAborted();
     notify("03 INVESTIGATE", `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`);
     emit({ type: "stage", stage: "03 INVESTIGATE", detail: `Deploying 6 domain specialist agents for [${domain.archetypeLabel}]...`, timestamp: new Date().toISOString() });
 
@@ -298,6 +301,7 @@ export class IdeaSwarmOrchestrator {
     const provenance = { llmRoles, heuristicRoles, fallbackReasons };
 
     // 04 ATTACK & CROSS-EXAMINE (Adversarial Round 1)
+    options.signal?.throwIfAborted();
     notify("04 ATTACK", `Red Team deploying fatal assumption attacks across [${domain.archetypeLabel}]...`);
 
     const debateInput: DebateTrailInput = {
@@ -328,6 +332,7 @@ export class IdeaSwarmOrchestrator {
     }
 
     // 05 VERIFY (Epistemic Robust Verifier & NLI)
+    options.signal?.throwIfAborted();
     notify("05 VERIFY", "Verifying sandboxed Python metrics & executing Epistemic Robust Verifier...");
 
     const evidenceFeed = buildEvidenceFeed({

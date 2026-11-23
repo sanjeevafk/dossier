@@ -65,17 +65,27 @@ function createRateLimiter(windowMs: number, maxHits: number, message: string) {
 const GLOBAL_DAILY_EVAL_CAP = parseInt(process.env.GLOBAL_DAILY_EVAL_CAP || "200", 10);
 const globalEval = { count: 0, resetAt: Date.now() + 24 * 60 * 60 * 1000 };
 
-function checkGlobalEvalCap(res: ServerResponse): boolean {
-  const now = Date.now();
+function rollGlobalEvalWindow(now: number): void {
   if (globalEval.resetAt <= now) {
     globalEval.count = 0;
     globalEval.resetAt = now + 24 * 60 * 60 * 1000;
   }
+}
+
+/** Read-only check: rejects with 429 when the cap is reached, but spends nothing. */
+function checkGlobalEvalCap(res: ServerResponse): boolean {
+  const now = Date.now();
+  rollGlobalEvalWindow(now);
   if (GLOBAL_DAILY_EVAL_CAP > 0 && globalEval.count >= GLOBAL_DAILY_EVAL_CAP) {
     return rejectRateLimited(res, globalEval.resetAt - now, "Daily evaluation capacity reached. Try again later or self-host.");
   }
-  globalEval.count++;
   return true;
+}
+
+/** Spend one unit of the global daily cap. Call only once an evaluation is actually admitted to run. */
+export function commitGlobalEvalSpend(): void {
+  rollGlobalEvalWindow(Date.now());
+  globalEval.count++;
 }
 
 const perIpEvaluateLimiter = createRateLimiter(

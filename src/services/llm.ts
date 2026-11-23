@@ -61,13 +61,22 @@ export interface LlmUsage {
   /** Responses served from the response cache: real API burn stays 0 for them. */
   cacheHits: number;
   startedAt: number;
+  /** Aborted when the caller (e.g. a disconnected HTTP client) no longer wants the result. */
+  signal?: AbortSignal;
 }
 
 const usageStore = new AsyncLocalStorage<LlmUsage>();
 
 /** Run `fn` with a fresh usage tracker; every LLM call made inside (including parallel ones) is recorded on it. */
-export function runWithUsageTracking<T>(fn: () => Promise<T>): Promise<T> {
-  return usageStore.run({ calls: 0, failedCalls: 0, inputTokens: 0, outputTokens: 0, models: {}, cacheHits: 0, startedAt: Date.now() }, fn);
+export function runWithUsageTracking<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  return usageStore.run({ calls: 0, failedCalls: 0, inputTokens: 0, outputTokens: 0, models: {}, cacheHits: 0, startedAt: Date.now(), signal }, fn);
+}
+
+/** Per-request timeout, also cut short when the surrounding evaluation is aborted. */
+function requestSignal(timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const abort = usageStore.getStore()?.signal;
+  return abort ? AbortSignal.any([timeout, abort]) : timeout;
 }
 
 export function currentLlmUsage(): LlmUsage | undefined {
@@ -82,6 +91,7 @@ export function currentLlmUsage(): LlmUsage | undefined {
 export function enforceEvaluationBudget(): void {
   const u = usageStore.getStore();
   if (!u) return;
+  u.signal?.throwIfAborted();
   const maxTokens = Number(process.env.DOSSIER_MAX_EVAL_TOKENS);
   if (Number.isFinite(maxTokens) && maxTokens > 0 && u.inputTokens + u.outputTokens >= maxTokens) {
     throw new Error(
@@ -450,7 +460,7 @@ async function fetchChatCompletion(
         { role: "user", content: userPrompt }
       ]
     }),
-    signal: AbortSignal.timeout(25000)
+    signal: requestSignal(25000)
   });
 
   if (!res.ok) {
@@ -493,7 +503,7 @@ async function fetchResponsesTurn(
       max_output_tokens: Math.min(32000, (options.maxTokens || 2500) + 14000),
       stream: false
     }),
-    signal: AbortSignal.timeout(90000)
+    signal: requestSignal(90000)
   });
 
   if (!res.ok) {
@@ -552,7 +562,7 @@ async function fetchChatStream(
         { role: "user", content: userPrompt }
       ]
     }),
-    signal: AbortSignal.timeout(25000)
+    signal: requestSignal(25000)
   });
 
   if (!res.ok) {

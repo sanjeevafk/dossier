@@ -6,7 +6,7 @@ import { parseBody, evaluateSchema } from "../validation.js";
 import { readJsonBody, sendJson } from "../http/respond.js";
 import { checkAuth } from "../http/auth.js";
 import { log } from "../http/log.js";
-import { evaluateLimiter, releaseEvaluationSlot, tryAcquireEvaluationSlot } from "../http/limits.js";
+import { commitGlobalEvalSpend, evaluateLimiter, releaseEvaluationSlot, tryAcquireEvaluationSlot } from "../http/limits.js";
 
 const orchestrator = new IdeaSwarmOrchestrator();
 
@@ -44,6 +44,13 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
         });
         return;
       }
+      commitGlobalEvalSpend();
+
+      // The JSON client has no way to recover a result it never received: stop spending if it leaves.
+      const abort = new AbortController();
+      res.on("close", () => {
+        if (!res.writableFinished) abort.abort();
+      });
 
       try {
         const ideaInput: IdeaInput = {
@@ -60,7 +67,8 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
           estimatedCacUsd,
           useLiveLLM: useLiveLLM !== false,
           exaKey,
-          tavilyKey
+          tavilyKey,
+          signal: abort.signal
         });
 
         sendJson(res, 200, {
@@ -106,19 +114,17 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
         });
         return;
       }
-
-      // Set SSE response headers
-      res.statusCode = 200;
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.setHeader("X-Accel-Buffering", "no");
-      res.flushHeaders?.();
+      commitGlobalEvalSpend();
 
       let isClientConnected = true;
       let finished = false;
+      // Cancel on disconnect, except once verdict synthesis has begun: the client's recovery path
+      // (recoverDossierAfterStream) loads the saved dossier, and that phase is short and ends in a save.
+      const abort = new AbortController();
+      let pastPointOfNoReturn = false;
       res.on("close", () => {
         isClientConnected = false;
+        if (!finished && !pastPointOfNoReturn) abort.abort();
       });
 
       const sendSSE = (event: string, data: unknown) => {
@@ -142,7 +148,16 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
         monetization: monetization || "$49/month SaaS"
       };
 
+      // Everything that can throw after the slot is taken lives inside this try, so the finally always releases it.
       try {
+        // Set SSE response headers
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+        res.flushHeaders?.();
+
         sendSSE("init", { service: "dossier-stream", timestamp: new Date().toISOString() });
 
         const dossier = await orchestrator.evaluateIdea(ideaInput, {
@@ -151,7 +166,9 @@ export async function handleEvaluate(ctx: RouteContext): Promise<boolean> {
           useLiveLLM: useLiveLLM !== false,
           exaKey: typeof req.headers["x-exa-key"] === "string" ? req.headers["x-exa-key"] : undefined,
           tavilyKey: typeof req.headers["x-tavily-key"] === "string" ? req.headers["x-tavily-key"] : undefined,
+          signal: abort.signal,
           onProgress: (stage, detail) => {
+            if (stage.startsWith("07")) pastPointOfNoReturn = true;
             sendSSE("progress", { stage, detail, timestamp: new Date().toISOString() });
           },
           onEvent: (event) => {
