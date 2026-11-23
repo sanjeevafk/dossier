@@ -647,6 +647,9 @@ export async function streamAgentTurn(
       if (provider.kind === "cli") {
         const text = await runGenericCliTurn(provider, systemPrompt, userPrompt, options);
         if (text.trim()) {
+          lastSuccessfulProvider = provider.name;
+          lastSuccessfulModel = options.model || provider.defaultModel;
+          markProviderOk(provider.name);
           onChunk(text);
           return text;
         }
@@ -671,6 +674,8 @@ export async function streamAgentTurn(
 
       const full = await fetchChatStream(provider, model, systemPrompt, userPrompt, options, onChunk);
       if (full.trim()) {
+        lastSuccessfulProvider = provider.name;
+        lastSuccessfulModel = model;
         markProviderOk(provider.name);
         return full;
       }

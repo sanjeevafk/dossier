@@ -39,10 +39,13 @@ export async function runDecisionModel(
       ...parsed,
       runtimeMs: Date.now() - start
     };
-  } catch {
-    // Graceful fallback to deterministic defaults if Python execution is interrupted
+  } catch (err: unknown) {
+    // Honest degraded fallback if Python execution is interrupted — never silently stamp BUILD
+    const message = err instanceof Error ? err.message : "Decision model execution failed";
     return {
       engine: "FallbackHeuristics",
+      degraded: true,
+      error: message,
       answers: {
         moat: { choice: "defensible_workflow", probabilities: { thin_wrapper: 0.12, defensible_workflow: 0.88 }, threshold: 0.28, flagged: false },
         regulatory_risk: { choice: "standard_compliance", probabilities: { regulatory_fatal: 0.05, standard_compliance: 0.95 }, threshold: 0.25, flagged: false },
@@ -50,8 +53,8 @@ export async function runDecisionModel(
         monetization: { choice: "viable_economics", probabilities: { monetization_zero: 0.08, viable_economics: 0.92 }, threshold: 0.30, flagged: false }
       },
       fatal_flags: [],
-      refine_flags: [],
-      verdict: "BUILD",
+      refine_flags: ["decision_model_unavailable"],
+      verdict: "REFINE",
       loss_ratio: 75.0,
       runtimeMs: Date.now() - start
     };

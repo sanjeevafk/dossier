@@ -369,6 +369,8 @@ export interface DecisionModelOutput {
   loss_ratio: number;
   runtimeMs?: number;
   economicsAvailability?: "available" | "degraded" | "unavailable";
+  degraded?: boolean;
+  error?: string;
 }
 
 /** Honest inter-agent disagreement signal — replaces cosmetic confidence scores. */
