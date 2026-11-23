@@ -19,7 +19,9 @@ export async function handleDossiers(ctx: RouteContext): Promise<boolean> {
       try {
         const limitParam = parsedUrl.searchParams.get("limit");
         const limit = limitParam ? parseInt(limitParam, 10) : 20;
-        const dossiers = await dossierStorage.listDossiers(limit);
+        const dedupeByTitle = parsedUrl.searchParams.get("dedupe") === "1" || parsedUrl.searchParams.get("dedupe") === "true";
+        const excludeHeuristic = parsedUrl.searchParams.get("excludeHeuristic") === "1" || parsedUrl.searchParams.get("excludeHeuristic") === "true";
+        const dossiers = await dossierStorage.listDossiers(limit, { dedupeByTitle, excludeHeuristic });
         sendJson(res, 200, { success: true, count: dossiers.length, dossiers });
       } catch (error: unknown) {
         sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : "Failed to list dossiers" });

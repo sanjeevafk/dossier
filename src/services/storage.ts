@@ -115,6 +115,7 @@ export class DossierStorageService {
         summary TEXT,
         created_at TEXT
       );
+      CREATE INDEX IF NOT EXISTS idx_dossiers_created ON dossiers(created_at DESC);
     `);
     this.db = db;
     this.seedDefaultDossiersIfEmpty(db);
@@ -289,6 +290,7 @@ export class DossierStorageService {
           JSON.stringify(dossier)
         );
       this.recordLedger(dossier);
+      this.pruneStaleDossiers();
     } catch {
       // SQLite write failure falls through to JSON backup below
     }
@@ -359,20 +361,61 @@ export class DossierStorageService {
     }
   }
 
+  private lastPruneAt = 0;
+
+  /**
+   * Prune un-resolved dossiers older than 30 days (keeping at least the newest 50)
+   * at most once per hour so disk/SQLite size stays bounded.
+   */
+  private pruneStaleDossiers(): void {
+    if (process.env.NODE_ENV === "test") return;
+    const now = Date.now();
+    if (now - this.lastPruneAt < 60 * 60_000) return;
+    this.lastPruneAt = now;
+    try {
+      const db = this.getDb();
+      const stale = db
+        .prepare(
+          `SELECT id FROM dossiers
+           WHERE created_at < datetime('now', '-30 days')
+             AND id NOT IN (SELECT dossier_id FROM ledger WHERE outcome IS NOT NULL)
+             AND id NOT IN (SELECT id FROM dossiers ORDER BY created_at DESC LIMIT 50)`
+        )
+        .all() as Array<{ id: string }>;
+      if (stale.length === 0) return;
+      const del = db.prepare("DELETE FROM dossiers WHERE id = ?");
+      for (const row of stale) {
+        del.run(row.id);
+        this.memoryCache.delete(row.id);
+        const safeId = row.id.replace(/[^a-zA-Z0-9_-]/g, "_");
+        fs.unlink(path.join(STORAGE_DIR, `dossier_${safeId}.json`)).catch(() => {});
+      }
+    } catch {
+      // Best-effort maintenance; never fail a save
+    }
+  }
+
   /**
    * List recent dossiers with metadata summaries.
    */
-  public async listDossiers(limit: number = 20): Promise<DossierSummary[]> {
+  public async listDossiers(
+    limit: number = 20,
+    options: { dedupeByTitle?: boolean; excludeHeuristic?: boolean } = {}
+  ): Promise<DossierSummary[]> {
     await this.ensureStorageDir();
     const summaries: DossierSummary[] = [];
     const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+    const dedupe = options.dedupeByTitle === true;
+    const excludeHeuristic = options.excludeHeuristic === true;
+    const fetchLimit = dedupe || excludeHeuristic ? Math.min(500, Math.max(limit * 5, 50)) : Math.max(1, Math.min(500, limit));
 
     try {
       const rows = this.getDb()
-        .prepare("SELECT id, code, title, archetype, verdict, score, risk, created_at FROM dossiers ORDER BY created_at DESC LIMIT ?")
-        .all(Math.max(1, Math.min(500, limit))) as Array<{
+        .prepare("SELECT id, code, title, archetype, verdict, score, risk, mode, created_at FROM dossiers ORDER BY created_at DESC LIMIT ?")
+        .all(fetchLimit) as Array<{
         id: string; code: string; title: string; archetype: string;
-        verdict: string; score: number; risk: string; created_at: string;
+        verdict: string; score: number; risk: string; mode: string; created_at: string;
       }>;
       const archetypeLabels: Record<string, string> = {
         b2b_saas: "B2B Enterprise & Vertical SaaS",
@@ -385,20 +428,35 @@ export class DossierStorageService {
         web3_defi: "Web3 & Decentralized Infrastructure",
         general_startup: "General Commercial"
       };
-      for (const r of rows) {
-        if (!r?.id || seenIds.has(r.id)) continue;
-        seenIds.add(r.id);
-        summaries.push({
-          id: r.id,
-          dossierCode: r.code || "TF-001",
-          title: r.title || "Untitled Concept",
-          archetype: r.archetype || "general_startup",
-          archetypeLabel: archetypeLabels[r.archetype] || "General Commercial",
-          verdict: r.verdict || "BUILD_IF_VALIDATED",
-          score: r.score ?? 75,
-          riskLevel: r.risk || "MEDIUM",
-          timestamp: r.created_at || new Date().toISOString()
-        });
+      const toSummary = (r: (typeof rows)[number]): DossierSummary => ({
+        id: r.id,
+        dossierCode: r.code || "TF-001",
+        title: r.title || "Untitled Concept",
+        archetype: r.archetype || "general_startup",
+        archetypeLabel: archetypeLabels[r.archetype] || "General Commercial",
+        verdict: r.verdict || "BUILD_IF_VALIDATED",
+        score: r.score ?? 75,
+        riskLevel: r.risk || "MEDIUM",
+        timestamp: r.created_at || new Date().toISOString()
+      });
+      const collect = (skipHeuristic: boolean) => {
+        seenIds.clear();
+        seenTitles.clear();
+        summaries.length = 0;
+        for (const r of rows) {
+          if (!r?.id || seenIds.has(r.id)) continue;
+          if (skipHeuristic && r.mode === "HEURISTIC_ENGINE") continue;
+          const titleKey = (r.title || "").trim().toLowerCase();
+          if (dedupe && titleKey && seenTitles.has(titleKey)) continue;
+          seenIds.add(r.id);
+          if (titleKey) seenTitles.add(titleKey);
+          summaries.push(toSummary(r));
+          if (summaries.length >= limit) break;
+        }
+      };
+      collect(excludeHeuristic);
+      if (excludeHeuristic && summaries.length === 0 && rows.length > 0) {
+        collect(false);
       }
       if (summaries.length > 0) return summaries.slice(0, limit);
     } catch (err) {

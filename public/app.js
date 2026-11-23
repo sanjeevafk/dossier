@@ -1061,7 +1061,7 @@ async function loadRecentDossiers() {
   if (!listEl) return;
 
   try {
-    const res = await fetch('/api/dossiers?limit=5');
+    const res = await fetch('/api/dossiers?limit=5&dedupe=1&excludeHeuristic=1');
     const data = await res.json();
     if (data.success && Array.isArray(data.dossiers) && data.dossiers.length > 0) {
       listEl.innerHTML = data.dossiers.slice(0, 5).map(d => {
@@ -1117,7 +1117,6 @@ async function loadDossierById(id) {
 
 // Auto-load dossier if URL specifies #dossier=<id> or #print=<id>
 window.addEventListener('DOMContentLoaded', async () => {
-  loadCalibrationPanel();
   const hash = window.location.hash || '';
   const match = hash.match(/#(?:dossier|print)=([^&]+)/);
   if (match && match[1]) {
@@ -1307,79 +1306,4 @@ function renderValidationPriority(dossier) {
     `;
     list.appendChild(row);
   });
-}
-
-// ======================= B1 — Calibration Track Record =======================
-function renderCalibrationPanel(calibration) {
-  const card = document.getElementById('calibrationCard');
-  if (!card || !calibration || typeof calibration !== 'object') {
-    if (card) card.classList.add('hidden');
-    return;
-  }
-  card.classList.remove('hidden');
-
-  const totals = calibration.totals || { recorded: 0, resolved: 0, pending: 0 };
-  const totalsEl = document.getElementById('calibrationTotals');
-  totalsEl.innerHTML = [
-    ['Recorded', totals.recorded],
-    ['Resolved', totals.resolved],
-    ['Pending', totals.pending]
-  ].map(([label, value]) => `
-    <div class="p-2 bg-raised rounded-lg">
-      <div class="text-lg font-medium text-ink font-sans leading-none">${Number(value || 0)}</div>
-      <div class="text-xs font-mono text-ink-3 mt-1">${label}</div>
-    </div>
-  `).join('');
-
-  const brierEl = document.getElementById('calibrationBrier');
-  if (calibration.brierOverall !== null && calibration.brierOverall !== undefined) {
-    brierEl.innerHTML = `<span class="font-medium text-ink">Brier ${calibration.brierOverall}</span> · lower is better · 0.25 = always guessing 50%`;
-  } else {
-    brierEl.textContent = 'No resolved forecasts yet — resolve outcomes via POST /api/forecasts/:id/resolve to build the track record.';
-  }
-
-  const relEl = document.getElementById('calibrationReliability');
-  const buckets = (calibration.reliability || []).filter((b) => b.count > 0);
-  if (buckets.length > 0) {
-    relEl.innerHTML = buckets.map((b) => {
-      const pct = (v) => Math.round(v * 100);
-      const overconfident = b.predicted - b.observed > 0.05;
-      const flag = overconfident ? ' <span class="text-warn" title="swarm more confident than outcomes justify">overconfident</span>' : '';
-      return `
-        <div>
-          <div class="flex justify-between font-mono text-xs text-ink-3">
-            <span>p ${b.bucket[0]}–${b.bucket[1]} <span class="text-ink-3">(n=${b.count})</span>${flag}</span>
-            <span><span class="text-violet-700 font-medium">${pct(b.predicted)}%</span> pred · <span class="text-ok font-medium">${pct(b.observed)}%</span> obs</span>
-          </div>
-          <div class="bg-muted rounded h-1.5 overflow-hidden mt-0.5"><div class="h-1.5 bg-violet-600/85" style="width: ${pct(b.predicted)}%"></div></div>
-          <div class="bg-muted rounded h-1.5 overflow-hidden mt-0.5"><div class="h-1.5 bg-emerald-600/85" style="width: ${pct(b.observed)}%"></div></div>
-        </div>
-      `;
-    }).join('');
-  } else {
-    relEl.innerHTML = '';
-  }
-
-  const domEl = document.getElementById('calibrationDomains');
-  const domains = (calibration.byDomain || []).filter((d) => d.resolved > 0).slice(0, 3);
-  domEl.innerHTML = domains.length
-    ? domains.map((d) => `
-        <div class="flex justify-between font-mono text-xs text-ink-2">
-          <span class="truncate pr-2">${escapeHtml(d.archetype)}</span>
-          <span class="shrink-0">${d.resolved} resolved${d.brier !== null ? ` · Brier ${d.brier}` : ''}</span>
-        </div>
-      `).join('')
-    : '';
-
-  const noteEl = document.getElementById('calibrationNote');
-  if (noteEl && calibration.mappingNote) noteEl.textContent = calibration.mappingNote;
-}
-
-async function loadCalibrationPanel() {
-  try {
-    const res = await fetch('/api/calibration');
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data.success && data.calibration) renderCalibrationPanel(data.calibration);
-  } catch {}
 }
