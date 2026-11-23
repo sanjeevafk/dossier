@@ -283,10 +283,15 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
     <!-- 4. RENDERED DOSSIER REPORT (OUTPUT & EXPORT)                 -->
     <!-- ============================================================ -->
     <section id="resultsSection" class="hidden bg-surface border border-line rounded-2xl p-6 md:p-8 space-y-8 shadow-sm">
+      <!-- Print-only Metadata Header -->
+      <div class="hidden print:flex items-center justify-between border-b border-line pb-2 font-mono text-[10px] text-ink-3">
+        <span>DOSSIER // ADVERSARIAL VENTURE AUDIT</span>
+        <span>EPISTEMIC VERIFICATION PROTOCOL</span>
+      </div>
       
       <!-- Report Header Bar -->
       <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-line pb-6">
-        <div class="space-y-2">
+        <div class="space-y-2 flex-1 min-w-0">
           <div class="flex items-center gap-3 font-mono text-xs">
             <span class="px-2 py-0.5 bg-zinc-900 text-white font-medium rounded text-xs">
               Evidence-first dossier
@@ -334,12 +339,12 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
         </div>
 
         <!-- Verdict Score Block -->
-        <div class="flex sm:flex-row md:flex-col gap-3 shrink-0">
-          <div class="bg-page border border-line p-4 rounded-xl text-center md:text-right min-w-44 shadow-2xs">
+        <div class="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0 md:w-72">
+          <div class="bg-page border border-line p-4 rounded-xl text-center md:text-right min-w-44 sm:flex-1 md:flex-none shadow-2xs">
             <span class="text-xs font-mono text-ink-3 block">Screening verdict</span>
             <span id="resVerdictBadge" class="font-mono text-2xl font-medium text-ok mt-0.5 block">BUILD</span>
           </div>
-          <div class="bg-page border border-line p-4 rounded-xl text-center md:text-right min-w-44 font-mono text-xs shadow-2xs space-y-1">
+          <div class="bg-page border border-line p-4 rounded-xl text-center md:text-right min-w-44 sm:flex-1 md:flex-none font-mono text-xs shadow-2xs space-y-1">
             <div class="flex justify-between md:justify-end gap-3"><span class="text-ink-3" id="resScoreLabel">Screening score</span><span id="resScoreVal" class="text-ink font-medium">78/100</span></div>
             <div class="flex justify-between md:justify-end gap-3"><span class="text-ink-3">Confidence (uncalibrated)</span><span id="resConfidence" class="text-ink font-medium">84%</span></div>
             <div class="flex justify-between md:justify-end gap-3"><span class="text-ink-3">Risk</span><span id="resRiskLevel" class="text-warn font-medium">MEDIUM</span></div>

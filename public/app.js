@@ -1122,6 +1122,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   const match = hash.match(/#(?:dossier|print)=([^&]+)/);
   if (match && match[1]) {
     await loadDossierById(match[1]);
+    if (hash.startsWith('#print=')) {
+      document.documentElement.classList.remove('dark');
+      document.querySelectorAll('#resultsSection details').forEach((d) => d.setAttribute('open', ''));
+    }
   }
 });
 

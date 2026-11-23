@@ -115,15 +115,27 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 /* Print optimizations */
 @media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
   body {
     background: #ffffff !important;
     color: #000000 !important;
   }
-  header, footer, #evalForm, #recentRuns, .no-print {
+  header, footer, main > section:not(#resultsSection), .no-print {
     display: none !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
   #resultsSection {
     display: block !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
   }
   .shadow-sm, .shadow-md, .shadow-lg {
     box-shadow: none !important;
