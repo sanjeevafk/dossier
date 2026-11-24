@@ -338,42 +338,37 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
           </div>
         </div>
 
-        <!-- Verdict Score Block -->
-        <div class="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0 md:w-72">
-          <div class="bg-page border border-line p-4 rounded-xl text-center md:text-right min-w-44 sm:flex-1 md:flex-none shadow-2xs">
-            <span class="text-xs font-mono text-ink-3 block">Screening verdict</span>
-            <span id="resVerdictBadge" class="font-mono text-2xl font-medium text-ok mt-0.5 block">BUILD</span>
-          </div>
-          <div class="bg-page border border-line p-4 rounded-xl text-center md:text-right min-w-44 sm:flex-1 md:flex-none font-mono text-xs shadow-2xs space-y-1">
-            <div class="flex justify-between md:justify-end gap-3"><span class="text-ink-3" id="resScoreLabel">Screening score</span><span id="resScoreVal" class="text-ink font-medium">78/100</span></div>
-            <div class="flex justify-between md:justify-end gap-3"><span class="text-ink-3">Confidence (uncalibrated)</span><span id="resConfidence" class="text-ink font-medium">84%</span></div>
-            <div class="flex justify-between md:justify-end gap-3"><span class="text-ink-3">Risk</span><span id="resRiskLevel" class="text-warn font-medium">MEDIUM</span></div>
+        <!-- Hard Gate / Screening Verdict Block -->
+        <div class="flex flex-col gap-3 shrink-0 md:w-72">
+          <div class="bg-page border border-line p-4 rounded-xl text-center md:text-right min-w-44 shadow-2xs">
+            <span class="text-xs font-mono text-ink-3 block">Hard gate / screening</span>
+            <span id="resVerdictBadge" class="font-mono text-xl font-medium text-ok mt-0.5 block">BUILD</span>
           </div>
         </div>
       </div>
 
-      <!-- Core Decision Factors: Fatal Flaw Trap & 7-Day Test -->
+      <!-- Top Evidenced Risks & Cheapest 7-Day Tests -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-        <!-- Fatal Flaw & Kill Conditions -->
+        <!-- Top Evidenced Risks & Kill Conditions -->
         <div class="p-5 bg-page border border-line rounded-xl flex flex-col justify-between space-y-3">
           <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <span class="font-mono text-xs font-medium text-bad">Primary Fatal Flaw Trap</span>
-              <span class="text-xs font-mono px-2 py-0.5 bg-bad-soft text-bad rounded font-medium">Kill condition</span>
+              <span class="font-mono text-xs font-medium text-bad">Top Evidenced Risks</span>
+              <span class="text-xs font-mono px-2 py-0.5 bg-bad-soft text-bad rounded font-medium">Kill gate</span>
             </div>
             <div id="resAssumptionClaim" class="text-xs text-ink font-sans leading-relaxed"></div>
           </div>
           <div class="pt-2 border-t border-line">
-            <div class="text-xs font-mono text-ink-3 font-semibold mb-2">Falsifiable Stop Criteria:</div>
+            <div class="text-xs font-mono text-ink-3 font-semibold mb-2">Hard Kill Gates &amp; Stop Criteria:</div>
             <div id="resKillConditions" class="text-xs text-ink-2 font-sans space-y-2"></div>
           </div>
         </div>
 
-        <!-- Cheapest 7-Day Validation Experiment -->
+        <!-- Cheapest 7-Day Validation Tests -->
         <div class="p-5 bg-page border border-line rounded-xl flex flex-col justify-between space-y-3">
           <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <span class="font-mono text-xs font-medium text-ink">Recommended 7-Day Test</span>
+              <span class="font-mono text-xs font-medium text-ink">Cheapest 7-Day Tests to Run</span>
               <span class="text-xs font-mono px-2 py-0.5 bg-muted text-ink rounded font-medium">Next action</span>
             </div>
             <div id="resValidationExp" class="text-xs text-ink font-sans leading-relaxed space-y-3"></div>
@@ -388,7 +383,7 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
       <!-- Validation checklist: the founder's to-do list -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="font-mono text-xs font-medium text-ink">Validation checklist (do these first)</h3>
+          <h3 class="font-mono text-xs font-medium text-ink">Cheapest tests checklist (do these first)</h3>
           <button id="resChecklistCopy" onclick="copyChecklist()" class="text-xs font-mono text-ink-3 hover:text-ink px-2 py-1 rounded border border-line hover:border-line-strong transition cursor-pointer hidden">Copy checklist</button>
         </div>
         <div id="resChecklist" class="space-y-2"></div>
@@ -397,10 +392,24 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
       <!-- Merged findings table -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="font-mono text-xs font-medium text-ink">All findings, merged across lanes</h3>
+          <h3 class="font-mono text-xs font-medium text-ink">Evidenced findings across lanes</h3>
           <span id="resFilteredNote" class="text-xs font-mono text-ink-3"></span>
         </div>
         <div id="resFindingsTable" class="border border-line rounded-xl overflow-hidden divide-y divide-line bg-surface"></div>
+      </div>
+
+      <!-- Screening Score (lower & smaller, screening only) -->
+      <div class="p-4 bg-page border border-line rounded-xl flex flex-wrap items-center justify-between gap-4 font-mono text-xs text-ink-3">
+        <div>
+          <span id="resScoreLabel" class="text-ink-3">Screening only</span>
+          <span class="mx-2 text-line-strong">·</span>
+          <span id="resScoreVal" class="text-ink font-medium">78/100</span>
+          <span class="ml-2">(does not predict outcomes; hard KILL gates still apply to math, physics, and regulatory dealbreakers)</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span>Confidence (uncalibrated): <strong id="resConfidence" class="text-ink font-medium">84%</strong></span>
+          <span>Risk: <strong id="resRiskLevel" class="text-warn font-medium">MEDIUM</strong></span>
+        </div>
       </div>
 
       <!-- 5-Dimensional Resilience Breakdown -->
@@ -559,45 +568,48 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
     <!-- 6. 6-AGENT SWARM ARCHITECTURE                                -->
     <!-- ============================================================ -->
     <section id="architectureSection" class="pt-12 border-t border-line space-y-8">
-      <div class="max-w-2xl space-y-2">
+      <div class="max-w-3xl space-y-2">
         <div class="font-mono text-xs font-medium text-ink-3">Agent Specifications</div>
         <h2 class="text-2xl sm:text-3xl font-medium tracking-tight text-ink">
           Six specialized adversarial agents.
         </h2>
         <p class="text-sm text-ink-2 leading-relaxed">
-          Each agent operates under a strict mathematical and operational charter, probing distinct failure vectors before reaching final consensus.
+          In <span class="font-mono text-xs">src/core/swarm.ts</span>, six specialist agents (<span class="font-mono text-xs">analyst</span>, <span class="font-mono text-xs">customer</span>, <span class="font-mono text-xs">architect</span>, <span class="font-mono text-xs">investor</span>, <span class="font-mono text-xs">redteam</span>, <span class="font-mono text-xs">expert</span>) inspect distinct failure vectors. Market recon runs as a pre-swarm step, and the executive summary is built deterministically from the merged findings.
+        </p>
+        <p class="text-xs font-mono text-ink-3 leading-relaxed">
+          Under the hood: Platt-scaled pre-gate (<span class="text-ink-2">decision_model.py</span>), Saltelli Sobol sensitivity + EVPI (<span class="text-ink-2">simulate_sobol.py</span>), NLI contradiction check (<span class="text-ink-2">nli.ts</span>), and recon across Polymarket, Manifold, Kalshi, SEC EDGAR, HuggingFace, ClinicalTrials, OpenAlex, World Bank, and GitHub/V2EX.
         </p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 font-mono text-xs">
         <div class="p-4 bg-surface border border-line rounded-xl space-y-2">
           <div class="flex items-center justify-between text-ink-3 text-xs">
-            <span>Agent 00</span>
-            <span>Synthesizer</span>
+            <span>Agent 01 · analyst</span>
+            <span>Market</span>
           </div>
-          <div class="font-sans font-medium text-ink text-sm">Executive Synthesizer</div>
+          <div class="font-sans font-medium text-ink text-sm">Market Analyst</div>
           <p class="font-sans text-xs text-ink-2 leading-relaxed">
-            Establishes domain priors, identifies procurement cycles, and synthesizes crossfire arguments into actionable strategic verdicts.
+            Sizes TAM/SAM against pre-swarm recon, tests replacement dynamics, and flags incumbent saturation.
           </p>
         </div>
 
         <div class="p-4 bg-surface border border-line rounded-xl space-y-2">
           <div class="flex items-center justify-between text-ink-3 text-xs">
-            <span>Agent 01</span>
-            <span>Contrarian</span>
+            <span>Agent 02 · customer</span>
+            <span>Reality check</span>
           </div>
-          <div class="font-sans font-medium text-ink text-sm">The Skeptic (Red Team)</div>
+          <div class="font-sans font-medium text-ink text-sm">Customer Advocate</div>
           <p class="font-sans text-xs text-ink-2 leading-relaxed">
-            Probes existential distribution risks, enterprise sales deadlocks, incumbent bundling traps, and uncompensated tail risks.
+            Matches propositions against real merchant problem catalogs (Fix My Itch) and validates daily workflow switching friction.
           </p>
         </div>
 
         <div class="p-4 bg-surface border border-line rounded-xl space-y-2">
           <div class="flex items-center justify-between text-ink-3 text-xs">
-            <span>Agent 02</span>
+            <span>Agent 03 · architect</span>
             <span>Engineering</span>
           </div>
-          <div class="font-sans font-medium text-ink text-sm">Technical Architect</div>
+          <div class="font-sans font-medium text-ink text-sm">Systems Architect</div>
           <p class="font-sans text-xs text-ink-2 leading-relaxed">
             Analyzes latency, workflow integration, model inference costs, API dependency moats, and data residency constraints.
           </p>
@@ -605,36 +617,54 @@ Example: ReconcilePay is an automated WhatsApp billing assistant for Indian Kira
 
         <div class="p-4 bg-surface border border-line rounded-xl space-y-2">
           <div class="flex items-center justify-between text-ink-3 text-xs">
-            <span>Agent 03</span>
-            <span>Oracle &amp; recon</span>
-          </div>
-          <div class="font-sans font-medium text-ink text-sm">Market Recon</div>
-          <p class="font-sans text-xs text-ink-2 leading-relaxed">
-            Queries Polymarket betting volumes, live news headlines, developer traction signals, and competitor displacement friction.
-          </p>
-        </div>
-
-        <div class="p-4 bg-surface border border-line rounded-xl space-y-2">
-          <div class="flex items-center justify-between text-ink-3 text-xs">
-            <span>Agent 04</span>
-            <span>Reality check</span>
-          </div>
-          <div class="font-sans font-medium text-ink text-sm">Customer Advocate</div>
-          <p class="font-sans text-xs text-ink-2 leading-relaxed">
-            Matches propositions against real merchant problem catalogs (Razorpay Fix My Itch) and validates daily workflow switching friction.
-          </p>
-        </div>
-
-        <div class="p-4 bg-surface border border-line rounded-xl space-y-2">
-          <div class="flex items-center justify-between text-ink-3 text-xs">
-            <span>Agent 05</span>
+            <span>Agent 04 · investor</span>
             <span>Venture capital</span>
           </div>
-          <div class="font-sans font-medium text-ink text-sm">Financial Analyst</div>
+          <div class="font-sans font-medium text-ink text-sm">Venture Capitalist</div>
           <p class="font-sans text-xs text-ink-2 leading-relaxed">
-            Calibrates CAC payback bounds, gross margin thresholds, and verifies scores against isolated Python Monte Carlo output.
+            Calibrates CAC payback bounds, gross margin thresholds, and checks unit economics against isolated Python Monte Carlo output.
           </p>
         </div>
+
+        <div class="p-4 bg-surface border border-line rounded-xl space-y-2">
+          <div class="flex items-center justify-between text-ink-3 text-xs">
+            <span>Agent 05 · redteam</span>
+            <span>Contrarian</span>
+          </div>
+          <div class="font-sans font-medium text-ink text-sm">The Skeptic (Red Team)</div>
+          <p class="font-sans text-xs text-ink-2 leading-relaxed">
+            Probes existential distribution risks, enterprise sales deadlocks, incumbent bundling traps, and historical failure precedents.
+          </p>
+        </div>
+
+        <div class="p-4 bg-surface border border-line rounded-xl space-y-2">
+          <div class="flex items-center justify-between text-ink-3 text-xs">
+            <span>Agent 06 · expert</span>
+            <span>Domain</span>
+          </div>
+          <div class="font-sans font-medium text-ink text-sm">Domain Expert</div>
+          <p class="font-sans text-xs text-ink-2 leading-relaxed">
+            Audits sector-specific compliance, statutory gates (SOC2, HIPAA, RBI, GDPR), and operational feasibility.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 6B. EVALUATION & HONEST LIMITS                               -->
+    <!-- ============================================================ -->
+    <section id="evaluationSection" class="pt-12 border-t border-line space-y-6">
+      <div class="max-w-3xl space-y-2">
+        <div class="font-mono text-xs font-medium text-ink-3">Evaluation</div>
+        <h2 class="text-2xl sm:text-3xl font-medium tracking-tight text-ink">
+          Pre-mortem, not a predictor.
+        </h2>
+        <p class="text-sm text-ink-2 leading-relaxed">
+          In the Nov 16 live-LLM evaluation (<span class="font-mono text-xs">n = 89</span>), the screening score had an AUROC of <span class="font-mono text-xs text-ink">0.46</span> (worse than a coin flip at separating winners from failures). In the specificity dev check, confident pitches with stated numbers waved through <span class="font-mono text-xs text-ink">84%</span> of real failures.
+        </p>
+        <p class="text-sm text-ink-2 leading-relaxed">
+          In plain words: Dossier cannot tell you from a short pitch whether a team will execute or win. Use it as a structured pre-mortem to surface evidenced failure modes, hard math/physics/regulatory kill gates, and the cheapest 7-day tests to run before building.
+        </p>
       </div>
     </section>
 
