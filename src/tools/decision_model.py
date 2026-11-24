@@ -88,17 +88,68 @@ def synthesize_verdict(engine_name, answers):
         "loss_ratio": round(COST_FALSE_POSITIVE / COST_FALSE_NEGATIVE, 1)
     }
 
+def _parse_systemone_answers(engine_name, data):
+    """Map System-One choice/probabilities response into Dossier's decision verdict."""
+    if "answers" not in data:
+        return None
+    raw_ans = data["answers"]
+    answers = {}
+    risk_keys = {
+        "moat": ("thin_wrapper", THRESHOLDS["thin_wrapper"]),
+        "regulatory_risk": ("regulatory_fatal", THRESHOLDS["regulatory_fatal"]),
+        "sales_cycle": ("procurement_deadlock", THRESHOLDS["procurement_deadlock"]),
+        "monetization": ("monetization_zero", THRESHOLDS["monetization_zero"])
+    }
+    for q_name, (risk_choice, threshold) in risk_keys.items():
+        if q_name in raw_ans:
+            ans_obj = raw_ans[q_name]
+            probs = ans_obj.get("probabilities", {})
+            p_risk = probs.get(risk_choice, 0.0)
+            answers[q_name] = {
+                "choice": ans_obj.get("choice", risk_choice if p_risk >= threshold else "safe"),
+                "probabilities": probs,
+                "threshold": threshold,
+                "flagged": p_risk >= threshold
+            }
+    return synthesize_verdict(engine_name, answers)
+
+
 def evaluate_concept_decision(concept_text):
     """
     Evaluates concept text through calibrated decision model questions.
-    Checks for active LiquidAI d1-omni System-One server (http://127.0.0.1:8080/v1/systemone)
-    or local Julia-1 model; falls back to calibrated semantic decision engine.
+    Checks SubQ AI SystemOne (SUBQ_API_KEY) or LiquidAI d1-omni System-One server
+    (LIQUID_D1_ENDPOINT); falls back to calibrated semantic decision engine.
     Returns calibrated probabilities, flagged failure gates, and loss-minimized verdict.
     """
     questions = build_decision_questions()
+    subq_key = os.environ.get("SUBQ_API_KEY")
+    subq_endpoint = os.environ.get("SUBQ_ENDPOINT", "https://api.subq.ai/v1/systemone")
+    subq_model = os.environ.get("SUBQ_MODEL", "subq-snap-1.2")
     d1_endpoint = os.environ.get("LIQUID_D1_ENDPOINT")
 
-    # Path 1: LiquidAI d1-omni-600M System-One server (when explicitly configured)
+    # Path 1: SubQ AI SystemOne API (skipped in NODE_ENV=test unless FORCE_SUBQ=1)
+    if subq_key and (os.environ.get("NODE_ENV") != "test" or os.environ.get("FORCE_SUBQ") == "1"):
+        try:
+            import urllib.request
+            body_obj = {"model": subq_model, "state": concept_text, "questions": questions}
+            payload = json.dumps(body_obj).encode("utf-8")
+            req = urllib.request.Request(
+                subq_endpoint,
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {subq_key}"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                parsed = _parse_systemone_answers(f"SubQ/{subq_model} (System-One)", data)
+                if parsed is not None:
+                    return parsed
+        except Exception:
+            pass  # SubQ unreachable, fall through cleanly
+
+    # Path 2: LiquidAI d1-omni-600M System-One server (when explicitly configured)
     if d1_endpoint:
         try:
             import urllib.request
@@ -107,27 +158,9 @@ def evaluate_concept_decision(concept_text):
             req = urllib.request.Request(d1_endpoint, data=payload, headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=5.0) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                if "answers" in data:
-                    raw_ans = data["answers"]
-                    answers = {}
-                    risk_keys = {
-                        "moat": ("thin_wrapper", THRESHOLDS["thin_wrapper"]),
-                        "regulatory_risk": ("regulatory_fatal", THRESHOLDS["regulatory_fatal"]),
-                        "sales_cycle": ("procurement_deadlock", THRESHOLDS["procurement_deadlock"]),
-                        "monetization": ("monetization_zero", THRESHOLDS["monetization_zero"])
-                    }
-                    for q_name, (risk_choice, threshold) in risk_keys.items():
-                        if q_name in raw_ans:
-                            ans_obj = raw_ans[q_name]
-                            probs = ans_obj.get("probabilities", {})
-                            p_risk = probs.get(risk_choice, 0.0)
-                            answers[q_name] = {
-                                "choice": ans_obj.get("choice", risk_choice if p_risk >= threshold else "safe"),
-                                "probabilities": probs,
-                                "threshold": threshold,
-                                "flagged": p_risk >= threshold
-                            }
-                    return synthesize_verdict("LiquidAI/d1-omni-600M (System-One)", answers)
+                parsed = _parse_systemone_answers("LiquidAI/d1-omni-600M (System-One)", data)
+                if parsed is not None:
+                    return parsed
         except Exception:
             pass # Liquid server unreachable, fall back cleanly
 

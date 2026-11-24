@@ -20,8 +20,17 @@ export function detectAdversarialInvariants(
   decisionEvaluation?: DecisionModelOutput | null
 ) {
   const text = `${idea.title} ${idea.summary} ${idea.targetAudience} ${idea.monetization} ${idea.techStack || ""}`.toLowerCase();
-  const thinWrapperByDecision = decisionEvaluation?.answers?.moat?.flagged ?? false;
-  const zeroMonetizationByDecision = decisionEvaluation?.answers?.monetization?.flagged ?? false;
+  const thinWrapperProb = decisionEvaluation?.answers?.moat?.probabilities?.thin_wrapper;
+  const thinWrapperByDecision = thinWrapperProb !== undefined
+    ? thinWrapperProb >= 0.70
+    : (decisionEvaluation?.answers?.moat?.flagged ?? false);
+  const zeroMonetizationProb = decisionEvaluation?.answers?.monetization?.probabilities?.monetization_zero;
+  const hasExplicitPricing = /\$\s*\d|\/\s*(?:mo|month|yr|year)|subscription|commission|take[- ]rate|fee|pricing/i.test(text);
+  const zeroMonetizationByDecision = !hasExplicitPricing && (
+    zeroMonetizationProb !== undefined
+      ? zeroMonetizationProb >= 0.65
+      : (decisionEvaluation?.answers?.monetization?.flagged ?? false)
+  );
 
   const hasFormatRisk = PRODUCT_FORMAT_KEYWORDS.test(text);
   const hasDefensibilityEvidence = STRUCTURAL_DEFENSIBILITY_SIGNALS.test(text);
